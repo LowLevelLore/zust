@@ -1,0 +1,15 @@
+b : integer = 30
+
+fn foo(a: integer, z: integer) : integer {
+    b : integer = 10
+    c : integer = 20
+    c := 30
+    b := 22
+    pint c
+}
+
+a : integer = 34
+
+pint b
+
+foo(3, 4)

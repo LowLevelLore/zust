@@ -1,0 +1,7 @@
+fn foo(i: integer) -> integer{
+    i*2
+}
+
+i : integer = 2
+i := foo(i)
+pint i

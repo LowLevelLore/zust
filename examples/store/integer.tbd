@@ -1,0 +1,8 @@
+a : integer = 10
+b : integer = 20
+
+a := 30
+
+pint a
+
+pint b
