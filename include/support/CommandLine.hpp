@@ -11,7 +11,8 @@ namespace zlang
     {
         Default,
         X86_64_MSWIN,
-        X86_64_LINUX
+        X86_64_LINUX,
+        LLVM_IR
     };
 
     struct CliError

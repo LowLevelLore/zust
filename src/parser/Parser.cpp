@@ -2,325 +2,180 @@
 
 namespace zlang
 {
-    void Parser::consume()
+    Parser::Parser(Lexer &lex) : lexer(lex)
     {
-        current_ = lexer_.nextToken();
+        advance();
     }
 
-    bool Parser::match(Token::Kind kind, const std::string &text) const
+    void Parser::advance()
     {
-        return current_.kind == kind && (text.empty() || current_.text == text);
+        currentToken = lexer.nextToken();
     }
 
-    bool Parser::matchConsume(Token::Kind kind, const std::string &text)
+    bool Parser::match(Token::Token::Kind kind)
     {
-        if (match(kind, text))
+        if (currentToken.kind == kind)
         {
-            consume();
+            advance();
             return true;
         }
         return false;
     }
 
-    Error Parser::expect(Token::Kind kind, const std::string &text)
+    void Parser::expect(Token::Token::Kind kind, const std::string &errMsg)
     {
-        if (matchConsume(kind, text))
-            return {};
-        return Error(ErrorType::Syntax, "Expected '" + text + "' at line " + std::to_string(current_.line));
+        if (!match(kind))
+        {
+            throw std::runtime_error(
+                "Parser error: " + errMsg +
+                " at line " + std::to_string(currentToken.line) +
+                ", column " + std::to_string(currentToken.column));
+        }
     }
 
-    Error Parser::parseProgram(std::unique_ptr<ASTNode> &out)
+    std::unique_ptr<ASTNode> Parser::parse()
     {
-        out = ASTNode::makeProgramNode();
-
-        while (!match(Token::Kind::EndOfFile))
+        auto program = ASTNode::makeProgramNode();
+        while (currentToken.kind != Token::Token::Kind::EndOfFile)
         {
-            if (match(Token::Kind::Keyword, "fn"))
-            {
-                auto func = parseFunctionDeclaration();
-                if (!func)
-                    return Error(ErrorType::Syntax, "Invalid function declaration.");
-                out->addChild(std::move(func));
-            }
-            else if (match(Token::Kind::Keyword, "if"))
-            {
-                auto ifNode = parseIf();
-                if (!ifNode)
-                    return Error(ErrorType::Syntax, "Invalid if statement.");
-                out->addChild(std::move(ifNode));
-            }
-            else if (match(Token::Kind::Keyword, "pint"))
-            {
-                auto pint = parseDebugPrint();
-                if (!pint)
-                    return Error(ErrorType::Syntax, "Invalid pint statement.");
-                out->addChild(std::move(pint));
-            }
-            else if (current_.kind == Token::Kind::Identifier)
-            {
-                Token nameToken = current_;
-                Token next = lexer_.peek(1);
-
-                if (next.kind == Token::Kind::Symbol && next.text == ":")
-                {
-                    auto decl = parseVariableDeclaration();
-                    if (!decl)
-                        return Error(ErrorType::Syntax, "Invalid variable declaration.");
-                    out->addChild(std::move(decl));
-
-                    // Check for = assignment
-                    if (match(Token::Kind::Symbol, "="))
-                    {
-                        consume(); // consume '='
-                        auto expr = parseExpression();
-                        if (!expr)
-                            return Error(ErrorType::Syntax, "Expected expression after '='.");
-                        auto reassign = ASTNode::makeVariableReassignmentNode(nameToken.text, std::move(expr));
-                        out->addChild(std::move(reassign));
-                    }
-                }
-                else if (next.kind == Token::Kind::Symbol && next.text == ":=")
-                {
-                    auto reassign = parseReassignment();
-                    if (!reassign)
-                        return Error(ErrorType::Syntax, "Invalid reassignment.");
-                    out->addChild(std::move(reassign));
-                }
-                else
-                {
-                    auto expr = parseExpression();
-                    if (!expr)
-                        return Error(ErrorType::Syntax, "Invalid expression.");
-                    out->addChild(std::move(expr));
-                }
-            }
-            else
-            {
-                auto expr = parseExpression();
-                if (!expr)
-                    return Error(ErrorType::Syntax, "Invalid expression.");
-                out->addChild(std::move(expr));
-            }
+            auto stmt = parseStatement();
+            if (stmt)
+                program->addChild(std::move(stmt));
         }
-
-        return {};
+        return program;
     }
 
-    std::unique_ptr<ASTNode> Parser::parseExpression(int prec)
+    std::unique_ptr<ASTNode> Parser::parseStatement()
     {
-        auto lhs = parsePrimary();
-        if (!lhs)
-            return nullptr;
+        if (match(Token::Token::Kind::Let))
+            return parseVariableDeclaration();
+        if (currentToken.kind == Token::Token::Kind::Identifier)
+            return parseVariableReassignment();
 
-        while (true)
-        {
-            int tokPrec = getTokenPrecedence();
-            if (tokPrec < prec)
-                break;
-            std::string op = current_.text;
-            consume();
-            auto rhs = parseExpression(tokPrec + 1);
-            if (!rhs)
-                return nullptr;
-            lhs = ASTNode::makeBinaryOperatorNode(op, std::move(lhs), std::move(rhs));
-        }
-
-        return lhs;
-    }
-
-    std::unique_ptr<ASTNode> Parser::parsePrimary()
-    {
-        if (matchConsume(Token::Kind::IntegerLiteral))
-            return ASTNode::makeIntegerLiteralNode(current_.text);
-
-        if (matchConsume(Token::Kind::FloatLiteral))
-            return ASTNode::makeFloatLiteralNode(current_.text);
-
-        if (matchConsume(Token::Kind::StringLiteral))
-            return ASTNode::makeStringLiteralNode(current_.text);
-
-        if (match(Token::Kind::Identifier))
-        {
-            Token name = current_;
-            if (lexer_.peek(1).kind == Token::Kind::Symbol && lexer_.peek(1).text == ":=")
-                return parseReassignment();
-
-            if (lexer_.peek(1).text == "(")
-                return parseIdentifierOrCall();
-
-            consume(); // plain variable access
-            return ASTNode::makeVariableAccessNode(name.text);
-        }
-
-        if (match(Token::Kind::Keyword, "fn"))
-            return parseFunctionDeclaration();
-
-        if (match(Token::Kind::Keyword, "pint"))
-            return parseDebugPrint();
-
-        if (matchConsume(Token::Kind::Symbol, "("))
-            return parseGroupedExpression();
-
-        logError(Error(ErrorType::Syntax, "Unexpected token: " + current_.text));
-        return nullptr;
+        throw std::runtime_error(
+            "Parser error: Unexpected token '" + currentToken.text +
+            "' at line " + std::to_string(currentToken.line) +
+            ", column " + std::to_string(currentToken.column));
     }
 
     std::unique_ptr<ASTNode> Parser::parseVariableDeclaration()
     {
-        Token nameToken = current_;
-        consume(); // identifier
+        // after 'let', currentToken should be identifier
+        if (currentToken.kind != Token::Token::Kind::Identifier)
+            expect(Token::Token::Kind::Identifier, "Expected variable name after 'let'");
 
-        if (!matchConsume(Token::Kind::Symbol, ":"))
+        std::string name = currentToken.text;
+        advance();
+        std::unique_ptr<ASTNode> typeNode, initNode;
+
+        // after let name
+        if (match(Token::Kind::Colon))
         {
-            logError(Error(ErrorType::Syntax, "Expected ':' after variable name."));
-            return nullptr;
+            typeNode = ASTNode::makeSymbolNode(currentToken.text);
+            advance();
         }
-
-        if (!match(Token::Kind::Identifier))
+        if (match(Token::Kind::Equal))
         {
-            logError(Error(ErrorType::Syntax, "Expected type name after ':'."));
-            return nullptr;
+            initNode = parseExpression();
         }
-
-        Token typeToken = current_;
-        consume(); // type name
-
-        // We drop the type and make initializer null (not stored in AST)
-        return ASTNode::makeVariableDeclarationNode(nameToken.text, nullptr);
+        expect(Token::Kind::SemiColon, "Expected ';' after declaration");
+        return ASTNode::makeVariableDeclarationNode(name, std::move(typeNode), std::move(initNode));
     }
 
-    std::unique_ptr<ASTNode> Parser::parseReassignment()
+    std::unique_ptr<ASTNode> Parser::parseVariableReassignment()
     {
-        Token nameToken = current_;
-        consume(); // identifier
+        std::string name = currentToken.text;
+        advance(); // consume identifier
 
-        if (!matchConsume(Token::Kind::Symbol, ":="))
-        {
-            logError(Error(ErrorType::Syntax, "Expected ':=' after identifier."));
-            return nullptr;
-        }
-
+        expect(Token::Token::Kind::Equal, "Expected '=' for variable reassignment");
         auto expr = parseExpression();
-        return ASTNode::makeVariableReassignmentNode(nameToken.text, std::move(expr));
+        expect(Token::Token::Kind::SemiColon, "Expected ';' after reassignment");
+        return ASTNode::makeVariableReassignmentNode(name, std::move(expr));
     }
 
-    std::unique_ptr<ASTNode> Parser::parseIdentifierOrCall()
+    std::unique_ptr<ASTNode> Parser::parseExpression()
     {
-        std::string name = current_.text;
-        consume(); // identifier consumed
-        expect(Token::Kind::Symbol, "(");
-        auto argsList = ASTNode::makeFunctionArgsListNode();
-        while (!match(Token::Kind::Symbol, ")"))
+        auto lhs = parseUnary();
+        return parseBinaryRHS(0, std::move(lhs));
+    }
+
+    std::unique_ptr<ASTNode> Parser::parsePrimary()
+    {
+        if (currentToken.kind == Token::Token::Kind::StringLiteral)
         {
-            auto arg = parseExpression();
-            argsList->addChild(std::move(arg));
-            if (!matchConsume(Token::Kind::Symbol, ","))
+            std::string s = currentToken.text;
+            advance();
+            return ASTNode::makeStringLiteralNode(s);
+        }
+        if (currentToken.kind == Token::Token::Kind::FloatLiteral)
+        {
+            std::string f = currentToken.text;
+            advance();
+            return ASTNode::makeFloatLiteralNode(f);
+        }
+        if (currentToken.kind == Token::Token::Kind::IntegerLiteral)
+        {
+            std::string val = currentToken.text;
+            advance();
+            return ASTNode::makeIntegerLiteralNode(val);
+        }
+        if (currentToken.kind == Token::Token::Kind::Identifier)
+        {
+            std::string name = currentToken.text;
+            advance();
+            return ASTNode::makeVariableAccessNode(name);
+        }
+        throw std::runtime_error(
+            "Parser error: Expected expression, got '" + currentToken.text +
+            "' at line " + std::to_string(currentToken.line) +
+            ", column " + std::to_string(currentToken.column));
+    }
+
+    std::unique_ptr<ASTNode> Parser::parseUnary()
+    {
+        // prefix ++, --, !
+        if (currentToken.kind == Token::Kind::Symbol &&
+            (currentToken.text == "++" || currentToken.text == "--" || currentToken.text == "!"))
+        {
+            std::string op = currentToken.text;
+            advance();
+            auto operand = parseUnary();
+            return ASTNode::makeUnaryOp(op, std::move(operand));
+        }
+        return parsePrimary();
+    }
+
+    std::unique_ptr<ASTNode> Parser::parseBinaryRHS(int exprPrec,
+                                                    std::unique_ptr<ASTNode> lhs)
+    {
+        while (true)
+        {
+            if (currentToken.kind != Token::Kind::Symbol)
                 break;
+            int tokPrec = getPrecedence(currentToken.text);
+            if (tokPrec < exprPrec)
+                return lhs;
+
+            std::string op = currentToken.text;
+            advance();
+
+            // parse RHS
+            auto rhs = parseUnary();
+            int nextPrec = getPrecedence(currentToken.text);
+            if (tokPrec < nextPrec)
+                rhs = parseBinaryRHS(tokPrec + 1, std::move(rhs));
+
+            lhs = ASTNode::makeBinaryOp(op, std::move(lhs), std::move(rhs));
         }
-        expect(Token::Kind::Symbol, ")");
-        return ASTNode::makeFunctionCallNode(name, std::move(argsList));
+        return lhs;
     }
 
-    std::unique_ptr<ASTNode> Parser::parseIf()
+    int Parser::getPrecedence(const std::string &op) const
     {
-        consume(); // consume 'if'
-        auto cond = parseExpression();
-        expect(Token::Kind::Symbol, "{");
-        auto thenBranch = ASTNode::makeProgramNode();
-        while (!match(Token::Kind::Symbol, "}"))
-        {
-            thenBranch->addChild(parseExpression());
-        }
-        expect(Token::Kind::Symbol, "}");
-        std::unique_ptr<ASTNode> elseBranch = nullptr;
-        if (matchConsume(Token::Kind::Identifier, "else"))
-        {
-            expect(Token::Kind::Symbol, "{");
-            elseBranch = ASTNode::makeProgramNode();
-            while (!match(Token::Kind::Symbol, "}"))
-            {
-                elseBranch->addChild(parseExpression());
-            }
-            expect(Token::Kind::Symbol, "}");
-        }
-        return ASTNode::makeIfNode(std::move(cond), std::move(thenBranch), std::move(elseBranch));
-    }
-
-    std::unique_ptr<ASTNode> Parser::parseFunctionDeclaration()
-    {
-        consume();                           // fn
-        expect(Token::Kind::Identifier, ""); // function name
-        std::string name = current_.text;
-        consume();
-        expect(Token::Kind::Symbol, "(");
-        auto paramsList = ASTNode::makeFunctionParamsListNode();
-        while (!match(Token::Kind::Symbol, ")"))
-        {
-            expect(Token::Kind::Identifier);
-            std::string paramName = current_.text;
-            consume();
-            expect(Token::Kind::Symbol, ":");
-            expect(Token::Kind::Identifier);
-            std::string typeName = current_.text;
-            consume();
-            paramsList->addChild(ASTNode::makeFunctionParamNode(paramName, typeName));
-            if (!matchConsume(Token::Kind::Symbol, ","))
-                break;
-        }
-        expect(Token::Kind::Symbol, ")");
-        expect(Token::Kind::Symbol, "->");
-        expect(Token::Kind::Identifier);
-        auto returnType = ASTNode::makeFunctionReturnTypeNode(current_.text);
-        consume();
-        expect(Token::Kind::Symbol, "{");
-        auto body = ASTNode::makeProgramNode();
-        while (!match(Token::Kind::Symbol, "}"))
-        {
-            body->addChild(parseExpression());
-        }
-        expect(Token::Kind::Symbol, "}");
-        return ASTNode::makeFunctionDeclarationNode(name, std::move(paramsList), std::move(returnType), std::move(body));
-    }
-
-    std::unique_ptr<ASTNode> Parser::parseDebugPrint()
-    {
-        expect(Token::Kind::Identifier, "pint");
-        expect(Token::Kind::Identifier, "");
-        std::string varName = current_.text;
-        consume();
-        return ASTNode::makeDebugPrintIntegerNode(varName);
-    }
-
-    std::unique_ptr<ASTNode> Parser::parseStringLiteral()
-    {
-        expect(Token::Kind::StringLiteral, "");
-        auto node = ASTNode::makeStringLiteralNode(current_.text);
-        consume();
-        return node;
-    }
-
-    std::unique_ptr<ASTNode> Parser::parseGroupedExpression()
-    {
-        consume(); // '('
-        auto expr = parseExpression();
-        expect(Token::Kind::Symbol, ")");
-        return expr;
-    }
-
-    int Parser::getTokenPrecedence() const
-    {
-        if (current_.kind != Token::Kind::Symbol)
-            return -1;
-        static std::map<std::string, int> precedences = {
-            {"+", 10},
-            {"-", 10},
-            {"*", 20},
-            {"/", 20},
-        };
-        auto it = precedences.find(current_.text);
-        if (it != precedences.end())
-            return it->second;
-        return -1;
+        static std::map<std::string, int> prec = {
+            {"||", 1}, {"&&", 2}, {"|", 3}, {"&", 4}, {"+", 5}, {"-", 5}, {"*", 6}, {"/", 6}};
+        auto it = prec.find(op);
+        return it == prec.end() ? -1 : it->second;
     }
 
 } // namespace zlang

@@ -12,6 +12,14 @@
 
 #include "lexer/Lexer.hpp"
 
+#include "typechecker/TypeChecker.hpp"
+
+#include "codegen/Codegen.hpp"
+#include "codegen/RegisterAllocator.hpp"
+
+#include <sstream>
 #include <map>
 #include <iostream>
 #include <memory>
+#include <fstream>
+#include <assert.h>

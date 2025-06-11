@@ -3,41 +3,9 @@
 namespace zlang
 {
 
-    static const std::vector<std::string> keywords = {
-        "fn", "if", "else", "pint"};
-
     Lexer::Lexer(const std::string &source)
-        : source_(source), pos_(0), line_(1), column_(1) {}
-
-    Token Lexer::nextToken()
+        : source_(source), pos_(0), line_(1), column_(1)
     {
-        skipWhitespaceAndComments();
-        if (pos_ >= source_.size())
-        {
-            return {Token::Kind::EndOfFile, "", line_, column_};
-        }
-        char c = peekChar();
-        if (std::isalpha(c) || c == '_')
-        {
-            return scanIdentifierOrKeyword();
-        }
-        if (std::isdigit(c))
-        {
-            return scanNumber();
-        }
-        if (c == '"')
-        {
-            return scanString();
-        }
-        return scanSymbol();
-    }
-
-    Token Lexer::peek(size_t offset) const
-    {
-        Lexer copy = *this;
-        for (size_t i = 0; i < offset; ++i)
-            copy.nextToken();
-        return copy.nextToken();
     }
 
     void Lexer::reset()
@@ -49,6 +17,8 @@ namespace zlang
 
     char Lexer::advance()
     {
+        if (pos_ >= source_.size())
+            return '\0';
         char c = source_[pos_++];
         if (c == '\n')
         {
@@ -74,107 +44,142 @@ namespace zlang
         while (true)
         {
             char c = peekChar();
-            // whitespace
-            if (std::isspace(c))
+            if (std::isspace(static_cast<unsigned char>(c)))
             {
                 advance();
                 continue;
             }
-            // line comment
             if (c == '/' && peekChar(1) == '/')
             {
-                while (c && c != '\n')
-                    c = advance();
-                continue;
-            }
-            // block comment
-            if (c == '/' && peekChar(1) == ' ')
-            {
+                // line comment
                 advance();
                 advance();
-                while (!(peekChar() == ' ' && peekChar(1) == '/'))
-                {
-                    if (peekChar() == '\0')
-                        break;
+                while (peekChar() != '\n' && peekChar() != '\0')
                     advance();
-                }
-                if (peekChar() == '*')
-                {
-                    advance();
-                    if (peekChar() == '/')
-                        advance();
-                }
                 continue;
             }
             break;
         }
     }
 
+    Token Lexer::nextToken()
+    {
+        skipWhitespaceAndComments();
+        size_t tokLine = line_;
+        size_t tokCol = column_;
+
+        char c = peekChar();
+        if (c == '\0')
+        {
+            return Token{Token::Kind::EndOfFile, "", tokLine, tokCol};
+        }
+
+        if (std::isalpha(static_cast<unsigned char>(c)) || c == '_')
+            return scanIdentifierOrKeyword();
+
+        if (std::isdigit(static_cast<unsigned char>(c)))
+            return scanNumber();
+
+        if (c == '"')
+            return scanString();
+
+        return scanSymbol();
+    }
+
+    Token Lexer::peek(size_t offset) const
+    {
+        Lexer copy = *this;
+        Token tok;
+        for (size_t i = 0; i <= offset; ++i)
+            tok = copy.nextToken();
+        return tok;
+    }
+
     Token Lexer::scanIdentifierOrKeyword()
     {
-        size_t startLine = line_, startCol = column_;
+        size_t startLine = line_;
+        size_t startCol = column_;
         std::string text;
-        while (std::isalnum(peekChar()) || peekChar() == '_')
-        {
+        while (std::isalnum(static_cast<unsigned char>(peekChar())) || peekChar() == '_')
             text.push_back(advance());
-        }
-        // check keywords
-        for (const auto &kw : keywords)
-        {
-            if (text == kw)
-                return {Token::Kind::Keyword, text, startLine, startCol};
-        }
-        return {Token::Kind::Identifier, text, startLine, startCol};
+
+        if (text == "let")
+            return Token{Token::Kind::Let, text, startLine, startCol};
+
+        return Token{Token::Kind::Identifier, text, startLine, startCol};
     }
 
     Token Lexer::scanNumber()
     {
-        size_t startLine = line_, startCol = column_;
+        size_t startLine = line_;
+        size_t startCol = column_;
         std::string text;
         bool seenDot = false;
-        while (std::isdigit(peekChar()) || (!seenDot && peekChar() == '.'))
+        while (std::isdigit(static_cast<unsigned char>(peekChar())) || (!seenDot && peekChar() == '.'))
         {
             if (peekChar() == '.')
                 seenDot = true;
             text.push_back(advance());
         }
-        return {seenDot ? Token::Kind::FloatLiteral : Token::Kind::IntegerLiteral,
-                text, startLine, startCol};
+        if ((peekChar() == 'f' || peekChar() == 'F') && seenDot)
+        {
+            text.push_back(advance());
+        }
+        return Token{
+            seenDot ? Token::Kind::FloatLiteral : Token::Kind::IntegerLiteral,
+            text, startLine, startCol};
     }
 
     Token Lexer::scanString()
     {
-        size_t startLine = line_, startCol = column_;
+        size_t startLine = line_;
+        size_t startCol = column_;
         advance(); // consume '"'
         std::string text;
         while (peekChar() != '"' && peekChar() != '\0')
-        {
             text.push_back(advance());
-        }
-
-        if (peekChar() != '"')
-        {
-            zlang::logError(zlang::Error(ErrorType::Syntax, "No closing bracket for string."));
-            exit(0);
-        }
-
-        advance(); // consume '"'
-        return {Token::Kind::StringLiteral, text, startLine, startCol};
+        if (peekChar() == '"')
+            advance(); // consume closing '"'
+        else
+            logError(Error(ErrorType::Syntax, "Unterminated string literal."));
+        return Token{Token::Kind::StringLiteral, text, startLine, startCol};
     }
 
     Token Lexer::scanSymbol()
     {
-        size_t startLine = line_, startCol = column_;
+        size_t startLine = line_;
+        size_t startCol = column_;
         char c = advance();
         std::string text(1, c);
-        // multi-char symbols
         char next = peekChar();
-        if ((c == ':' && next == '=') || (c == '-' && next == '>') ||
-            ((c == '<' || c == '>' || c == '=' || c == '!') && next == '='))
+        // Multi-char operators
+        if ((c == '&' && next == '&') ||
+            (c == '|' && next == '|') ||
+            (c == '+' && next == '+') ||
+            (c == '-' && next == '-'))
         {
             text.push_back(advance());
         }
-        return {Token::Kind::Symbol, text, startLine, startCol};
+
+        switch (c)
+        {
+        case ':':
+            return Token{Token::Kind::Colon, text, startLine, startCol};
+        case '=':
+            return Token{Token::Kind::Equal, text, startLine, startCol};
+        case ';':
+            return Token{Token::Kind::SemiColon, text, startLine, startCol};
+        case '+':
+        case '-':
+        case '*':
+        case '/':
+        case '|':
+        case '&':
+        case '!':
+            return Token{Token::Kind::Symbol, text, startLine, startCol};
+        default:
+            return Token{Token::Kind::Symbol, text, startLine, startCol};
+        }
     }
 
 } // namespace zlang

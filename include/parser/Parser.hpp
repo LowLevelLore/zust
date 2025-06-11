@@ -1,39 +1,36 @@
-#pragma once
+#ifndef ZLANG_PARSER_HPP
+#define ZLANG_PARSER_HPP
 
 #include <memory>
-#include <string>
-#include "lexer/Lexer.hpp"
+#include "../lexer/Lexer.hpp"
+#include "../ast/ASTNode.hpp"
 
 namespace zlang
 {
-
     class Parser
     {
     public:
-        Parser(Lexer lexer) : lexer_(std::move(lexer)), current_(lexer_.nextToken()) {}
-        Error parseProgram(std::unique_ptr<ASTNode> &out);
+        explicit Parser(Lexer &lexer);
+        std::unique_ptr<ASTNode> parse();
 
     private:
-        std::unique_ptr<ASTNode> parseExpression(int prec = 0);
-        std::unique_ptr<ASTNode> parsePrimary();
+        Lexer &lexer;
+        Token currentToken;
+
+        void advance();
+        bool match(Token::Kind kind);
+        void expect(Token::Kind kind, const std::string &errMsg);
+
+        std::unique_ptr<ASTNode> parseStatement();
         std::unique_ptr<ASTNode> parseVariableDeclaration();
-        std::unique_ptr<ASTNode> parseReassignment();
-        std::unique_ptr<ASTNode> parseGroupedExpression();
-        std::unique_ptr<ASTNode> parseIdentifierOrCall();
-        std::unique_ptr<ASTNode> parseFunctionDeclaration();
-        std::unique_ptr<ASTNode> parseIf();
-        std::unique_ptr<ASTNode> parseDebugPrint();
-        std::unique_ptr<ASTNode> parseStringLiteral();
+        std::unique_ptr<ASTNode> parseVariableReassignment();
+        std::unique_ptr<ASTNode> parseExpression();
+        std::unique_ptr<ASTNode> parsePrimary();
 
-        int getTokenPrecedence() const;
-
-        bool match(Token::Kind kind, const std::string &text = "") const;
-        Error expect(Token::Kind kind, const std::string &text = "");
-        bool matchConsume(Token::Kind kind, const std::string &text = "");
-        void consume();
-
-        Lexer lexer_;
-        Token current_;
+        int getPrecedence(const std::string &op) const;
+        std::unique_ptr<ASTNode> parseUnary();
+        std::unique_ptr<ASTNode> parseBinaryRHS(int exprPrec, std::unique_ptr<ASTNode> lhs);
     };
+}
 
-} // namespace zlang
+#endif // ZLANG_PARSER_HPP

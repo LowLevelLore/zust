@@ -3,23 +3,25 @@
 
 #include <string>
 #include <vector>
-#include "common/Errors.hpp"
+#include "../common/Errors.hpp"
 
 namespace zlang
 {
-
-    /// Token kinds in zlang
     struct Token
     {
         enum class Kind
         {
+            Let,
             Identifier,
+            Colon,
             IntegerLiteral,
             FloatLiteral,
             StringLiteral,
             Symbol,
             Keyword,
             EndOfFile,
+            SemiColon,
+            Equal,
             Unknown
         } kind;
 
@@ -40,6 +42,12 @@ namespace zlang
         {
             switch (k)
             {
+            case Kind::Equal:
+                return "Equal";
+            case Kind::Colon:
+                return "Colon";
+            case Kind::Let:
+                return "Let";
             case Kind::Identifier:
                 return "Identifier";
             case Kind::IntegerLiteral:
@@ -54,6 +62,8 @@ namespace zlang
                 return "Keyword";
             case Kind::EndOfFile:
                 return "EndOfFile";
+            case Kind::SemiColon:
+                return "SemiColon";
             case Kind::Unknown:
                 return "Unknown";
             }
@@ -61,25 +71,18 @@ namespace zlang
         }
     };
 
-    // Optional: makes it easy to stream Token to std::cout
     inline std::ostream &operator<<(std::ostream &os, const Token &token)
     {
         return os << token.toString();
     }
-
     using Error = zlang::Error;
-
-    /// Lexer: tokenize source code
     class Lexer
     {
     public:
         explicit Lexer(const std::string &source);
 
-        /// Get next token
         Token nextToken();
-        /// Peek ahead
         Token peek(size_t offset = 0) const;
-        /// Reset to beginning
         void reset();
 
     private:

@@ -2,3 +2,6 @@ zpiler
 build/
 
 *.o
+*.asm
+
+temp*

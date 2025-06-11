@@ -74,6 +74,10 @@ namespace zlang
                 {
                     format = CodegenOutputFormat::X86_64_LINUX;
                 }
+                else if (fmt == "llvm-ir")
+                {
+                    format = CodegenOutputFormat::LLVM_IR;
+                }
                 else
                 {
                     errorFlag = true;
