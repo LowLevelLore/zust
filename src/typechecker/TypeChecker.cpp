@@ -28,16 +28,13 @@ namespace zlang
         case NodeType::VariableDeclaration:
         {
             std::string annotatedType, initType;
-
             if (node->children.size() >= 1 &&
                 node->children[0]->type == NodeType::Symbol)
             {
                 annotatedType = node->children[0]->value;
             }
             if (node->children.size() == 2)
-            {
                 initType = checkNode(node->children[1].get());
-            }
 
             if (annotatedType.empty() && initType.empty())
             {
@@ -48,19 +45,23 @@ namespace zlang
                 return "";
             }
 
+            // If both present but mismatch, only error if *non‑numeric*
             if (!annotatedType.empty() && !initType.empty() &&
                 annotatedType != initType)
             {
-                logError({ErrorType::Type,
-                          "Initializer type '" + initType +
-                              "' does not match annotation '" + annotatedType +
-                              "' on variable '" + node->value + "'"});
-                shouldCodegen_ = false;
+                if (!(isNumeric(annotatedType) && isNumeric(initType)))
+                {
+                    logError({ErrorType::Type,
+                              "Initializer type '" + initType +
+                                  "' does not match annotation '" + annotatedType +
+                                  "' on variable '" + node->value + "'"});
+                    shouldCodegen_ = false;
+                }
             }
 
+            // final type is the annotation if provided, else the inferred
             std::string finalType =
                 !annotatedType.empty() ? annotatedType : initType;
-
             scope->defineVariable(node->value, VariableInfo{finalType});
             return finalType;
         }
@@ -87,9 +88,9 @@ namespace zlang
             {
                 return scope->lookupVariable(node->value).type;
             }
-            catch (std::runtime_error &e)
+            catch (...)
             {
-                logError({ErrorType::Type, e.what()});
+                logError({ErrorType::Type, "Unknown variable " + node->value});
                 shouldCodegen_ = false;
                 return "";
             }
@@ -97,15 +98,14 @@ namespace zlang
 
         case NodeType::IntegerLiteral:
             return "integer";
-
         case NodeType::FloatLiteral:
-            return (node->value.back() == 'f' || node->value.back() == 'F')
-                       ? "float"
-                       : "double";
-
+            if (!node->value.empty() &&
+                (node->value.back() == 'f' || node->value.back() == 'F'))
+                return "float";
+            else
+                return "double";
         case NodeType::StringLiteral:
             return "string";
-
         case NodeType::BooleanLiteral:
             return "boolean";
 
@@ -115,10 +115,29 @@ namespace zlang
             std::string rhs = checkNode(node->children[1].get());
             const auto &op = node->value;
 
+            // Arithmetic + - * /
             if (op == "+" || op == "-" || op == "*" || op == "/")
             {
-                if (isNumeric(lhs) && lhs == rhs)
-                    return lhs;
+                if (isNumeric(lhs) && isNumeric(rhs))
+                {
+                    auto tL = node->scope->lookupType(lhs);
+                    auto tR = node->scope->lookupType(rhs);
+                    // float wins
+                    bool resF = (tL.isFloat || tR.isFloat);
+                    auto resB = std::max(tL.bits, tR.bits);
+                    // figure out name:
+                    if (resF)
+                    {
+                        return (resB == 32 ? "float" : "double");
+                    }
+                    else
+                    {
+                        const TypeInfo &wider = (tL.bits >= tR.bits ? tL : tR);
+                        // e.g. signed 64 ⇒ int64_t, unsigned 32 ⇒ uint32_t
+                        std::string prefix = wider.isSigned ? "int" : "uint";
+                        return prefix + std::to_string(resB) + "_t";
+                    }
+                }
                 logError({ErrorType::Type,
                           "Arithmetic '" + op +
                               "' only on numeric types, got '" + lhs +
@@ -126,32 +145,43 @@ namespace zlang
                 shouldCodegen_ = false;
                 return "";
             }
+
+            // Logical || &&
             if (op == "||" || op == "&&")
             {
                 if (lhs == "boolean" && rhs == "boolean")
                     return "boolean";
                 logError({ErrorType::Type,
                           "Logical '" + op +
-                              "' needs booleans, got '" +
+                              "' needs booleans, got '" + lhs +
+                              "' and '" + rhs + "'"});
+                shouldCodegen_ = false;
+                return "";
+            }
+
+            // Comparisons
+            if (op == "==" || op == "!=" || op == ">=" || op == ">" || op == "<=" || op == "<")
+            {
+                // numeric vs numeric → OK
+                if (isNumeric(lhs) && isNumeric(rhs))
+                    return "boolean";
+
+                // same exact non‑numeric types → OK
+                if (lhs == rhs && !isNumeric(lhs))
+                    return "boolean";
+
+                logError({ErrorType::Type,
+                          "Comparison '" + op +
+                              "' requires both operands to be numeric or same type, "
+                              "got '" +
                               lhs + "' and '" + rhs + "'"});
                 shouldCodegen_ = false;
                 return "";
             }
-            if (op == "==" || op == "!=" || op == ">=" || op == ">" || op == "<=" || op == "<")
-            {
-                if (!isComparable(lhs) || lhs != rhs)
-                {
-                    logError({ErrorType::Type,
-                              "Comparison '" + op +
-                                  "' requires matching numeric types, got '" +
-                                  lhs + "' and '" + rhs + "'"});
-                    shouldCodegen_ = false;
-                    return "";
-                }
-                return "boolean";
-            }
-            // bitwise | & on ints
-            if ((op == "|" || op == "&") && lhs == "integer" && rhs == "integer")
+
+            // Bitwise on plain integers
+            if ((op == "|" || op == "&") &&
+                lhs == "integer" && rhs == "integer")
                 return "integer";
 
             logError({ErrorType::Type,
@@ -178,9 +208,8 @@ namespace zlang
             {
                 if (!isNumeric(ty))
                 {
-                    logError(
-                        {ErrorType::Type,
-                         "Unary '" + op + "' needs numeric, got '" + ty + "'"});
+                    logError({ErrorType::Type,
+                              "Unary '" + op + "' needs numeric, got '" + ty + "'"});
                     shouldCodegen_ = false;
                 }
                 return ty;
@@ -209,7 +238,7 @@ namespace zlang
 
     bool TypeChecker::isNumeric(const std::string &ty)
     {
-        return ty == "integer" || ty == "float" || ty == "double";
+        return numeric_types.find(ty) != numeric_types.end();
     }
 
     bool TypeChecker::isComparable(const std::string &ty)

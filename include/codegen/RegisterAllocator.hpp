@@ -25,7 +25,7 @@ namespace zlang
         std::string allocateXMM();
 
         /// Free a previously allocated XMM register; throws if invalid
-        void freeXMM(const std::string &reg);
+        bool freeXMM(const std::string &reg);
 
         /// Reset allocator state (mark all as free)
         void reset();

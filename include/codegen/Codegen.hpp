@@ -44,6 +44,36 @@ namespace zlang
         void generateStatement(const ASTNode *s, std::ostream &out);
         int labelCounter = 0;
         RegisterAllocator alloc = RegisterAllocator::forSysV();
+        static TypeInfo promoteType(const TypeInfo &a, const TypeInfo &b)
+        {
+            if (a.isFloat || b.isFloat)
+            {
+                if (a.isFloat && b.isFloat)
+                    return a.bits > b.bits ? a : b;
+                return a.isFloat ? a : b;
+            }
+            if (a.bits != b.bits)
+                return a.bits > b.bits ? a : b;
+            return a;
+        }
+
+        static char getIntSuffix(uint64_t bits)
+        {
+            switch (bits)
+            {
+            case 64:
+                return 'q';
+            case 32:
+                return 'l';
+            case 16:
+                return 'w';
+            case 8:
+                return 'b';
+            default:
+                throw std::runtime_error("Invalid integer size");
+            }
+        }
+        static std::string getCorrectMove(const uint64_t size_bytes);
     };
 
     class CodeGenWindows : public CodeGen

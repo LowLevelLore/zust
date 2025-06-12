@@ -5,11 +5,27 @@ namespace zlang
     Parser::Parser(Lexer &lex) : lexer(lex)
     {
         currentScope = std::make_shared<ScopeContext>(nullptr);
-        currentScope.get()->defineType("integer", {});
-        currentScope.get()->defineType("float", {});
-        currentScope.get()->defineType("double", {});
-        currentScope.get()->defineType("string", {});
-        currentScope.get()->defineType("boolean", {});
+        // TODO: This is controversial, lets make something in the near future that gets these (size_t, integer, float, double, etc) sizes dynamically
+        currentScope->defineType("boolean", TypeInfo{8, 1, false, false});
+        currentScope->defineType("string", TypeInfo{64, 8, false, false}); // Assuming pointer to heap
+        currentScope->defineType("size_t", TypeInfo{64, 8, false, false});
+        currentScope->defineType("integer", TypeInfo{64, 8, false, true}); // Default int type
+
+        // Unsigned integers
+        currentScope->defineType("uint8_t", TypeInfo{8, 1, false, false});
+        currentScope->defineType("uint16_t", TypeInfo{16, 2, false, false});
+        currentScope->defineType("uint32_t", TypeInfo{32, 4, false, false});
+        currentScope->defineType("uint64_t", TypeInfo{64, 8, false, false});
+
+        // Signed integers
+        currentScope->defineType("int8_t", TypeInfo{8, 1, false, true});
+        currentScope->defineType("int16_t", TypeInfo{16, 2, false, true});
+        currentScope->defineType("int32_t", TypeInfo{32, 4, false, true});
+        currentScope->defineType("int64_t", TypeInfo{64, 8, false, true});
+
+        // Floating-point types
+        currentScope->defineType("float", TypeInfo{32, 4, true, true});
+        currentScope->defineType("double", TypeInfo{64, 8, true, true});
         shouldTypecheck = true;
         advance();
     }
@@ -133,7 +149,6 @@ namespace zlang
 
     std::unique_ptr<ASTNode> Parser::parseVariableDeclaration()
     {
-        // after 'let', currentToken should be identifier
         if (currentToken.kind != Token::Token::Kind::Identifier)
             expect(Token::Token::Kind::Identifier, "Expected variable name after 'let'");
 
@@ -141,7 +156,6 @@ namespace zlang
         advance();
         std::unique_ptr<ASTNode> typeNode, initNode;
 
-        // after let name
         if (match(Token::Kind::Colon))
         {
             typeNode = ASTNode::makeSymbolNode(currentToken.text, currentScope);
@@ -158,7 +172,7 @@ namespace zlang
     std::unique_ptr<ASTNode> Parser::parseVariableReassignment()
     {
         std::string name = currentToken.text;
-        advance(); // consume identifier
+        advance();
 
         expect(Token::Token::Kind::Equal, "Expected '=' for variable reassignment");
         auto expr = parseExpression();

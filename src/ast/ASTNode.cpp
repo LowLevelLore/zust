@@ -36,6 +36,10 @@ namespace zlang
     {
         if (children.empty())
             return nullptr;
+        if (children.back().get()->type != NodeType::ElseIfStatement || children.back().get()->type != NodeType::ElseStatement)
+        {
+            return nullptr;
+        }
         return children.back().get();
     }
 

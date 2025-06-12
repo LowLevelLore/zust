@@ -7,3 +7,4 @@ x = 11;
 let k: string = "Hello World";
 let g: double = 32.11;
 let h: float = 3.14f;
+

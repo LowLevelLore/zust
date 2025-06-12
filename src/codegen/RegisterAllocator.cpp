@@ -33,7 +33,13 @@ namespace zlang
     {
         auto it = inUse.find(reg);
         if (it == inUse.end())
+        {
+            if (freeXMM(reg))
+            {
+                return;
+            }
             throw std::runtime_error("RegisterAllocator: attempted to free unallocated register '" + reg + "'");
+        }
         inUse.erase(it);
         available.push_back(reg);
     }
@@ -56,13 +62,14 @@ namespace zlang
         return reg;
     }
 
-    void RegisterAllocator::freeXMM(const std::string &reg)
+    bool RegisterAllocator::freeXMM(const std::string &reg)
     {
         auto it = inUseXMM.find(reg);
         if (it == inUseXMM.end())
-            throw std::runtime_error("RegisterAllocator: attempted to free XMM unallocated register '" + reg + "'");
+            return false;
         inUseXMM.erase(it);
         availableXMM.push_back(reg);
+        return true;
     }
 
 } // namespace zlang

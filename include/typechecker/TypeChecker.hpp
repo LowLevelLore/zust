@@ -5,9 +5,11 @@
 #include "ast/ASTNode.hpp"
 #include "parser/ScopeContext.hpp"
 #include "common/Errors.hpp"
+#include <set>
 
 namespace zlang
 {
+    static const std::set<std::string> numeric_types = {"integer", "size_t", "uint8_t", "uint16_t", "uint32_t", "uint64_t", "uint128_t", "int8_t", "int16_t", "int32_t", "int64_t", "int128_t", "float", "double"};
 
     class TypeChecker
     {
