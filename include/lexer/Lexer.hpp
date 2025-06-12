@@ -1,6 +1,4 @@
-#ifndef ZLANG_LEXER_LEXER_HPP
-#define ZLANG_LEXER_LEXER_HPP
-
+#pragma once
 #include <string>
 #include <vector>
 #include "../common/Errors.hpp"
@@ -17,11 +15,19 @@ namespace zlang
             IntegerLiteral,
             FloatLiteral,
             StringLiteral,
+            BoolLiteral,
             Symbol,
             Keyword,
             EndOfFile,
             SemiColon,
             Equal,
+            If,
+            ElseIf,
+            Else,
+            LeftBrace,
+            RightBrace,
+            LeftParen,
+            RightParen,
             Unknown
         } kind;
 
@@ -66,6 +72,22 @@ namespace zlang
                 return "SemiColon";
             case Kind::Unknown:
                 return "Unknown";
+            case Kind::BoolLiteral:
+                return "Boolean";
+            case Kind::If:
+                return "If";
+            case Kind::ElseIf:
+                return "ElseIf";
+            case Kind::Else:
+                return "Else";
+            case Kind::LeftBrace:
+                return "LeftBrace";
+            case Kind::RightBrace:
+                return "RightBrace";
+            case Kind::RightParen:
+                return "RightParen";
+            case Kind::LeftParen:
+                return "LeftParen";
             }
             return "Invalid";
         }
@@ -94,12 +116,10 @@ namespace zlang
         char advance();
         char peekChar(size_t offset = 0) const;
         void skipWhitespaceAndComments();
-        Token scanIdentifierOrKeyword();
+        Token scanIdentifierOrKeywordOrConditional();
         Token scanNumber();
         Token scanString();
         Token scanSymbol();
     };
 
 } // namespace zlang
-
-#endif // ZLANG_LEXER_LEXER_HPP

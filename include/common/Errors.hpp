@@ -1,6 +1,4 @@
-#ifndef ZLANG_COMMON_ERRORS_HPP
-#define ZLANG_COMMON_ERRORS_HPP
-
+#pragma once
 #include <string>
 
 namespace zlang
@@ -27,5 +25,3 @@ namespace zlang
     };
 
 } // namespace zlang
-
-#endif // ZLANG_COMMON_ERRORS_HPP

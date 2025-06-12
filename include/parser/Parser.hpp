@@ -1,9 +1,10 @@
-#ifndef ZLANG_PARSER_HPP
-#define ZLANG_PARSER_HPP
-
+#pragma once
 #include <memory>
+#include "parser/ScopeContext.hpp"
 #include "../lexer/Lexer.hpp"
 #include "../ast/ASTNode.hpp"
+#include "common/Errors.hpp"
+#include "common/Logging.hpp"
 
 namespace zlang
 {
@@ -12,10 +13,16 @@ namespace zlang
     public:
         explicit Parser(Lexer &lexer);
         std::unique_ptr<ASTNode> parse();
+        bool isCorrect()
+        {
+            return shouldTypecheck;
+        }
 
     private:
         Lexer &lexer;
         Token currentToken;
+        std::shared_ptr<ScopeContext> currentScope;
+        bool shouldTypecheck = true;
 
         void advance();
         bool match(Token::Kind kind);
@@ -24,13 +31,16 @@ namespace zlang
         std::unique_ptr<ASTNode> parseStatement();
         std::unique_ptr<ASTNode> parseVariableDeclaration();
         std::unique_ptr<ASTNode> parseVariableReassignment();
+        std::unique_ptr<ASTNode> parseConditionals();
         std::unique_ptr<ASTNode> parseExpression();
         std::unique_ptr<ASTNode> parsePrimary();
 
         int getPrecedence(const std::string &op) const;
         std::unique_ptr<ASTNode> parseUnary();
         std::unique_ptr<ASTNode> parseBinaryRHS(int exprPrec, std::unique_ptr<ASTNode> lhs);
+
+        void enterScope();
+        void exitScope();
+        std::unique_ptr<ASTNode> parseBlock();
     };
 }
-
-#endif // ZLANG_PARSER_HPP

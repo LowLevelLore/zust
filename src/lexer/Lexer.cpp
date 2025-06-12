@@ -75,9 +75,9 @@ namespace zlang
         }
 
         if (std::isalpha(static_cast<unsigned char>(c)) || c == '_')
-            return scanIdentifierOrKeyword();
+            return scanIdentifierOrKeywordOrConditional();
 
-        if (std::isdigit(static_cast<unsigned char>(c)))
+        if (std::isdigit(static_cast<unsigned char>(c)) || (c == '-' && std::isdigit((unsigned char)peekChar(1))))
             return scanNumber();
 
         if (c == '"')
@@ -95,7 +95,7 @@ namespace zlang
         return tok;
     }
 
-    Token Lexer::scanIdentifierOrKeyword()
+    Token Lexer::scanIdentifierOrKeywordOrConditional()
     {
         size_t startLine = line_;
         size_t startCol = column_;
@@ -106,6 +106,18 @@ namespace zlang
         if (text == "let")
             return Token{Token::Kind::Let, text, startLine, startCol};
 
+        if (text == "true" || text == "false")
+            return {Token::Kind::BoolLiteral, text, startLine, startCol};
+
+        if (text == "if")
+            return {Token::Kind::If, text, startLine, startCol};
+
+        if (text == "elif")
+            return {Token::Kind::ElseIf, text, startLine, startCol};
+
+        if (text == "else")
+            return {Token::Kind::Else, text, startLine, startCol};
+
         return Token{Token::Kind::Identifier, text, startLine, startCol};
     }
 
@@ -115,6 +127,10 @@ namespace zlang
         size_t startCol = column_;
         std::string text;
         bool seenDot = false;
+        if (peekChar() == '-' and isdigit(peekChar(1)))
+        {
+            text.push_back(advance());
+        }
         while (std::isdigit(static_cast<unsigned char>(peekChar())) || (!seenDot && peekChar() == '.'))
         {
             if (peekChar() == '.')
@@ -156,7 +172,11 @@ namespace zlang
         if ((c == '&' && next == '&') ||
             (c == '|' && next == '|') ||
             (c == '+' && next == '+') ||
-            (c == '-' && next == '-'))
+            (c == '-' && next == '-') ||
+            (c == '>' && next == '=') ||
+            (c == '<' && next == '=') ||
+            (c == '!' && next == '=') ||
+            (c == '=' && next == '='))
         {
             text.push_back(advance());
         }
@@ -169,6 +189,14 @@ namespace zlang
             return Token{Token::Kind::Equal, text, startLine, startCol};
         case ';':
             return Token{Token::Kind::SemiColon, text, startLine, startCol};
+        case '{':
+            return Token{Token::Kind::LeftBrace, text, startLine, startCol};
+        case '}':
+            return Token{Token::Kind::RightBrace, text, startLine, startCol};
+        case '(':
+            return Token{Token::Kind::LeftParen, text, startLine, startCol};
+        case ')':
+            return Token{Token::Kind::RightParen, text, startLine, startCol};
         case '+':
         case '-':
         case '*':
@@ -176,6 +204,8 @@ namespace zlang
         case '|':
         case '&':
         case '!':
+        case '>':
+        case '<':
             return Token{Token::Kind::Symbol, text, startLine, startCol};
         default:
             return Token{Token::Kind::Symbol, text, startLine, startCol};

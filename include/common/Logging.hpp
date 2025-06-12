@@ -1,5 +1,4 @@
-#ifndef ZLANG_COMMON_LOGGING_HPP
-#define ZLANG_COMMON_LOGGING_HPP
+#pragma once
 
 #include <string>
 #include "Errors.hpp"
@@ -12,5 +11,3 @@ namespace zlang
     void logMessage(const std::string &message);
 
 } // namespace zlang
-
-#endif // ZLANG_COMMON_LOGGING_HPP

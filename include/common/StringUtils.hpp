@@ -1,6 +1,4 @@
-#ifndef ZLANG_COMMON_STRINGUTILS_HPP
-#define ZLANG_COMMON_STRINGUTILS_HPP
-
+#pragma once
 #include <string>
 #include <vector>
 
@@ -33,5 +31,3 @@ namespace zlang
     }
 
 } // namespace zlang
-
-#endif // ZLANG_COMMON_STRINGUTILS_HPP

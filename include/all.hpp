@@ -1,3 +1,4 @@
+#pragma once
 #include "common/Colors.hpp"
 #include "common/Errors.hpp"
 #include "common/Logging.hpp"
@@ -9,6 +10,7 @@
 #include "ast/ASTNode.hpp"
 
 #include "parser/Parser.hpp"
+#include "parser/ScopeContext.hpp"
 
 #include "lexer/Lexer.hpp"
 

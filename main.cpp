@@ -53,6 +53,11 @@ int main(int argc, char *argv[])
 
     std::unique_ptr<ASTNode> program = parser.parse();
 
+    if (!parser.isCorrect())
+    {
+        return 1;
+    }
+
     if (cli.getVerbosity() == 1)
     {
         if (!program.get())
@@ -66,6 +71,9 @@ int main(int argc, char *argv[])
     // Type checking
     TypeChecker typeChecker;
     typeChecker.check(program);
+
+    if (!typeChecker.shouldCodegen())
+        return 1;
 
     std::unique_ptr<zlang::CodeGen> cg =
         CodeGen::create(TargetTriple::X86_64_LINUX);
@@ -106,7 +114,7 @@ int main(int argc, char *argv[])
 
     if (cli.getOutputFile().empty())
     {
-        cg->generate(program.get(), std::cout);
+        cg->generate(program.get(), std::cout, true);
     }
     else
     {
@@ -118,7 +126,7 @@ int main(int argc, char *argv[])
             exit(1);
         }
         std::cout << "HERE" << std::endl;
-        cg->generate(program.get(), ofs);
+        cg->generate(program.get(), ofs, true);
     }
 
     return 0;

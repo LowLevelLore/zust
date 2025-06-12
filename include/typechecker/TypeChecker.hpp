@@ -1,41 +1,32 @@
-#ifndef ZLANG_TYPECHECKER_HPP
-#define ZLANG_TYPECHECKER_HPP
+#pragma once
 
+#include <memory>
 #include <string>
-#include <unordered_map>
-#include <stdexcept>
-#include "../ast/ASTNode.hpp"
+#include "ast/ASTNode.hpp"
+#include "parser/ScopeContext.hpp"
+#include "common/Errors.hpp"
 
 namespace zlang
 {
-    /// Represents variable types in zlang
-    enum class Types
-    {
-        Int,
-        Float,
-        Double,
-        String,
-        Unknown
-    };
-
-    std::string typeToString(Types type);
 
     class TypeChecker
     {
     public:
-        /// Performs type checking on the given AST (program node)
-        /// Throws std::runtime_error on type errors with descriptive messages
+        /// Walks the whole AST, logs any errors found.
         void check(const std::unique_ptr<ASTNode> &program);
+        bool shouldCodegen()
+        {
+            return shouldCodegen_;
+        }
 
     private:
-        std::unordered_map<std::string, Types> symbolTable;
+        /// Checks a single AST node, returns its type name (or "" on error).
+        std::string checkNode(const ASTNode *node);
+        /// Helpers
+        bool isNumeric(const std::string &ty);
+        bool isComparable(const std::string &ty);
 
-        /// Checks a statement or expression node, returns its Types
-        Types checkNode(const ASTNode *node);
-
-        /// Helper to parse annotation string to Types
-        Types parseType(const std::string &typeName);
+        bool shouldCodegen_ = true;
     };
-}
 
-#endif // ZLANG_TYPECHECKER_HPP
+} // namespace zlang

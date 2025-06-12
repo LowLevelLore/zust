@@ -1,5 +1,4 @@
-#ifndef ZLANG_REGISTERALLOCATOR_HPP
-#define ZLANG_REGISTERALLOCATOR_HPP
+#pragma once
 
 #include <string>
 #include <vector>
@@ -43,5 +42,3 @@ namespace zlang
         std::unordered_set<std::string> inUseXMM;
     };
 }
-
-#endif // ZLANG_REGISTERALLOCATOR_HPP

@@ -1,6 +1,4 @@
-#ifndef ZLANG_SUPPORT_COMMANDLINE_HPP
-#define ZLANG_SUPPORT_COMMANDLINE_HPP
-
+#pragma once
 #include <string>
 #include <vector>
 
@@ -56,5 +54,3 @@ namespace zlang
     };
 
 } // namespace zlang
-
-#endif // ZLANG_SUPPORT_COMMANDLINE_HPP

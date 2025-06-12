@@ -1,6 +1,4 @@
-#ifndef ZLANG_COMMON_COLORS_HPP
-#define ZLANG_COMMON_COLORS_HPP
-
+#pragma once
 namespace zlang
 {
     namespace colors
@@ -16,5 +14,3 @@ namespace zlang
     } // namespace colors
 
 } // namespace zlang
-
-#endif // ZLANG_COMMON_COLORS_HPP

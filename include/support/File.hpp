@@ -1,5 +1,4 @@
-#ifndef ZLANG_FILE_HPP
-#define ZLANG_FILE_HPP
+#pragma once
 
 #include <string>
 #include <optional>
@@ -16,5 +15,3 @@ namespace zlang
     };
 
 } // namespace zlang
-
-#endif // ZLANG_FILE_HPP

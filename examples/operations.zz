@@ -1,2 +1,2 @@
 let x: integer = 2;
-let y = 2 * x - x;
+let y: integer = 2 * x - x;
