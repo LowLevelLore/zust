@@ -2,6 +2,7 @@
 
 namespace zlang
 {
+    CodeGen::~CodeGen() = default;
     std::unique_ptr<CodeGen> CodeGen::create(TargetTriple target)
     {
         switch (target)

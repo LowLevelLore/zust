@@ -71,7 +71,7 @@ namespace zlang
             VariableInfo info = scope->lookupVariable(node->value);
             std::string expected = info.type;
             std::string actual = checkNode(node->children[0].get());
-            if (expected != actual)
+            if (!(expected == actual or isNumeric(expected) == isNumeric(actual)))
             {
                 logError({ErrorType::Type,
                           "Reassignment of '" + node->value +
@@ -120,23 +120,12 @@ namespace zlang
             {
                 if (isNumeric(lhs) && isNumeric(rhs))
                 {
-                    auto tL = node->scope->lookupType(lhs);
-                    auto tR = node->scope->lookupType(rhs);
-                    // float wins
-                    bool resF = (tL.isFloat || tR.isFloat);
-                    auto resB = std::max(tL.bits, tR.bits);
-                    // figure out name:
-                    if (resF)
-                    {
-                        return (resB == 32 ? "float" : "double");
-                    }
-                    else
-                    {
-                        const TypeInfo &wider = (tL.bits >= tR.bits ? tL : tR);
-                        // e.g. signed 64 ⇒ int64_t, unsigned 32 ⇒ uint32_t
-                        std::string prefix = wider.isSigned ? "int" : "uint";
-                        return prefix + std::to_string(resB) + "_t";
-                    }
+                    const TypeInfo &tL = node->scope->lookupType(lhs);
+                    const TypeInfo &tR = node->scope->lookupType(rhs);
+
+                    TypeInfo promoted = promoteType(tL, tR);
+
+                    return typeName(promoted);
                 }
                 logError({ErrorType::Type,
                           "Arithmetic '" + op +
@@ -206,10 +195,10 @@ namespace zlang
             }
             if (op == "++" || op == "--")
             {
-                if (!isNumeric(ty))
+                if (!isInteger(ty))
                 {
                     logError({ErrorType::Type,
-                              "Unary '" + op + "' needs numeric, got '" + ty + "'"});
+                              "Unary '" + op + "' needs Integral type, got '" + ty + "'"});
                     shouldCodegen_ = false;
                 }
                 return ty;
@@ -234,6 +223,11 @@ namespace zlang
                 checkNode(c.get());
             return "";
         }
+    }
+
+    bool TypeChecker::isInteger(const std::string &ty)
+    {
+        return integral_types.find(ty) != integral_types.end();
     }
 
     bool TypeChecker::isNumeric(const std::string &ty)

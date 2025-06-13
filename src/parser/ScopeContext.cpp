@@ -54,7 +54,7 @@ namespace zlang
         throw std::runtime_error("Undefined type '" + name + "'");
     }
 
-    std::uint64_t ScopeContext::getVariableOffset(const std::string &name) const
+    std::int64_t ScopeContext::getVariableOffset(const std::string &name) const
     {
         auto it = offsetTable.find(name);
         if (it != offsetTable.end())
@@ -64,7 +64,23 @@ namespace zlang
         throw std::runtime_error("Unknown variable " + name);
     }
 
-    bool ScopeContext::isGlobalScope()
+    bool ScopeContext::isGlobalVariable(const std::string &name) const
+    {
+
+        const ScopeContext *ctx = this;
+        while (ctx)
+        {
+            auto it = ctx->vars_.find(name);
+            if (it != ctx->vars_.end())
+            {
+                return (ctx->parent_ == nullptr);
+            }
+            ctx = ctx->parent_.get();
+        }
+        throw std::runtime_error("Unknown variable " + name);
+    }
+
+    bool ScopeContext::isGlobalScope() const
     {
         return !this->parent_.get();
     }

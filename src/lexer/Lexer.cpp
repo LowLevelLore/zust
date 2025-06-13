@@ -176,7 +176,9 @@ namespace zlang
             (c == '>' && next == '=') ||
             (c == '<' && next == '=') ||
             (c == '!' && next == '=') ||
-            (c == '=' && next == '='))
+            (c == '=' && next == '=') ||
+            (c == '+' && next == '+') ||
+            (c == '-' && next == '-'))
         {
             text.push_back(advance());
         }

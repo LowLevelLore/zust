@@ -78,7 +78,6 @@ namespace zlang
             return parseVariableReassignment();
         if (currentToken.kind == Token::Kind::If || currentToken.kind == Token::Kind::ElseIf || currentToken.kind == Token::Kind::Else)
             return parseConditionals();
-        // TODO: We can catch ElseIf and Else that are without If here.
         logError({ErrorType::Syntax,
                   "Unexpected token '" + currentToken.text +
                       "' at line " + std::to_string(currentToken.line) +
@@ -161,6 +160,7 @@ namespace zlang
             typeNode = ASTNode::makeSymbolNode(currentToken.text, currentScope);
             advance();
         }
+        logMessage("DECLARATION");
         if (match(Token::Kind::Equal))
         {
             initNode = parseExpression();
@@ -216,7 +216,20 @@ namespace zlang
         {
             std::string name = currentToken.text;
             advance();
-            return ASTNode::makeVariableAccessNode(name, currentScope);
+
+            // 2) make the VariableAccess node
+            auto node = ASTNode::makeVariableAccessNode(name, currentScope);
+
+            // 3) check if the *current* token is ++ or -- (postfix)
+            if (currentToken.kind == Token::Kind::Symbol &&
+                (currentToken.text == "++" || currentToken.text == "--"))
+            {
+                std::string op = currentToken.text; // "++" or "--"
+                advance();                          // consume the ++/--
+                node = ASTNode::makeUnaryOp(op, std::move(node), currentScope);
+            }
+
+            return node;
         }
         logError({ErrorType::Syntax,
                   "Expected expression, got '" + currentToken.text +
@@ -228,7 +241,6 @@ namespace zlang
 
     std::unique_ptr<ASTNode> Parser::parseUnary()
     {
-        // prefix ++, --, !
         if (currentToken.kind == Token::Kind::Symbol &&
             (currentToken.text == "++" || currentToken.text == "--" || currentToken.text == "!"))
         {

@@ -2,6 +2,14 @@
 
 namespace zlang
 {
+
+    CodeGenLinux::CodeGenLinux()
+        : labelCounter(0)
+    {
+    }
+
+    CodeGenLinux::~CodeGenLinux() = default;
+
     std::string CodeGenLinux::emitExpr(const ASTNode *node,
                                        std::ostream &out,
                                        RegisterAllocator &alloc)
@@ -15,28 +23,15 @@ namespace zlang
             regType[r] = t;
         };
 
-        auto intToXmm = [&](const std::string &r_int, const TypeInfo &t_int)
+        // Convert integer GPR -> XMM of given width
+        auto intToXmm = [&](const std::string &r_int, uint32_t bits)
         {
-            (void)t_int;
             std::string r_xmm = alloc.allocateXMM();
-            out << "    cvtsi2sd %" << r_int << ", %" << r_xmm << "\n";
+            const char *cvt = (bits == 32 ? "cvtsi2ss" : "cvtsi2sd");
+            out << "    " << cvt << " %" << r_int << ", %" << r_xmm << "\n";
             alloc.free(r_int);
-            noteType(r_xmm, {/*bits=*/64, /*isFloat=*/true, /*isSigned=*/true});
+            noteType(r_xmm, {bits, bits / 8, true, true});
             return r_xmm;
-        };
-
-        auto xmmToGpr = [&](const std::string &r_xmm)
-        {
-            // spill to stack + reload
-            out << "    subq $8, %rsp\n"
-                   "    movsd %"
-                << r_xmm << ", (%rsp)\n";
-            alloc.free(r_xmm);
-            auto r = alloc.allocate();
-            out << "    movq   (%rsp), %" << r << "\n"
-                                                  "    addq   $8, %rsp\n";
-            noteType(r, {/*bits=*/64, /*isFloat=*/true, /*isSigned=*/true});
-            return r;
         };
 
         // === Literals ===
@@ -44,253 +39,476 @@ namespace zlang
         {
             auto r = alloc.allocate();
             out << "    movq $" << node->value << ", %" << r << "\n";
-            noteType(r, {64, /*isFloat=*/false, /*isSigned=*/true});
+            noteType(r, node->scope->lookupType("int64_t"));
             return r;
         }
+
         if (node->type == NT::FloatLiteral)
         {
             std::string lbl = ".LC" + std::to_string(constCounter++);
             std::string val = node->value;
-            if (!val.empty() && (val.back() == 'f' || val.back() == 'F'))
+            bool isF32 = (!val.empty() && (val.back() == 'f' || val.back() == 'F'));
+            if (isF32)
                 val.pop_back();
-            out << ".section .rodata\n"
-                << lbl << ": .double " << val << "\n"
-                << ".section .text\n";
-            // load into XMM
-            std::string r_xmm = alloc.allocateXMM();
-            out << "    movsd " << lbl << "(%rip), %" << r_xmm << "\n";
-            noteType(r_xmm, {64, /*isFloat=*/true, /*isSigned=*/true});
-            // spill to GPR
-            return xmmToGpr(r_xmm);
+
+            // emit constant
+            out << "# rodata\n"
+                   ".section .rodata\n"
+                << lbl << ": ." << (isF32 ? "float" : "double") << " " << val << "\n"
+                                                                                 ".section .text\n";
+
+            auto r_xmm = alloc.allocateXMM();
+            out << "    " << (isF32 ? "movss " : "movsd ")
+                << lbl << "(%rip), %" << r_xmm << "\n";
+            noteType(r_xmm, (isF32 ? node->scope->lookupType("float") : node->scope->lookupType("double")));
+            return r_xmm;
         }
         if (node->type == NT::StringLiteral)
         {
             std::string lbl = ".LC" + std::to_string(constCounter++);
-            out << ".section .rodata\n"
+            out << "# rodata\n"
+                   ".section .rodata\n"
                 << lbl << ": .string \"" << node->value << "\"\n"
-                << ".section .text\n";
+                                                           ".section .text\n";
             auto r = alloc.allocate();
             out << "    leaq " << lbl << "(%rip), %" << r << "\n";
-            // treat pointers as 64‑bit ints
-            noteType(r, {64, /*isFloat=*/false, /*isSigned=*/false});
+            noteType(r, node->scope->lookupType("string"));
             return r;
         }
 
-        // === Variable access ===
+        // === VariableAccess ===
         if (node->type == NT::VariableAccess)
         {
             auto &scope = *node->scope;
             auto name = node->value;
             auto ti = scope.lookupType(scope.lookupVariable(name).type);
             uint64_t sz = ti.bits / 8;
-            bool isF = ti.isFloat;
-            std::string r;
-            if (isF)
+
+            if (scope.isGlobalVariable(name))
             {
-                r = alloc.allocateXMM();
-                out << "    " << getCorrectMove(sz)
-                    << " " << name << "(%rip), %" << r << "\n";
+                if (ti.isFloat)
+                {
+                    std::string r_xmm = alloc.allocateXMM();
+                    out << "    " << (sz == 4 ? "movss " : "movsd ")
+                        << name << "(%rip), %" << r_xmm << "\n";
+                    noteType(r_xmm, ti);
+                    return r_xmm;
+                }
+                else
+                {
+                    std::string r = alloc.allocate();
+                    std::string adj = adjustReg(r, ti.bits);
+                    out << "    " << getCorrectMove(sz, false)
+                        << " " << name << "(%rip), %" << adj << "\n";
+                    noteType(r, ti);
+                    return r;
+                }
             }
             else
             {
-                r = alloc.allocate();
-                out << "    " << getCorrectMove(sz)
-                    << " " << name << "(%rip), %" << r << "\n";
+                int64_t off = scope.getVariableOffset(name);
+                if (ti.isFloat)
+                {
+                    std::string r = alloc.allocateXMM();
+                    out << "    "
+                        << (sz == 4 ? "movss " : "movsd ")
+                        << off << "(%rbp), %" << r << "\n";
+                    noteType(r, (sz == 4 ? node->scope->lookupType("float") : node->scope->lookupType("double")));
+                    return r;
+                }
+                else
+                {
+                    std::string r = alloc.allocate();
+                    std::string adj = adjustReg(r, ti.bits);
+                    out << "    " << getCorrectMove(sz, false)
+                        << " " << off << "(%rbp), %" << adj << "\n";
+                    noteType(r, ti);
+                    return r;
+                }
             }
-            noteType(r, ti);
-            return isF ? xmmToGpr(r) : r;
         }
 
-        // === Binary operations ===
+        // === BinaryOp ===
         if (node->type == NT::BinaryOp)
         {
+            // Evaluate both operands
             auto rl = emitExpr(node->children[0].get(), out, alloc);
             auto rr = emitExpr(node->children[1].get(), out, alloc);
+
+            // Lookup operand types and compute result type
             auto t1 = regType.at(rl);
             auto t2 = regType.at(rr);
-            auto tr = promoteType(t1, t2);
-            std::string op = node->value;
+            auto tr = TypeChecker::promoteType(t1, t2);
+            const auto &op = node->value;
 
-            // if we need float ops:
+            logMessage("Operation: " + op);
+            logMessage("Left Type: " + TypeChecker::typeName(t1));
+            logMessage(t1.to_string());
+            logMessage("Right Type: " + TypeChecker::typeName(t2));
+            logMessage(t2.to_string());
+
+            // --- Floating‑point path ---
             if (tr.isFloat)
             {
-                // promote integer operands
-                std::string xl = (t1.isFloat ? rl : intToXmm(rl, t1));
-                std::string xr = (t2.isFloat ? rr : intToXmm(rr, t2));
+                bool isF32 = (tr.bits == 32);
+                std::string xr = rr;
+                std::string xl = rl;
+
+                std::string suf = isF32 ? "ss" : "sd";
+
+                if (!t1.isFloat)
+                {
+                    xl = intToXmm(rl, tr.bits);
+                }
+
+                if (!t2.isFloat)
+                {
+                    xr = intToXmm(rr, tr.bits);
+                }
 
                 if (op == "+")
-                    out << "    addsd %" << xr << ", %" << xl << "\n";
+                    out << "    add" << suf << " %" << xr << ", %" << xl << "\n";
                 else if (op == "-")
-                    out << "    subsd %" << xr << ", %" << xl << "\n";
+                    out << "    sub" << suf << " %" << xr << ", %" << xl << "\n";
                 else if (op == "*")
-                    out << "    mulsd %" << xr << ", %" << xl << "\n";
+                    out << "    mul" << suf << " %" << xr << ", %" << xl << "\n";
                 else if (op == "/")
-                    out << "    divsd %" << xr << ", %" << xl << "\n";
-                else if (op == "==" || op == "!=" || op == ">=" || op == ">" || op == "<=" || op == "<")
+                    out << "    div" << suf << " %" << xr << ", %" << xl << "\n";
+                else if (assembly_operations.count(op))
                 {
-                    // unordered compare
-                    out << "    ucomisd %" << xr << ", %" << xl << "\n"
-                        << "    " << assembly_operations[op] << " %al\n"
-                        << "    movzbq %al, %" << xl << "\n";
-                    // result in GPR
-                    return xmmToGpr(xl);
+                    out << "    ucomi" << suf << " %" << xr << ", %" << xl << "\n"
+                        << "    " << assembly_operations[op] << " %al\n";
+                    auto r_bool = alloc.allocate();
+                    out << "    movzbq %al, %" << r_bool << "\n";
+                    noteType(r_bool, node->scope->lookupType("boolean"));
+                    alloc.freeXMM(xr);
+                    alloc.freeXMM(xl);
+                    return r_bool;
                 }
                 else
                 {
                     throw std::runtime_error("Unsupported FP op " + op);
                 }
-                // got result in xl(XMM) → spill back
-                return xmmToGpr(xl);
+
+                noteType(xl, tr);
+                alloc.freeXMM(xr);
+                return xl;
             }
 
-            // integer path
+            // --- Integer path ---
             char suf = getIntSuffix(tr.bits);
+            auto r_l = adjustReg(rl, tr.bits);
+            auto r_r = adjustReg(rr, tr.bits);
+
             if (op == "+")
-                out << "    add" << suf << " %" << rr << ", %" << rl << "\n";
+            {
+                out << "    add" << suf << " %" << r_r << ", %" << r_l << "\n";
+            }
             else if (op == "-")
-                out << "    sub" << suf << " %" << rr << ", %" << rl << "\n";
+            {
+                out << "    sub" << suf << " %" << r_r << ", %" << r_l << "\n";
+            }
             else if (op == "*")
-                out << "    imul" << suf << " %" << rr << ", %" << rl << "\n";
+            {
+                out << "    imul" << suf << " %" << r_r << ", %" << r_l << "\n";
+            }
             else if (op == "/")
             {
-                out << "    mov" << suf << " %" << rl << ", %rax\n"
-                                                         "    cqo\n"
-                                                         "    idiv"
-                    << suf << " %" << rr << "\n";
-                alloc.free(rl);
+                // Signed division
+                if (tr.bits == 32)
+                {
+                    // dividend in EAX, sign‑extend to EDX:EAX
+                    out << "    movl %" << r_l << ", %eax\n"
+                                                  "    cltd\n"
+                                                  "    idivl %"
+                        << r_r << "\n"
+                                  "    movl %eax, %"
+                        << r_l << "\n";
+                }
+                else
+                {
+                    // dividend in RAX, sign‑extend to RDX:RAX
+                    out << "    movq %" << r_l << ", %rax\n"
+                                                  "    cqo\n"
+                                                  "    idivq %"
+                        << r_r << "\n"
+                                  "    movq %rax, %"
+                        << r_l << "\n";
+                }
                 alloc.free(rr);
-                noteType("rax", tr);
-                return std::string("rax");
-            }
-            else if (op == "==" || op == "!=" || op == ">=" || op == ">" || op == "<=" || op == "<")
-            {
-                out << "    cmp" << suf << " %" << rr << ", %" << rl << "\n"
-                    << "    " << assembly_operations[op] << " %al\n"
-                    << "    movzbq %al, %" << rl << "\n";
-                alloc.free(rr);
-                noteType(rl, {64, false, true});
+                noteType(r_l, tr);
                 return rl;
             }
-            else if (op == "&&" || op == "&")
-                out << "    and" << suf << " %" << rr << ", %" << rl << "\n";
-            else if (op == "||" || op == "|")
-                out << "    or" << suf << " %" << rr << ", %" << rl << "\n";
+            else if (assembly_operations.count(op))
+            {
+                out << "    cmp" << suf << " %" << r_r << ", %" << r_l << "\n"
+                    << "    " << assembly_operations[op] << " %al\n"
+                    << "    movzbq %al, %" << r_l << "\n";
+                alloc.free(rr);
+                noteType(rl, node->scope->lookupType("boolean"));
+                return rl;
+            }
+            else if (op == "&&" || op == "||" || op == "&" || op == "|")
+            {
+                std::string instr;
+                if (op == "&&")
+                    instr = "and";
+                else if (op == "||")
+                    instr = "or";
+                else
+                    instr = op; // "&" or "|"
+                out << "    " << instr << suf << " %" << r_r << ", %" << r_l << "\n";
+            }
             else
+            {
                 throw std::runtime_error("Unsupported int op " + op);
+            }
 
             alloc.free(rr);
             noteType(rl, tr);
             return rl;
         }
 
-        // === Boolean literal & unary ops stay identical ===
+        // === BooleanLiteral & UnaryOp ===
         if (node->type == NT::BooleanLiteral)
         {
             auto r = alloc.allocate();
             out << "    movq $" << (node->value == "true" ? "1" : "0")
                 << ", %" << r << "\n";
-            noteType(r, {64, false, false});
+            noteType(r, node->scope->lookupType("boolean"));
             return r;
         }
+        // --- UnaryOp ---
         if (node->type == NT::UnaryOp)
         {
-            auto op = node->value;
-            if (op == "!")
+            const auto &op = node->value;
+            if (op == "!" || op == "++" || op == "--")
             {
-                auto r = emitExpr(node->children[0].get(), out, alloc);
-                out << "    cmpq $0, %" << r << "\n"
-                                                "    sete %al\n"
-                                                "    movzbq %al, %"
-                    << r << "\n";
-                noteType(r, {64, false, false});
-                return r;
-            }
-            if (op == "++" || op == "--")
-            {
-                auto var = node->children[0]->value;
-                auto r = alloc.allocate();
-                out << "    movq " << var << "(%rip), %" << r << "\n"
-                                                                 "    "
-                    << (op == "++" ? "incq " : "decq ") << "%" << r << "\n"
-                                                                       "    movq %"
-                    << r << ", " << var << "(%rip)\n";
-                noteType(r, {64, false, true});
-                return r;
+                // Fetch the operand AST and its variable name (must be VariableAccess)
+                const ASTNode *child = node->children[0].get();
+                if (child->type != NodeType::VariableAccess)
+                    throw std::runtime_error(op + " can only be applied to variables");
+
+                std::string varName = child->value;
+                auto &scp = *child->scope;
+                TypeInfo ti = scp.lookupType(scp.lookupVariable(varName).type);
+
+                if (op == "!")
+                {
+                    auto r = emitExpr(child, out, alloc);
+                    out << "    cmpq $0, %" << r << "\n"
+                                                    "    sete %al\n"
+                                                    "    movzbq %al, %"
+                        << r << "\n";
+                    noteType(r, node->scope->lookupType("boolean"));
+                    return r;
+                }
+
+                if (ti.isFloat)
+                    throw std::runtime_error("Operator '" + op + "' not supported on float");
+
+                uint64_t sz = ti.bits / 8;
+                char suf = getIntSuffix(ti.bits);
+
+                std::string r = alloc.allocate();
+                std::string adj = adjustReg(r, ti.bits);
+                if (scp.isGlobalVariable(varName))
+                {
+                    out << "    " << getCorrectMove(sz, /*isFloat=*/false)
+                        << " " << varName << "(%rip), %" << adj << "\n";
+                }
+                else
+                {
+                    int64_t off = scp.getVariableOffset(varName);
+                    out << "    " << getCorrectMove(sz, /*isFloat=*/false)
+                        << " " << off << "(%rbp), %" << adj << "\n";
+                }
+
+                out << "    " << (op == "++" ? "inc" : "dec") << suf
+                    << " %" << adj << "\n";
+
+                if (scp.isGlobalVariable(varName))
+                {
+                    out << "    " << getCorrectMove(sz, /*isFloat=*/false)
+                        << " %" << adj << ", " << varName << "(%rip)\n";
+                }
+                else
+                {
+                    int64_t off = scp.getVariableOffset(varName);
+                    out << "    " << getCorrectMove(sz, /*isFloat=*/false)
+                        << " %" << adj << ", " << off << "(%rbp)\n";
+                }
+                noteType(adj, {ti.bits, ti.align, /*isFloat=*/false, ti.isSigned});
+                return adj;
             }
         }
 
         throw std::runtime_error("Unsupported expr");
     }
 
-    std::string CodeGenLinux::getCorrectMove(const uint64_t size_bytes)
+    char CodeGenLinux::getIntSuffix(uint64_t bits) const
     {
-        switch (size_bytes)
+        switch (bits)
         {
+        case 64:
+            return 'q';
+        case 32:
+            return 'l';
+        case 16:
+            return 'w';
         case 8:
-            return "movq";
-        case 4:
-            return "movl";
-        case 2:
-            return "movw";
-        case 1:
-            return "movb";
+            return 'b';
         default:
-            throw std::runtime_error("Unsupported size for move");
+            throw std::runtime_error("Invalid integer size");
         }
     }
 
-    void CodeGenLinux::generateStatement(const ASTNode *s, std::ostream &out)
+    std::string CodeGenLinux::getCorrectMove(uint64_t s, bool f)
     {
-        if (s->type == NodeType::VariableDeclaration)
+        if (f)
         {
-            if (s->children.size() == 2)
-            {
-                auto &scope = *s->scope;
-                auto varName = s->value;
-                auto varTypeName = scope.lookupVariable(varName).type;
-                std::uint64_t size = scope.lookupType(varTypeName).bits / 8;
-
-                std::string r = emitExpr(s->children[1].get(), out, alloc);
-
-                if (scope.isGlobalScope())
-                {
-                    out << "    " << getCorrectMove(size)
-                        << " %" << r << ", " << varName << "(%rip)\n";
-                }
-                else
-                {
-                    // Stack-based variable: store at [rbp + offset]
-                    int offset = scope.getVariableOffset(varName);
-                    out << "    " << getCorrectMove(size)
-                        << " %" << r << ", " << offset << "(%rbp)\n";
-                }
-                alloc.free(r);
-            }
-            // else case remains
+            if (s == 4)
+                return "movss";
+            else if (s == 8)
+                return "movsd";
+            else
+                throw std::runtime_error("Bad float move size");
         }
-        if (s->type == NodeType::VariableReassignment && !s->children.empty())
+        else
         {
-            auto &scope = *s->scope;
-            auto varName = s->value;
-            auto varTypeName = scope.lookupVariable(varName).type;
-            std::uint64_t size = scope.lookupType(varTypeName).bits / 8;
-
-            std::string r = emitExpr(s->children[0].get(), out, alloc);
-
-            if (scope.isGlobalScope())
+            switch (s)
             {
-                out << "    " << getCorrectMove(size)
-                    << " %" << r << ", " << varName << "(%rip)\n";
+            case 8:
+                return "movq";
+            case 4:
+                return "movl";
+            case 2:
+                return "movw";
+            case 1:
+                return "movb";
+            }
+            throw std::runtime_error("Bad int move size");
+        }
+    }
+
+    void CodeGenLinux::generateStatement(const ASTNode *s,
+                                         std::ostream &out)
+    {
+        using NT = NodeType;
+
+        if (s->type == NT::VariableReassignment)
+        {
+            auto &scp = *s->scope;
+            auto nm = s->value;
+            auto ti = scp.lookupType(scp.lookupVariable(nm).type);
+            uint64_t sz = ti.bits / 8;
+            auto r = emitExpr(s->children.back().get(), out, alloc);
+
+            if (ti.isFloat)
+            {
+                out << "    " << (sz == 4 ? "movss %" : "movsd %") << r
+                    << ", "
+                    << (scp.isGlobalVariable(nm) ? nm + "(%rip)"
+                                                 : std::to_string(scp.getVariableOffset(nm)) + "(%rbp)")
+                    << "\n";
+                alloc.freeXMM(r);
             }
             else
             {
-                int offset = scope.getVariableOffset(varName);
-                out << "    " << getCorrectMove(size)
-                    << " %" << r << ", " << offset << "(%rbp)\n";
+                std::string adj = adjustReg(r, ti.bits);
+                out << "    " << getCorrectMove(sz, false)
+                    << " %" << adj << ", "
+                    << (scp.isGlobalVariable(nm) ? nm + "(%rip)"
+                                                 : std::to_string(scp.getVariableOffset(nm)) + "(%rbp)")
+                    << "\n";
+                alloc.free(r);
             }
-            alloc.free(r);
+            return;
         }
-        if (s->type == NodeType::IfStatement)
+
+        if (s->type == NT::VariableDeclaration)
+        {
+            auto &scp = *s->scope;
+            auto nm = s->value;
+            auto ti = scp.lookupType(scp.lookupVariable(nm).type);
+            uint64_t sz = ti.bits / 8;
+
+            if (!scp.isGlobalVariable(nm))
+            {
+                out << "    # Making space for variable named: " << nm << "\n";
+                out << "    subq $" << sz << ", %rsp\n";
+                if (s->children.size() >= 2)
+                {
+                    auto r = emitExpr(s->children.back().get(), out, alloc);
+                    if (ti.isFloat)
+                    {
+                        out << "    " << (sz == 4 ? "movss %" : "movsd %") << r
+                            << ", "
+                            << std::to_string(scp.getVariableOffset(nm)) + "(%rbp)"
+                            << "\n";
+                        alloc.freeXMM(r);
+                    }
+                    else
+                    {
+                        std::string adj = adjustReg(r, ti.bits);
+                        out << "    " << getCorrectMove(sz, false)
+                            << " %" << adj << ", "
+                            << std::to_string(scp.getVariableOffset(nm)) + "(%rbp)"
+                            << "\n";
+                        alloc.free(r);
+                    }
+                }
+                else
+                {
+                    if (ti.isFloat)
+                    {
+                        out << "    " << (sz == 4 ? "movss $0.0, (%rsp)" : "movsd $0.0, (%rsp)") << "\n";
+                    }
+                    else
+                    {
+                        out << "    " << getCorrectMove(sz, false) << " $0, (%rsp)" << "\n";
+                    }
+                }
+            }
+            else
+            {
+                if (s->children.size() >= 2)
+                {
+                    auto r = emitExpr(s->children.back().get(), out, alloc);
+                    if (ti.isFloat)
+                    {
+                        out << "    " << (sz == 4 ? "movss %" : "movsd %") << r
+                            << ", "
+                            << nm + "(%rip)"
+                            << "\n";
+                        alloc.freeXMM(r);
+                    }
+                    else
+                    {
+                        std::string adj = adjustReg(r, ti.bits);
+                        out << "    " << getCorrectMove(sz, false)
+                            << " %" << adj << ", "
+                            << nm + "(%rip)"
+                            << "\n";
+                        alloc.free(r);
+                    }
+                }
+                else
+                {
+                    if (ti.isFloat)
+                    {
+                        out << "    " << (sz == 4 ? "movss $0.0, " + nm + "(%rip)" : "movsd $0.0, " + nm + "(%rip)") << "\n";
+                    }
+                    else
+                    {
+                        out << "    " << getCorrectMove(sz, false) << " $0, " + nm + "(%rip)" << "\n";
+                    }
+                }
+            }
+
+            return;
+        }
+        if (s->type == NT::IfStatement)
         {
             int id = labelCounter++;
             std::string elseLbl = ".Lelse" + std::to_string(id);
@@ -304,14 +522,14 @@ namespace zlang
                 auto blkScope = blockNode->scope;
                 int allocSize = -blkScope->stackOffset + 8;
                 // +8 to cover the pushed RBP
-                out << "    ; Block Starts (scope enter)\n";
+                out << "    # Block Starts (scope enter)\n";
                 out << "    push   %rbp\n";
                 out << "    mov    %rsp, %rbp\n";
                 out << "    sub    $" << allocSize << ", %rsp\n";
             };
             auto emitEpilogue = [&]()
             {
-                out << "    ; Block Ends (scope exit)\n";
+                out << "    # Block Ends (scope exit)\n";
                 out << "    leave\n";
             };
             const ASTNode *ifBlock = s->children[1].get();
@@ -326,11 +544,9 @@ namespace zlang
             {
                 if (branch->type == NodeType::ElseIfStatement)
                 {
-                    // test
                     auto r2 = emitExpr(branch->children[0].get(), out, alloc);
                     out << "    cmpq $0, %" << r2 << "\n";
                     out << "    je   " << elseLbl << "\n";
-                    // on false, fall through to next
                     alloc.free(r2);
 
                     const ASTNode *elifBlock = branch->children[1].get();
@@ -356,7 +572,6 @@ namespace zlang
                 << endLbl << ":\n\n";
             return;
         }
-        out << "\n";
     }
 
     void CodeGenLinux::generate(const ASTNode *program, std::ostream &out, bool isFirst)
@@ -402,4 +617,4 @@ namespace zlang
             out << "    movq $60, %rax\n    movq $0, %rdi\n    syscall\n";
         }
     }
-}
+} // namespace zlang

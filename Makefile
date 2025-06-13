@@ -1,5 +1,5 @@
 CXX := g++
-CXXFLAGS := -std=c++20 -Wall -Wextra -Iinclude -g -O2 -Werror -Wreorder -D_FORTIFY_SOURCE=2 -D_GLIBCXX_ASSERTIONS -fstack-protector-strong -fstack-clash-protection -Wpedantic -pedantic
+CXXFLAGS := -std=c++20 -Wall -Wextra -Iinclude -g -O2 -Wreorder -D_FORTIFY_SOURCE=2 -D_GLIBCXX_ASSERTIONS -fstack-protector-strong -fstack-clash-protection -Wpedantic -pedantic
 
 # Directories
 SRC_DIR := src
