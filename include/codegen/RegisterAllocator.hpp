@@ -29,10 +29,10 @@ namespace zlang
 
         /// Reset allocator state (mark all as free)
         void reset();
+        RegisterAllocator() = default;
 
     private:
         RegisterAllocator(std::vector<std::string> regs);
-
         std::vector<std::string> available;
         std::unordered_set<std::string> inUse;
 

@@ -75,8 +75,24 @@ int main(int argc, char *argv[])
     if (!typeChecker.shouldCodegen())
         return 1;
 
+    std::ostream *outstream = &std::cout;
+    std::ofstream ofs;
+
+    // Only open the file if requested:
+    if (!cli.getOutputFile().empty())
+    {
+        ofs.open(cli.getOutputFile());
+        if (!ofs)
+        {
+            std::cerr << "Error: cannot open output file: "
+                      << cli.getOutputFile() << "\n";
+            std::exit(1);
+        }
+        outstream = &ofs; // now point at the file
+    }
+
     std::unique_ptr<zlang::CodeGen> cg =
-        CodeGen::create(TargetTriple::X86_64_LINUX);
+        CodeGen::create(TargetTriple::X86_64_LINUX, *outstream);
 
     switch (cli.getFormat())
     {
@@ -85,25 +101,25 @@ int main(int argc, char *argv[])
         cg = CodeGen::create(TargetTriple::X86_64_WINDOWS);
 #endif
 #ifdef __linux__
-        cg = CodeGen::create(TargetTriple::X86_64_LINUX);
+        cg = CodeGen::create(TargetTriple::X86_64_LINUX, *outstream);
 #endif
         break;
 
     case CodegenOutputFormat::X86_64_MSWIN:
     {
-        cg = CodeGen::create(TargetTriple::X86_64_WINDOWS);
+        cg = CodeGen::create(TargetTriple::X86_64_WINDOWS, *outstream);
         break;
     }
 
     case CodegenOutputFormat::X86_64_LINUX:
     {
-        cg = CodeGen::create(TargetTriple::X86_64_LINUX);
+        cg = CodeGen::create(TargetTriple::X86_64_LINUX, *outstream);
         break;
     }
 
     case CodegenOutputFormat::LLVM_IR:
     {
-        cg = CodeGen::create(TargetTriple::LLVM_IR);
+        cg = CodeGen::create(TargetTriple::LLVM_IR, *outstream);
         break;
     }
 
@@ -112,22 +128,7 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    if (cli.getOutputFile().empty())
-    {
-        cg->generate(program.get(), std::cout, true);
-    }
-    else
-    {
-        std::ofstream ofs(cli.getOutputFile());
-        if (!ofs)
-        {
-            std::cerr << "Error: cannot open output file: "
-                      << cli.getOutputFile() << "\n";
-            exit(1);
-        }
-        std::cout << "HERE" << std::endl;
-        cg->generate(program.get(), ofs, true);
-    }
+    cg->generate(std::move(program));
 
     return 0;
 }

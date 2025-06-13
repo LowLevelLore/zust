@@ -16,7 +16,7 @@
 
 #include "typechecker/TypeChecker.hpp"
 
-#include "codegen/Codegen.hpp"
+#include "codegen/CodeGen.hpp"
 #include "codegen/RegisterAllocator.hpp"
 
 #include <sstream>
