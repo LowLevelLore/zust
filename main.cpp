@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    if (cli.getVerbosity() == 1)
+    if (cli.printAST())
     {
         if (!program.get())
         {

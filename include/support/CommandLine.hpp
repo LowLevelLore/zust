@@ -34,7 +34,7 @@ namespace zlang
         std::string getOutputFile() const noexcept;
         CodegenOutputFormat getFormat() const noexcept;
         int getVerbosity() const noexcept;
-
+        bool printAST() const noexcept;
         static void printUsage(const std::string &programName);
         static void printFormats();
 
@@ -45,6 +45,7 @@ namespace zlang
         CliError error;
 
         bool helpFlag = false;
+        bool printAST_ = false;
         bool formatsFlag = false;
         int verbosity = 1;
 

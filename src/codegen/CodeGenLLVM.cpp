@@ -184,12 +184,11 @@ namespace zlang
 
     void CodeGenLLVM::emitEpilogue()
     {
+        out << "    ; Block ends\n";
     }
     void CodeGenLLVM::emitPrologue(std::unique_ptr<ASTNode> blockNode)
     {
-        out << fresh() << ":\n";
     }
-
     void CodeGenLLVM::generateStatement(std::unique_ptr<ASTNode> statement)
     {
         switch (statement->type)
@@ -213,7 +212,6 @@ namespace zlang
             throw std::runtime_error("Unknown statement encountered.");
         }
     }
-
     void CodeGenLLVM::generateVariableReassignment(
         std::unique_ptr<ASTNode> node)
     {
@@ -242,50 +240,78 @@ namespace zlang
     void CodeGenLLVM::generateIfStatement(std::unique_ptr<ASTNode> statement)
     {
         int id = blockLabelCount++;
-        std::string elseLbl = ".Lelse" + std::to_string(id);
-        std::string endLbl = ".Lend" + std::to_string(id);
-        auto condR = emitExpression(std::move(statement->children[0]));
-        out << "    cmpq $0, %" << condR << "\n";
-        out << "    je " << elseLbl << "\n";
-        alloc.free(condR);
-        std::unique_ptr<ASTNode> ifBlock = std::move(statement->children[1]);
+        std::string thenLbl = "if.then" + std::to_string(id);
+        std::string elseLbl = "if.else" + std::to_string(id);
+        std::string endLbl = "if.end" + std::to_string(id);
+
+        // Emit the condition
+        auto condVal = emitExpression(std::move(statement->children[0])); // e.g., %1
+
+        // Compare the result to 0 (false)
+        std::string condBool = fresh(); // e.g., %2
+        out << "    " << condBool << " = icmp ne i1 " << condVal << ", 0\n";
+        out << "    br i1 " << condBool << ", label %" << thenLbl << ", label %" << elseLbl << "\n";
+
+        // Then block
+        out << thenLbl << ":\n";
+        auto ifBlock = std::move(statement->children[1]);
+        auto children = std::move(ifBlock->children);
         emitPrologue(std::move(ifBlock));
-        for (auto &statement : ifBlock->children)
-            generateStatement(std::move(statement));
+        for (auto &stmt : children)
+            generateStatement(std::move(stmt));
         emitEpilogue();
-        out << "    jmp   " << endLbl << "\n";
+        out << "    br label %" << endLbl << "\n";
+
+        // Else or ElseIf
         out << elseLbl << ":\n";
         ASTNode *branch = statement->getElseBranch();
         while (branch)
         {
             if (branch->type == NodeType::ElseIfStatement)
             {
-                auto r2 = emitExpression(std::move(branch->children[0]));
-                out << "    cmpq $0, %" << r2 << "\n";
-                out << "    je   " << elseLbl << "\n";
-                alloc.free(r2);
+                auto elifCond = emitExpression(std::move(branch->children[0]));
+                std::string elifBool = fresh();
+                out << "    " << elifBool << " = icmp ne i1 " << elifCond << ", 0\n";
 
-                std::unique_ptr<ASTNode> elifBlock = std::move(branch->children[1]);
+                std::string elifThen = "elif.then" + std::to_string(blockLabelCount);
+                std::string elifNext = "elif.next" + std::to_string(blockLabelCount);
+                blockLabelCount++;
+
+                out << "    br i1 " << elifBool << ", label %" << elifThen << ", label %" << elifNext << "\n";
+
+                // Elif then block
+                out << elifThen << ":\n";
+                auto elifBlock = std::move(branch->children[1]);
+                auto elifChildren = std::move(elifBlock->children);
                 emitPrologue(std::move(elifBlock));
-                for (auto &statement : elifBlock->children)
-                    generateStatement(std::move(statement));
+                for (auto &stmt : elifChildren)
+                    generateStatement(std::move(stmt));
                 emitEpilogue();
-                out << "    jmp   " << endLbl << "\n";
+                out << "    br label %" << endLbl << "\n";
 
+                // Prepare for next else
+                out << elifNext << ":\n";
                 branch = branch->getElseBranch();
             }
             else if (branch->type == NodeType::ElseStatement)
             {
-                std::unique_ptr<ASTNode> elseBlock = std::move(branch->children[0]);
+                auto elseBlock = std::move(branch->children[0]);
+                auto elseChildren = std::move(elseBlock->children);
                 emitPrologue(std::move(elseBlock));
-                for (auto &statement : elseBlock->children)
-                    generateStatement(std::move(statement));
+                for (auto &stmt : elseChildren)
+                    generateStatement(std::move(stmt));
                 emitEpilogue();
+                out << "    br label %" << endLbl << "\n";
+                break;
+            }
+            else
+            {
                 break;
             }
         }
-        out << endLbl << ":\n\n";
-        return;
+
+        // End block
+        out << endLbl << ":\n";
     }
 
     void CodeGenLLVM::generate(std::unique_ptr<ASTNode> program)

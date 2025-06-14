@@ -353,7 +353,6 @@ namespace zlang
     {
         out << "    # Block Ends (scope exit)\n";
         out << "    leave\n";
-        out << "    ret\n";
     }
     void CodeGenLinux::emitPrologue(std::unique_ptr<ASTNode> blockNode)
     {
@@ -393,6 +392,7 @@ namespace zlang
     void CodeGenLinux::generateVariableReassignment(
         std::unique_ptr<ASTNode> statement)
     {
+        logMessage("Inside Reassignment");
         auto &scp = *statement->scope;
         auto nm = statement->value;
         auto ti = scp.lookupType(scp.lookupVariable(nm).type);
@@ -514,9 +514,12 @@ namespace zlang
         out << "    je " << elseLbl << "\n";
         alloc.free(condR);
         std::unique_ptr<ASTNode> ifBlock = std::move(statement->children[1]);
+        std::vector<std::unique_ptr<zlang::ASTNode>> children = std::move(ifBlock->children);
         emitPrologue(std::move(ifBlock));
-        for (auto &stmt : ifBlock->children)
+        for (auto &stmt : children)
+        {
             generateStatement(std::move(stmt));
+        }
         emitEpilogue();
         out << "    jmp   " << endLbl << "\n";
         out << elseLbl << ":\n";
@@ -531,8 +534,9 @@ namespace zlang
                 alloc.free(r2);
 
                 std::unique_ptr<ASTNode> elifBlock = std::move(branch->children[1]);
+                std::vector<std::unique_ptr<zlang::ASTNode>> children = std::move(elifBlock->children);
                 emitPrologue(std::move(elifBlock));
-                for (auto &stmt : elifBlock->children)
+                for (auto &stmt : children)
                     generateStatement(std::move(stmt));
                 emitEpilogue();
                 out << "    jmp   " << endLbl << "\n";
@@ -542,8 +546,9 @@ namespace zlang
             else if (branch->type == NodeType::ElseStatement)
             {
                 std::unique_ptr<ASTNode> elseBlock = std::move(branch->children[0]);
+                std::vector<std::unique_ptr<zlang::ASTNode>> children = std::move(elseBlock->children);
                 emitPrologue(std::move(elseBlock));
-                for (auto &stmt : elseBlock->children)
+                for (auto &stmt : children)
                     generateStatement(std::move(stmt));
                 emitEpilogue();
                 break;

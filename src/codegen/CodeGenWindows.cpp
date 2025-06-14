@@ -309,7 +309,6 @@ namespace zlang
     {
         out << "    # Block Ends (scope exit)\n";
         out << "    leave\n";
-        out << "    ret\n";
     }
     void CodeGenWindows::emitPrologue(std::unique_ptr<ASTNode> blockNode)
     {
@@ -477,9 +476,12 @@ namespace zlang
         out << "    je " << elseLbl << "\n";
         alloc.free(condR);
         std::unique_ptr<ASTNode> ifBlock = std::move(statement->children[1]);
+        std::vector<std::unique_ptr<zlang::ASTNode>> children = std::move(ifBlock->children);
         emitPrologue(std::move(ifBlock));
-        for (auto &statement : ifBlock->children)
-            generateStatement(std::move(statement));
+        for (auto &stmt : children)
+        {
+            generateStatement(std::move(stmt));
+        }
         emitEpilogue();
         out << "    jmp   " << endLbl << "\n";
         out << elseLbl << ":\n";
@@ -494,9 +496,10 @@ namespace zlang
                 alloc.free(r2);
 
                 std::unique_ptr<ASTNode> elifBlock = std::move(branch->children[1]);
+                std::vector<std::unique_ptr<zlang::ASTNode>> children = std::move(elifBlock->children);
                 emitPrologue(std::move(elifBlock));
-                for (auto &statement : elifBlock->children)
-                    generateStatement(std::move(statement));
+                for (auto &stmt : children)
+                    generateStatement(std::move(stmt));
                 emitEpilogue();
                 out << "    jmp   " << endLbl << "\n";
 
@@ -505,9 +508,10 @@ namespace zlang
             else if (branch->type == NodeType::ElseStatement)
             {
                 std::unique_ptr<ASTNode> elseBlock = std::move(branch->children[0]);
+                std::vector<std::unique_ptr<zlang::ASTNode>> children = std::move(elseBlock->children);
                 emitPrologue(std::move(elseBlock));
-                for (auto &statement : elseBlock->children)
-                    generateStatement(std::move(statement));
+                for (auto &stmt : children)
+                    generateStatement(std::move(stmt));
                 emitEpilogue();
                 break;
             }

@@ -6,4 +6,6 @@ build/
 
 temp*
 
-*.txt
+tests/asm/
+tests/executable/
+tests/object/

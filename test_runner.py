@@ -1,53 +1,89 @@
 #!/usr/bin/env python3
 import subprocess
 import sys
+import os
 from pathlib import Path
 import shutil
 
-# Your compiler driver:
-ZPILER = "zpiler"  
+# ANSI colors
+RED = "\033[91m"
+GREEN = "\033[92m"
+YELLOW = "\033[93m"
+CYAN = "\033[96m"
+BOLD = "\033[1m"
+RESET = "\033[0m"
 
-# Per‐target invocation info:
+# Your compiler driver:
+ZPILER = "zpiler"
+
+# Per‑target invocation info:
 TARGETS = {
     "linux": {
-        "zpiler_flag": "--target X86_64_LINUX",
+        "zpiler_flag": "--format x86_64-linux",
         "asm_ext": ".s",
-        # assemble with 'as', link with 'ld'
         "assemble": lambda asm, obj: ["as", asm, "-o", obj],
-        "link":    lambda obj, exe: ["ld", obj, "-o", exe]
+        "link": lambda obj, exe: ["ld", obj, "-o", exe],
     },
     "windows": {
-        "zpiler_flag": "--target X86_64_WINDOWS",
-        "asm_ext": ".asm",  # MASM‐style source
-        # assemble with ml64, link with link.exe
+        "zpiler_flag": "--format x86_64-mswin",
+        "asm_ext": ".asm",
         "assemble": lambda asm, obj: ["ml64", "/nologo", "/c", asm, "/Fo" + obj],
-        "link":    lambda obj, exe: ["link", "/nologo", "/SUBSYSTEM:CONSOLE",
-                                     "/OUT:" + exe, obj]
+        "link": lambda obj, exe: [
+            "link",
+            "/nologo",
+            "/SUBSYSTEM:CONSOLE",
+            "/OUT:" + exe,
+            obj,
+        ],
     },
     "llvm": {
-        "zpiler_flag": "--target LLVM_IR",
+        "zpiler_flag": "--format llvm-ir",
         "asm_ext": ".ll",
         "assemble": lambda ir, obj: ["llc", "-filetype=obj", ir, "-o", obj],
-        "link":    lambda obj, exe: ["clang", obj, "-o", exe]
-    }
+        "link": lambda obj, exe: ["clang", obj, "-o", exe],
+    },
 }
 
 ROOT = Path(__file__).parent.resolve()
-TEST_ZZ = ROOT / "test" / "zz"
-ASM_DIR  = ROOT / "test" / "asm"
-OBJ_DIR  = ROOT / "test" / "object"
-EXE_DIR  = ROOT / "test" / "executable"
+TEST_ZZ = ROOT / "tests" / "zz"
+ASM_DIR = ROOT / "tests" / "asm"
+OBJ_DIR = ROOT / "tests" / "object"
+EXE_DIR = ROOT / "tests" / "executable"
+
 
 def run(cmd):
-    print("> " + " ".join(cmd))
+    print(f"{CYAN}> {' '.join(cmd)}{RESET}")
     proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if proc.returncode != 0:
-        sys.stderr.write(proc.stderr.decode())
+        sys.stderr.write(f"{RED}{proc.stderr.decode()}{RESET}")
         sys.exit(proc.returncode)
     return proc.stdout
 
+
+def detect_native_target():
+    plat = sys.platform
+    if plat.startswith("linux"):
+        return "linux"
+    if plat.startswith("win32") or plat.startswith("cygwin"):
+        return "windows"
+    return "llvm"
+
+
 def main():
-    # Clean outputs
+    env = os.getenv("TARGET")
+    if env:
+        wanted = [t.strip() for t in env.split(",") if t.strip() in TARGETS]
+        if not wanted:
+            print(
+                f"{RED}ERROR: TARGET={env} contains no known backends{RESET}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+    else:
+        wanted = [detect_native_target()]
+
+    print(f"{BOLD}Running tests for targets: {YELLOW}{wanted}{RESET}")
+
     for d in (ASM_DIR, OBJ_DIR, EXE_DIR):
         if d.exists():
             shutil.rmtree(d)
@@ -55,44 +91,41 @@ def main():
 
     zz_files = list(TEST_ZZ.rglob("*.zz"))
     if not zz_files:
-        print("No .zz tests found.")
+        print(f"{YELLOW}No .zz tests found.{RESET}")
         sys.exit(1)
 
-    for target, cfg in TARGETS.items():
-        print(f"\n=== Testing {target} ===")
+    for target in wanted:
+        cfg = TARGETS[target]
+        print(f"\n{BOLD}=== Testing {YELLOW}{target}{RESET} ===")
         for zz in zz_files:
             rel = zz.relative_to(TEST_ZZ)
-            asm_out = ASM_DIR  / target / rel.with_suffix(cfg["asm_ext"])
-            obj_out = OBJ_DIR  / target / rel.with_suffix(".obj")
-            exe_out = EXE_DIR  / target / rel.with_suffix(".exe")
+            asm_out = ASM_DIR / target / rel.with_suffix(cfg["asm_ext"])
+            obj_out = OBJ_DIR / target / rel.with_suffix(".obj")
+            exe_out = EXE_DIR / target / rel.with_suffix(".exe")
 
-            asm_out.parent.mkdir(parents=True, exist_ok=True)
-            obj_out.parent.mkdir(parents=True, exist_ok=True)
-            exe_out.parent.mkdir(parents=True, exist_ok=True)
+            for p in (asm_out.parent, obj_out.parent, exe_out.parent):
+                p.mkdir(parents=True, exist_ok=True)
 
-            # 1) Emit assembly/IR
-            run([ZPILER] + cfg["zpiler_flag"].split()
-                + ["-o", str(asm_out), str(zz)])
-
-            # 2) Assemble → object
+            run([ZPILER] + cfg["zpiler_flag"].split() + ["-o", str(asm_out), str(zz)])
             run(cfg["assemble"](str(asm_out), str(obj_out)))
-
-            # 3) Link → executable
             run(cfg["link"](str(obj_out), str(exe_out)))
 
-            # 4) Run it
             print(f"Running {exe_out} …")
             res = subprocess.run([str(exe_out)])
             if res.returncode != 0:
-                sys.stderr.write(f"FAIL: {rel} on {target} returned {res.returncode}\n")
+                sys.stderr.write(
+                    f"{RED}FAIL: {rel} on {target} returned {res.returncode}{RESET}\n"
+                )
                 sys.exit(res.returncode)
             else:
-                print(f"PASS: {rel} ✓")
+                print(f"{GREEN}PASS: {rel} ✓{RESET}")
 
-    # Cleanup executables
-    print("\nCleaning up executables…")
+    print(f"\n{CYAN}Cleaning up trash{RESET}")
     shutil.rmtree(EXE_DIR)
-    print("All tests passed!")
+    shutil.rmtree(OBJ_DIR)
+    shutil.rmtree(ASM_DIR)
+    print(f"{GREEN}All tests passed!{RESET}")
+
 
 if __name__ == "__main__":
     main()
