@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    paths:
+      - '**.zz'
+      - 'src/**'
+      - 'test/zz/**'
+  pull_request: {}
+
+jobs:
+  test-linux-llvm:
+    name: Test Linux & LLVM
+    runs-on: ubuntu-latest
+    env:
+      # Only run the linux & llvm targets in this job
+      RUN_TARGETS: linux,llvm
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Dependencies (Ubuntu)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            mingw-w64 \
+            llvm \
+            clang \
+            cmake \
+            python3 \
+            python3-pip
+
+      - name: Build zpiler
+        run: |
+          mkdir build && cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release
+          cmake --build . -- -j
+          sudo cp zpiler /usr/local/bin/
+
+      - name: Run Tests (Linux & LLVM)
+        run: |
+          # Tell the test runner which targets to run
+          export TEST_TARGETS=$RUN_TARGETS
+          python3 test_runner.py
+
+  test-windows:
+    name: Test Windows Backend
+    runs-on: windows-latest
+    env:
+      # Only run the windows target in this job
+      RUN_TARGETS: windows
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Dependencies (Windows)
+        shell: pwsh
+        run: |
+          choco install -y cmake visualstudio2019buildtools mingw # if you use mingw for build
+          # Or rely on pre‑installed VS + MSVC for native build
+
+      - name: Build zpiler (Windows)
+        shell: pwsh
+        run: |
+          mkdir build
+          cd build
+          cmake .. -G "Visual Studio 16 2019" -A x64 -DCMAKE_BUILD_TYPE=Release
+          cmake --build . --config Release
+          copy .\Release\zpiler.exe $Env:USERPROFILE\zpiler.exe
+          set PATH=$Env:USERPROFILE;$Env:PATH
+
+      - name: Run Tests (Windows)
+        shell: pwsh
+        run: |
+          $Env:TEST_TARGETS = $Env:RUN_TARGETS
+          python test_runner.py

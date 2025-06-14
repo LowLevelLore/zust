@@ -11,6 +11,7 @@ namespace zlang
     std::string CodeGenLLVM::intToXmm(const std::string &register_int,
                                       uint32_t bits)
     {
+        return "";
     }
 
     std::string CodeGenLLVM::generateIntegerLiteral(std::unique_ptr<ASTNode> node)
