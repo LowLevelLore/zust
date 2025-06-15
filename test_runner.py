@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 import shutil
 
-# ANSI colors
+# ANSI colors for not having eye cancer
 RED = "\033[91m"
 GREEN = "\033[92m"
 YELLOW = "\033[93m"
