@@ -98,7 +98,7 @@ int main(int argc, char *argv[])
     {
     case CodegenOutputFormat::Default:
 #ifdef _WIN64
-        cg = CodeGen::create(TargetTriple::X86_64_WINDOWS);
+        cg = CodeGen::create(TargetTriple::X86_64_WINDOWS, *outstream);
 #endif
 #ifdef __linux__
         cg = CodeGen::create(TargetTriple::X86_64_LINUX, *outstream);
