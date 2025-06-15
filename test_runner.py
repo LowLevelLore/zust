@@ -4,6 +4,7 @@ import sys
 import os
 from pathlib import Path
 import shutil
+import platform
 
 # ANSI colors for not having eye cancer
 RED = "\033[91m"
@@ -13,7 +14,7 @@ CYAN = "\033[96m"
 BOLD = "\033[1m"
 RESET = "\033[0m"
 
-ZPILER = "build/zpiler"
+ZPILER = "build/zpiler" if platform.system() != "Windows" else "build/Debug/zpiler.exe"
 
 # Per‑target invocation info:
 TARGETS = {
