@@ -8,8 +8,6 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Reproduce your flags exactly:
 set(COMMON_FLAGS
-    -Wall
-    -Wextra
     -g
     -O2
     -Wreorder
@@ -22,6 +20,12 @@ set(COMMON_FLAGS
     -Wno-unused-parameter
     -pedantic
 )
+
+if (MSVC)
+    add_compile_options(/W4 /WX)
+else()
+    add_compile_options(-Wall -Wextra)
+endif()
 
 # Append to both debug and release by default:
 string(REPLACE ";" " " FLAGS_STR "${COMMON_FLAGS}")
