@@ -3,7 +3,6 @@ import subprocess
 import sys
 import os
 from pathlib import Path
-import argparse
 import shutil
 
 # ANSI colors for not having eye cancer
@@ -14,14 +13,7 @@ CYAN = "\033[96m"
 BOLD = "\033[1m"
 RESET = "\033[0m"
 
-parser = argparse.ArgumentParser(description="Run zpiler tests")
-parser.add_argument(
-    "--zpiler-path",
-    default=os.getenv("ZPILER_PATH", "zpiler"),
-    help="Path to zpiler executable (defaults to 'zpiler' or $ZPILER_PATH)",
-)
-args = parser.parse_args()
-ZPILER = args.zpiler_path
+ZPILER = "build/zpiler"
 
 # Per‑target invocation info:
 TARGETS = {
