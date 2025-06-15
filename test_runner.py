@@ -42,6 +42,7 @@ TARGETS = {
         "assemble": lambda ir, obj: ["llc", "-filetype=obj", ir, "-o", obj],
         "link": lambda obj, exe: ["clang", obj, "-o", exe, "-no-pie"],
     },
+    #  Please Make windows work.
 }
 
 ROOT = Path(__file__).parent.resolve()

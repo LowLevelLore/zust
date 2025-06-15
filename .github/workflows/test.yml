@@ -9,7 +9,8 @@ on:
       - "include/**"
       - "main.cpp"
       - "*.yml"
-      - "test_runner.py"
+      - "**.py"
+      - "CMakeLists.txt"
   pull_request: {}
 
 jobs:
