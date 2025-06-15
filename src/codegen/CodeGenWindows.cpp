@@ -302,7 +302,6 @@ namespace zlang
             noteType(reg, ti);
             return reg;
         }
-
         throw std::runtime_error("Unknown Unary Operator: " + op);
     }
 
@@ -555,7 +554,6 @@ namespace zlang
             if (statement->type == NodeType::VariableDeclaration)
                 globals.push_back(statement.get());
 
-        std::cout << "GENERATE CALLED" << std::endl;
         outGlobal << ".data\n\n";
 
         for (auto &g : globals)
@@ -590,15 +588,14 @@ namespace zlang
             generateStatement(std::move(statement));
         }
 
-        out << "    mov rax, 60\n";
-        out << "    mov rdi, 0\n";
-        out << "    syscall\n";
+        out << "    xor eax, eax\n";
+        out << "    ret\n";
 
         out << "main ENDP\n";
 
         outfinal << outGlobal.str()
                  << "\n; ============== Globals End Here ==============\n"
-                 << out.str() << "\n\n";
+                 << out.str() << "END\n\n";
     }
 
 } // namespace zlang

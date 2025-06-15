@@ -8,7 +8,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Reproduce your flags exactly:
 if (MSVC)
-    add_compile_options(/W4 /WX /wd4244 /wd4456 /wd4100)
+    add_compile_options(/W4 /WX /wd4244 /wd4456 /wd4100 /Zi /Od)
 else()
     add_compile_options(
         -g

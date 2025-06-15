@@ -27,11 +27,12 @@ TARGETS = {
     "windows": {
         "zpiler_flag": "--format x86_64-mswin",
         "asm_ext": ".asm",
-        "assemble": lambda asm, obj: ["ml64", "/nologo", "/c", asm, "/Fo" + obj],
+        "assemble": lambda asm, obj: ["ml64", "/nologo", "/c", asm, "/Fo " + obj],
         "link": lambda obj, exe: [
             "link",
             "/nologo",
             "/SUBSYSTEM:CONSOLE",
+            "/ENTRY:main",
             "/OUT:" + exe,
             obj,
         ],
