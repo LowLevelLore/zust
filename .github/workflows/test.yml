@@ -63,4 +63,4 @@ jobs:
 
       - name: Run Tests
         shell: cmd
-        run: python ..\\test_runner.py --zpiler-path "%ZPILER_PATH%"
+        run: python test_runner.py --zpiler-path "%ZPILER_PATH%"
