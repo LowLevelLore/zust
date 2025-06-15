@@ -77,32 +77,39 @@ namespace zlang
     CodeGenWindows::generateVariableAccess(std::unique_ptr<ASTNode> node)
     {
         auto &scope = *node->scope;
-        auto name = node->value;
+        const std::string name = node->value;
         TypeInfo ti = scope.lookupType(scope.lookupVariable(name).type);
         uint64_t sz = ti.bits / 8;
+
+        // Determine the correct memory operand prefix
+        auto ptrPrefix = [&](const std::string &sym)
+        {
+            if (sz == 8)
+                return std::string("qword ptr ") + "[" + sym + "]";
+            if (sz == 4)
+                return std::string("dword ptr ") + "[" + sym + "]";
+            if (sz == 2)
+                return std::string("word ptr ") + "[" + sym + "]";
+            return std::string("byte ptr ") + "[" + sym + "]";
+        };
 
         if (scope.isGlobalVariable(name))
         {
             if (ti.isFloat)
             {
-                // global float: movss/movsd xmm0, PTR [name]
+                // Global float → load into XMM register
                 auto r_xmm = alloc.allocateXMM();
-                std::string mov = (sz == 4 ? "movss" : "movsd");
-                out << "    " << mov
-                    << " " << r_xmm
+                const char *mov = (sz == 4 ? "movss" : "movsd");
+                out << "    " << mov << " " << r_xmm
                     << ", PTR [" << name << "]\n";
                 noteType(r_xmm, ti);
                 return r_xmm;
             }
             else
             {
-                // global integer: mov    rax, qword ptr [name]
+                // Global integer → load into GP register
                 auto r = alloc.allocate();
-                std::string ptrSize = (sz == 8 ? "qword ptr " : sz == 4 ? "dword ptr "
-                                                            : sz == 2   ? "word ptr "
-                                                                        : "byte ptr ");
-                out << "    mov    " << r << ", "
-                    << ptrSize << "[" << name << "]\n";
+                out << "    mov    " << r << ", " << ptrPrefix(name) << "\n";
                 noteType(r, ti);
                 return r;
             }
@@ -112,24 +119,21 @@ namespace zlang
             int64_t off = scope.getVariableOffset(name);
             if (ti.isFloat)
             {
-                // stack float: movss/movsd xmm0, PTR [rbp - offset]
+                // Stack float → load into XMM register
                 auto r_xmm = alloc.allocateXMM();
                 const char *mov = (sz == 4 ? "movss" : "movsd");
-                out << "    " << mov
-                    << " " << r_xmm
+                out << "    " << mov << " " << r_xmm
                     << ", PTR [rbp - " << off << "]\n";
                 noteType(r_xmm, ti);
                 return r_xmm;
             }
             else
             {
-                // stack integer: mov    eax, dword ptr [rbp - offset]
+                // Stack integer → load into GP register
                 auto r = alloc.allocate();
-                std::string ptrSize = (sz == 8 ? "qword ptr " : sz == 4 ? "dword ptr "
-                                                            : sz == 2   ? "word ptr "
-                                                                        : "byte ptr ");
                 out << "    mov    " << r << ", "
-                    << ptrSize << "[rbp - " << off << "]\n";
+                    << ptrPrefix(std::string("rbp - ") + std::to_string(off))
+                    << "\n";
                 noteType(r, ti);
                 return r;
             }
@@ -149,41 +153,36 @@ namespace zlang
 
         if (tr.isFloat)
         {
-            // FP promotion
+            // FP path
             uint64_t bits = tr.bits;
             const char *suf = (bits == 32 ? "ss" : "sd");
-            // Convert ints → xmm if needed
+            // ints → xmm
             std::string xl = (t1.isFloat ? rl : intToXmm(rl, bits));
             std::string xr = (t2.isFloat ? rr : intToXmm(rr, bits));
 
-            // Instruction selection
             if (op == "+")
                 out << "    add" << suf << " " << xl << ", " << xr << "\n";
             else if (op == "-")
-                out
-                    << "    sub" << suf << " " << xl << ", " << xr << "\n";
+                out << "    sub" << suf << " " << xl << ", " << xr << "\n";
             else if (op == "*")
-                out
-                    << "    mul" << suf << " " << xl << ", " << xr << "\n";
+                out << "    mul" << suf << " " << xl << ", " << xr << "\n";
             else if (op == "/")
-                out
-                    << "    div" << suf << " " << xl << ", " << xr << "\n";
+                out << "    div" << suf << " " << xl << ", " << xr << "\n";
             else if (assembly_comparison_operations.count(op))
             {
+                // comparison → boolean via allocated GP reg
                 out << "    ucomi" << suf << " " << xl << ", " << xr << "\n";
-                out
-                    << "    " << assembly_comparison_operations.at(op) << " al\n";
-                out
-                    << "    movzx rax, al\n";
+                std::string result = alloc.allocate();
+                std::string low8 = std::string(1, result.back()) + "l";
+                out << "    " << assembly_comparison_operations.at(op) << " " << low8 << "\n";
+                out << "    movzx  " << result << ", " << low8 << "\n";
                 alloc.freeXMM(xl);
                 alloc.freeXMM(xr);
-                noteType("rax", node->scope->lookupType("boolean"));
-                return "rax";
+                noteType(result, node->scope->lookupType("boolean"));
+                return result;
             }
             else
-            {
                 throw std::runtime_error("Unsupported FP op: " + op);
-            }
 
             alloc.freeXMM(xr);
             noteType(xl, tr);
@@ -192,47 +191,48 @@ namespace zlang
         else
         {
             // Integer path
-            char suf = integer_suffixes[tr.bits]; // 'b','w','l','q'
+            char suf = integer_suffixes[tr.bits];
             std::string dl = adjustReg(rl, tr.bits);
             std::string dr = adjustReg(rr, tr.bits);
 
             if (op == "+")
                 out << "    add" << suf << " " << dl << ", " << dr << "\n";
             else if (op == "-")
-                out
-                    << "    sub" << suf << " " << dl << ", " << dr << "\n";
+                out << "    sub" << suf << " " << dl << ", " << dr << "\n";
             else if (op == "*")
-                out
-                    << "    imul" << suf << " " << dl << ", " << dr << "\n";
+                out << "    imul" << suf << " " << dl << ", " << dr << "\n";
             else if (op == "/")
             {
-                // idiv: dividend in rax, divisor dr → result in rax
+                // preserve any value in RAX by moving it to a temp
+                std::string temp = alloc.allocate();
+                out << "    mov    " << temp << ", rax\n";
+                // move dividend into RAX
                 out << "    mov    rax, " << dl << "\n";
-                out
-                    << "    cqo\n"; // sign-extend to rdx:rax
-                out
-                    << "    idiv   " << dr << "\n";
-                out
-                    << "    mov    " << dl << ", rax\n";
+                out << "    cqo\n";
+                out << "    idiv   " << dr << "\n";
+                // move result back into dl
+                out << "    mov    " << dl << ", rax\n";
+                // restore old RAX
+                out << "    mov    rax, " << temp << "\n";
+                alloc.free(temp);
                 alloc.free(rr);
                 noteType(dl, tr);
                 return dl;
             }
             else if (assembly_comparison_operations.count(op))
             {
+                // comparison → boolean
                 out << "    cmp" << suf << " " << dl << ", " << dr << "\n";
-                out
-                    << "    " << assembly_comparison_operations.at(op) << " al\n";
-                out
-                    << "    movzx rax, al\n";
+                std::string result = alloc.allocate();
+                std::string low8 = std::string(1, result.back()) + "l";
+                out << "    " << assembly_comparison_operations.at(op) << " " << low8 << "\n";
+                out << "    movzx  " << result << ", " << low8 << "\n";
                 alloc.free(rr);
-                noteType("rax", node->scope->lookupType("boolean"));
-                return "rax";
+                noteType(result, node->scope->lookupType("boolean"));
+                return result;
             }
             else
-            {
                 throw std::runtime_error("Unsupported integer op: " + op);
-            }
 
             alloc.free(rr);
             noteType(rl, tr);
@@ -244,36 +244,50 @@ namespace zlang
     {
         const std::string &op = node->value;
         auto child = std::move(node->children[0]);
+
         if (op == "!")
         {
-            auto r = emitExpression(std::move(child));
-            // cmp r,0; sete al; movzx rax, al
-            out << "    cmp    " << r << ", 0";
-            out
-                << "    sete   al";
-            out
-                << "    movzx  rax, al";
+            // Emit the operand
+            std::string r = emitExpression(std::move(child));
+
+            // Compare against zero
+            out << "    cmp    " << r << ", 0\n";
+
+            // Allocate a GP register for the boolean result
+            std::string result = alloc.allocate();
+            std::string low8 = std::string(1, result.back()) + "l";
+
+            // Set low byte to 0/1 and zero-extend
+            out << "    sete   " << low8 << "\n";
+            out << "    movzx  " << result << ", " << low8 << "\n";
+
+            // Free the operand register
             alloc.free(r);
-            noteType("rax", node->scope->lookupType("boolean"));
-            return "rax";
+
+            noteType(result, node->scope->lookupType("boolean"));
+            return result;
         }
         else if (op == "++" || op == "--")
         {
             std::string var = child->value;
             auto &scp = *child->scope;
-            TypeInfo ti = child->scope->lookupType(child->scope->lookupVariable(var).type);
+            TypeInfo ti = scp.lookupType(scp.lookupVariable(var).type);
+
             if (ti.isFloat)
                 throw std::runtime_error("Increment/Decrement not supported on float");
+
+            // Load variable into a register
+            std::string reg = generateVariableAccess(std::move(child));
+            std::string adj = adjustReg(reg, ti.bits);
+
+            // Perform inc or dec
             char suf = integer_suffixes[ti.bits];
-            std::string reg = generateVariableAccess(std::move(child)); // load variable into reg or xmm
-            std::string adj = adjustReg(reg, ti.bits);                  // get correct name size
-            // perform inc or dec
             out << "    " << (op == "++" ? "inc" : "dec") << suf << " " << adj << "\n";
 
-            // store back to memory
-            std::string ptrSize = (ti.bits / 8 == 8 ? "qword ptr " : ti.bits / 8 == 4 ? "dword ptr "
-                                                                 : ti.bits / 8 == 2   ? "word ptr "
-                                                                                      : "byte ptr ");
+            // Store back to memory
+            auto ptrSize = (ti.bits / 8 == 8 ? "qword ptr " : ti.bits / 8 == 4 ? "dword ptr "
+                                                          : ti.bits / 8 == 2   ? "word ptr "
+                                                                               : "byte ptr ");
             if (scp.isGlobalVariable(var))
             {
                 out << "    mov    " << ptrSize << "[" << var << "], " << adj << "\n";
@@ -283,9 +297,11 @@ namespace zlang
                 int64_t off = scp.getVariableOffset(var);
                 out << "    mov    " << ptrSize << "[rbp - " << off << "], " << adj << "\n";
             }
+
             noteType(reg, ti);
             return reg;
         }
+
         throw std::runtime_error("Unknown Unary Operator: " + op);
     }
 
