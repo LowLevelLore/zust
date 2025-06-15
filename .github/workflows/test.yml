@@ -20,16 +20,26 @@ jobs:
       TARGET: linux,llvm
     steps:
       - uses: actions/checkout@v3
+
+      - name: Cache build directory
+        uses: actions/cache@v4
+        with:
+          path: |
+            build
+          key: linux-build-${{ hashFiles('CMakeLists.txt', 'src/**') }}
+
       - name: Install Dependencies
         run: |
           sudo apt-get update -y
           sudo apt-get install -y build-essential llvm clang cmake python3-pip
+
       - name: Build zpiler
         run: |
-          mkdir build && cd build
+          mkdir -p build && cd build
           cmake .. -DCMAKE_BUILD_TYPE=Release
           make -j
           sudo cp zpiler /usr/local/bin/
+
       - name: Run Tests
         run: python3 test_runner.py
 
@@ -39,6 +49,13 @@ jobs:
       TARGET: windows
     steps:
       - uses: actions/checkout@v3
+
+      - name: Cache build directory
+        uses: actions/cache@v4
+        with:
+          path: |
+            build
+          key: windows-build-${{ hashFiles('CMakeLists.txt', 'src/**') }}
 
       - name: Setup MSVC Developer Command Prompt
         uses: ilammy/msvc-dev-cmd@v1
@@ -63,4 +80,4 @@ jobs:
 
       - name: Run Tests
         shell: cmd
-        run: python test_runner.py --zpiler-path "%ZPILER_PATH%"
+        run: python test_runner.py
