@@ -57,8 +57,10 @@ jobs:
 
       - name: Add to PATH
         shell: cmd
-        run: setx PATH "%USERPROFILE%;%PATH%"
+        run: |
+          set ZPILER_PATH=%USERPROFILE%\\zpiler.exe
+          set PATH=%USERPROFILE%;%PATH%
 
       - name: Run Tests
         shell: cmd
-        run: python test_runner.py
+        run: python ..\\test_runner.py --zpiler-path "%ZPILER_PATH%"
