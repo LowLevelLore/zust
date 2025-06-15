@@ -160,10 +160,33 @@ namespace zlang
             typeNode = ASTNode::makeSymbolNode(currentToken.text, currentScope);
             advance();
         }
-        logMessage("DECLARATION");
         if (match(Token::Kind::Equal))
         {
             initNode = parseExpression();
+        }
+        if (initNode == nullptr)
+        {
+            TypeInfo ty = currentScope->lookupType(typeNode->value);
+            if (zlang::numeric_types.find(typeNode->value) != zlang::numeric_types.end())
+            {
+                if (ty.isFloat)
+                {
+                    if (ty.bits == 32)
+                        initNode = ASTNode::makeFloatLiteralNode("0.0F", currentScope);
+                    else
+                        initNode = ASTNode::makeFloatLiteralNode("0.0", currentScope);
+                }
+                else
+                    initNode = ASTNode::makeIntegerLiteralNode("0", currentScope);
+            }
+            else
+            {
+                if (typeNode->value == "boolean")
+                    initNode = ASTNode::makeBooleanLiteralNode(true, currentScope);
+
+                else if (typeNode->value == "string")
+                    initNode = ASTNode::makeStringLiteralNode("", currentScope);
+            }
         }
         expect(Token::Kind::SemiColon, "Expected ';' after declaration");
         return ASTNode::makeVariableDeclarationNode(name, std::move(typeNode), std::move(initNode), currentScope);

@@ -26,18 +26,14 @@ namespace zlang
         std::string lbl = ".Lfloat" + std::to_string(floatLabelCount++);
         std::string val = node->value;
         bool isF32 = (!val.empty() && (val.back() == 'f' || val.back() == 'F'));
+
         if (isF32)
             val.pop_back();
 
-        out << "# rodata\n"
-               ".section .rodata\n"
-            << lbl << ": ." << (isF32 ? "float" : "double") << " " << val
-            << "\n"
-               ".section .text\n";
+        outGlobal << lbl << ": ." << (isF32 ? "float" : "double") << " " << val << "\n";
 
         auto r_xmm = alloc.allocateXMM();
-        out << "    " << (isF32 ? "movss " : "movsd ") << lbl << "(%rip), %"
-            << r_xmm << "\n";
+        out << "    " << (isF32 ? "movss " : "movsd ") << lbl << "(%rip), %" << r_xmm << "\n";
         noteType(r_xmm, (isF32 ? node->scope->lookupType("float")
                                : node->scope->lookupType("double")));
         return r_xmm;
@@ -45,18 +41,27 @@ namespace zlang
     std::string CodeGenLinux::generateStringLiteral(std::unique_ptr<ASTNode> node)
     {
         std::string lbl = ".Lstr" + std::to_string(stringLabelCount++);
-        out << "# rodata\n"
-               ".section .rodata\n"
-            << lbl << ": .string \"" << node->value
-            << "\"\n"
-               ".section .text\n";
+
+        std::string str = node->value;
+        std::ostringstream escaped;
+        for (char c : str)
+        {
+            if (c == '\\')
+                escaped << "\\\\";
+            else if (c == '\"')
+                escaped << "\\\"";
+            else
+                escaped << c;
+        }
+
+        outGlobal << lbl << ": .string \"" << escaped.str() << "\"\n";
+
         auto r = alloc.allocate();
         out << "    leaq " << lbl << "(%rip), %" << r << "\n";
         noteType(r, node->scope->lookupType("string"));
         return r;
     }
-    std::string
-    CodeGenLinux::generateBooleanLiteral(std::unique_ptr<ASTNode> node)
+    std::string CodeGenLinux::generateBooleanLiteral(std::unique_ptr<ASTNode> node)
     {
         auto r = alloc.allocate();
         out << "    movq $" << (node->value == "true" ? "1" : "0") << ", %" << r
@@ -64,8 +69,7 @@ namespace zlang
         noteType(r, node->scope->lookupType("boolean"));
         return r;
     }
-    std::string
-    CodeGenLinux::generateVariableAccess(std::unique_ptr<ASTNode> node)
+    std::string CodeGenLinux::generateVariableAccess(std::unique_ptr<ASTNode> node)
     {
         auto &scope = *node->scope;
         auto name = node->value;
@@ -115,8 +119,7 @@ namespace zlang
             }
         }
     }
-    std::string
-    CodeGenLinux::generateBinaryOperation(std::unique_ptr<ASTNode> node)
+    std::string CodeGenLinux::generateBinaryOperation(std::unique_ptr<ASTNode> node)
     {
         auto rl = emitExpression(std::move(node->children[0]));
         auto rr = emitExpression(std::move(node->children[1]));
@@ -126,12 +129,6 @@ namespace zlang
         auto t2 = regType.at(rr);
         auto tr = TypeChecker::promoteType(t1, t2);
         const auto &op = node->value;
-
-        logMessage("Operation: " + op);
-        logMessage("Left Type: " + TypeChecker::typeName(t1));
-        logMessage(t1.to_string());
-        logMessage("Right Type: " + TypeChecker::typeName(t2));
-        logMessage(t2.to_string());
 
         // --- Floating‑point path ---
         if (tr.isFloat)
@@ -258,8 +255,7 @@ namespace zlang
         noteType(rl, tr);
         return rl;
     }
-    std::string
-    CodeGenLinux::generateUnaryOperation(std::unique_ptr<ASTNode> node)
+    std::string CodeGenLinux::generateUnaryOperation(std::unique_ptr<ASTNode> node)
     {
         const auto &op = node->value;
         if (op == "!" || op == "++" || op == "--")
@@ -325,7 +321,6 @@ namespace zlang
         }
         throw std::runtime_error("Unknown Unary Operator");
     }
-
     std::string CodeGenLinux::emitExpression(std::unique_ptr<ASTNode> node)
     {
         switch (node->type)
@@ -348,7 +343,6 @@ namespace zlang
             throw std::runtime_error("Unknown statement encountered.");
         }
     }
-
     void CodeGenLinux::emitEpilogue()
     {
         out << "    # Block Ends (scope exit)\n";
@@ -364,7 +358,6 @@ namespace zlang
         out << "    mov    %rsp, %rbp\n";
         out << "    sub    $" << allocSize << ", %rsp\n";
     }
-
     void CodeGenLinux::generateStatement(std::unique_ptr<ASTNode> statement)
     {
         switch (statement->type)
@@ -388,7 +381,6 @@ namespace zlang
             throw std::runtime_error("Unknown statement encountered.");
         }
     }
-
     void CodeGenLinux::generateVariableReassignment(
         std::unique_ptr<ASTNode> statement)
     {
@@ -557,43 +549,44 @@ namespace zlang
         out << endLbl << ":\n\n";
         return;
     }
-
     void CodeGenLinux::generate(std::unique_ptr<ASTNode> program)
     {
         std::vector<ASTNode *> globals;
         for (auto &statement : program->children)
             if (statement->type == NodeType::VariableDeclaration)
                 globals.push_back(statement.get());
-        out << ".data\n\n";
+        outGlobal << ".data\n\n";
         for (auto &g : globals)
         {
             TypeInfo info = g->scope->lookupType(g->children[0]->value);
             switch (info.bits / 8)
             {
             case 8:
-                out << g->value << ": .quad 0\n";
+                outGlobal << g->value << ": .quad 0\n";
                 break;
             case 4:
-                out << g->value << ": .long 0\n";
+                outGlobal << g->value << ": .long 0\n";
                 break;
             case 2:
-                out << g->value << ": .word 0\n";
+                outGlobal << g->value << ": .word 0\n";
                 break;
             case 1:
-                out << g->value << ": .byte 0\n";
+                outGlobal << g->value << ": .byte 0\n";
                 break;
             default:
                 throw std::runtime_error("Unsupported global size");
             }
         }
-        out << "\n.section .rodata\n"; // Ensure rodata section exists
+        outGlobal << "\n.section .rodata\n"; // Ensure rodata section exists
         out << ".text\n.global _start\n_start:\n\n";
-
         for (std::unique_ptr<ASTNode> &statement : program.get()->children)
         {
             generateStatement(std::move(statement));
         }
 
         out << "    movq $60, %rax\n    movq $0, %rdi\n    syscall\n";
+
+        outfinal << outGlobal.str() + "\n# ==============Globals End Here==============\n"
+                 << out.str() << "\n\n";
     }
 } // namespace zlang

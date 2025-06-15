@@ -7,6 +7,7 @@
 #include "ast/ASTNode.hpp"
 #include "codegen/RegisterAllocator.hpp"
 #include "typechecker/TypeChecker.hpp"
+#include <sstream>
 
 namespace zlang
 {
@@ -34,7 +35,10 @@ namespace zlang
         std::uint64_t doubleLabelCount = 0;
         std::uint64_t floatLabelCount = 0;
         RegisterAllocator alloc;
-        std::ostream &out;
+        std::ostream &outfinal;
+
+        std::ostringstream outGlobal;
+        std::ostringstream out;
 
         static std::string adjustReg(const std::string &r64, uint64_t bits)
         {
@@ -127,7 +131,7 @@ namespace zlang
         virtual std::string generateUnaryOperation(std::unique_ptr<ASTNode> node) = 0;
 
     public:
-        CodeGen(RegisterAllocator alloc, std::ostream &outstream) : stringLabelCount(0), blockLabelCount(0), doubleLabelCount(0), floatLabelCount(0), alloc(alloc), out(outstream) {}
+        CodeGen(RegisterAllocator alloc, std::ostream &outstream) : stringLabelCount(0), blockLabelCount(0), doubleLabelCount(0), floatLabelCount(0), alloc(alloc), outfinal(outstream) {}
         virtual ~CodeGen();
         virtual void generate(std::unique_ptr<ASTNode> program) = 0;
         static std::unique_ptr<CodeGen> create(TargetTriple target, std::ostream &outstream);
@@ -197,6 +201,7 @@ namespace zlang
     {
     private:
         std::unordered_map<std::uint32_t, char> integer_suffixes = {{8, 'b'}, {16, 'w'}, {32, 'l'}, {64, 'q'}};
+        std::unordered_map<std::string, std::string> stringLiterals;
         std::string intToXmm(const std::string &r_int, uint32_t bits) override;
 
         void generateStatement(std::unique_ptr<ASTNode> statement) override;

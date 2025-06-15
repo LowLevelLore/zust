@@ -40,7 +40,7 @@ TARGETS = {
         "zpiler_flag": "--format llvm-ir",
         "asm_ext": ".ll",
         "assemble": lambda ir, obj: ["llc", "-filetype=obj", ir, "-o", obj],
-        "link": lambda obj, exe: ["clang", obj, "-o", exe],
+        "link": lambda obj, exe: ["clang", obj, "-o", exe, "-no-pie"],
     },
 }
 

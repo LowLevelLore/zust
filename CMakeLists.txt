@@ -18,6 +18,8 @@ set(COMMON_FLAGS
     -fstack-protector-strong
     -fstack-clash-protection
     -Wpedantic
+    -Wno-unused-variable
+    -Wno-unused-parameter
     -pedantic
 )
 

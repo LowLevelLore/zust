@@ -31,10 +31,7 @@ namespace zlang
         if (isF32)
             val.pop_back();
 
-        // in read‑only data
-        out << ".rdata?\n";
-        out << lbl << " DWORD " << val << "\n";
-        out << ".code\n";
+        outGlobal << lbl << " DWORD " << val << "\n";
 
         auto r_xmm = alloc.allocateXMM();
         out << "    " << (isF32 ? "movss" : "movsd")
@@ -46,10 +43,20 @@ namespace zlang
     std::string CodeGenWindows::generateStringLiteral(std::unique_ptr<ASTNode> node)
     {
         std::string lbl = ".Lstr" + std::to_string(stringLabelCount++);
-        out << ".rdata?\n";
-        out << lbl << " BYTE "
-            << '"' << node->value << '"' << ", 0\n";
-        out << ".code\n";
+
+        std::ostringstream escaped;
+        for (char c : node->value)
+        {
+            if (c == '\\')
+                escaped << "\\\\";
+            else if (c == '\"')
+                escaped << "\\\"";
+            else
+                escaped << c;
+        }
+
+        outGlobal << lbl << " BYTE "
+                  << '"' << escaped.str() << '"' << ", 0\n";
 
         auto r = alloc.allocate();
         out << "    lea    " << r
@@ -526,29 +533,29 @@ namespace zlang
         for (auto &statement : program->children)
             if (statement->type == NodeType::VariableDeclaration)
                 globals.push_back(statement.get());
-        out << ".data\n\n";
+        outGlobal << ".data\n\n";
         for (auto &g : globals)
         {
             TypeInfo info = g->scope->lookupType(g->children[0]->value);
             switch (info.bits / 8)
             {
             case 8:
-                out << g->value << ": .quad 0\n";
+                outGlobal << g->value << ": .quad 0\n";
                 break;
             case 4:
-                out << g->value << ": .long 0\n";
+                outGlobal << g->value << ": .long 0\n";
                 break;
             case 2:
-                out << g->value << ": .word 0\n";
+                outGlobal << g->value << ": .word 0\n";
                 break;
             case 1:
-                out << g->value << ": .byte 0\n";
+                outGlobal << g->value << ": .byte 0\n";
                 break;
             default:
                 throw std::runtime_error("Unsupported global size");
             }
         }
-        out << "\n.section .rodata\n"; // Ensure rodata section exists
+        outGlobal << "\n.section .rodata\n"; // Ensure rodata section exists
         out << ".text\n.global _start\n_start:\n\n";
 
         for (std::unique_ptr<ASTNode> &statement : program.get()->children)
@@ -557,5 +564,7 @@ namespace zlang
         }
 
         out << "    movq $60, %rax\n    movq $0, %rdi\n    syscall\n";
+        outfinal << outGlobal.str() + "\n# ==============Globals End Here==============\n"
+                 << out.str() << "\n\n";
     }
 } // namespace zlang

@@ -3,10 +3,6 @@
 namespace zlang
 {
     CodeGen::~CodeGen() = default;
-
-    void CodeGen::generate(std::unique_ptr<ASTNode> program)
-    {
-    }
     std::unique_ptr<CodeGen> CodeGen::create(TargetTriple target, std::ostream &outstream)
     {
         switch (target)
