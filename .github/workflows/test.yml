@@ -6,6 +6,10 @@ on:
       - "**.zz"
       - "src/**"
       - "test/zz/**"
+      - "include/**"
+      - "main.cpp"
+      - "*.yml"
+      - "test_runner.py"
   pull_request: {}
 
 jobs:
