@@ -38,7 +38,6 @@ jobs:
           mkdir -p build && cd build
           cmake .. -DCMAKE_BUILD_TYPE=Release
           make -j
-          sudo cp zpiler /usr/local/bin/
 
       - name: Run Tests
         run: python3 test_runner.py
@@ -68,15 +67,8 @@ jobs:
         run: |
           mkdir build
           cd build
-          cmake .. -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Release
+          cmake .. -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_RUNTIME_OUTPUT_DIRECTORY=Debug
           nmake
-          copy zpiler.exe %USERPROFILE%\zpiler.exe
-
-      - name: Add to PATH
-        shell: cmd
-        run: |
-          set ZPILER_PATH=%USERPROFILE%\\zpiler.exe
-          set PATH=%USERPROFILE%;%PATH%
 
       - name: Run Tests
         shell: cmd

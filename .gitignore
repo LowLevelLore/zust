@@ -9,3 +9,5 @@ temp*
 tests/asm/
 tests/executable/
 tests/object/
+
+*vscode*

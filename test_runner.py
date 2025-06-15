@@ -55,10 +55,19 @@ EXE_DIR = ROOT / "tests" / "executable"
 def run(cmd):
     print(f"{CYAN}> {' '.join(cmd)}{RESET}")
     proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout = proc.stdout.decode()
+    stderr = proc.stderr.decode()
+
+    if stdout.strip():
+        print(f"{stdout}")
+    if stderr.strip():
+        sys.stderr.write(f"{YELLOW}{stderr}{RESET}")
+
     if proc.returncode != 0:
-        sys.stderr.write(f"{RED}{proc.stderr.decode()}{RESET}")
+        sys.stderr.write(f"{RED}Command failed: {' '.join(cmd)}{RESET}\n")
         sys.exit(proc.returncode)
-    return proc.stdout
+
+    return stdout
 
 
 def detect_native_target():
