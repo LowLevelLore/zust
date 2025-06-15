@@ -11,3 +11,6 @@ tests/executable/
 tests/object/
 
 *vscode*
+
+**.obj
+**.exe
