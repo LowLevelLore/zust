@@ -8,7 +8,7 @@ on:
       - "test/zz/**"
       - "include/**"
       - "main.cpp"
-      - "*.yml"
+      - "**.yml"
       - "**.py"
       - "CMakeLists.txt"
   pull_request: {}
