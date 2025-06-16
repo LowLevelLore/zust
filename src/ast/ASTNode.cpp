@@ -34,7 +34,7 @@ namespace zlang
 
     ASTNode *ASTNode::getElseBranch() const
     {
-        if (children.empty())
+        if (children.empty() or children.back().get() == nullptr)
             return nullptr;
         if (children.back().get()->type != NodeType::ElseIfStatement || children.back().get()->type != NodeType::ElseStatement)
         {

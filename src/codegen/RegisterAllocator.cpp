@@ -29,10 +29,15 @@ namespace zlang
         return reg;
     }
 
-    static std::string getBaseReg(const std::string &reg)
+    std::string RegisterAllocator::getBaseReg(const std::string &reg)
     {
         static const std::unordered_map<std::string, std::string> reg_to_base = {
             {"rax", "rax"}, {"eax", "rax"}, {"ax", "rax"}, {"al", "rax"}, {"rbx", "rbx"}, {"ebx", "rbx"}, {"bx", "rbx"}, {"bl", "rbx"}, {"rcx", "rcx"}, {"ecx", "rcx"}, {"cx", "rcx"}, {"cl", "rcx"}, {"rdx", "rdx"}, {"edx", "rdx"}, {"dx", "rdx"}, {"dl", "rdx"}, {"rsi", "rsi"}, {"esi", "rsi"}, {"si", "rsi"}, {"sil", "rsi"}, {"rdi", "rdi"}, {"edi", "rdi"}, {"di", "rdi"}, {"dil", "rdi"}, {"rbp", "rbp"}, {"ebp", "rbp"}, {"bp", "rbp"}, {"bpl", "rbp"}, {"rsp", "rsp"}, {"esp", "rsp"}, {"sp", "rsp"}, {"spl", "rsp"}, {"r8", "r8"}, {"r8d", "r8"}, {"r8w", "r8"}, {"r8b", "r8"}, {"r9", "r9"}, {"r9d", "r9"}, {"r9w", "r9"}, {"r9b", "r9"}, {"r10", "r10"}, {"r10d", "r10"}, {"r10w", "r10"}, {"r10b", "r10"}, {"r11", "r11"}, {"r11d", "r11"}, {"r11w", "r11"}, {"r11b", "r11"}, {"r12", "r12"}, {"r12d", "r12"}, {"r12w", "r12"}, {"r12b", "r12"}, {"r13", "r13"}, {"r13d", "r13"}, {"r13w", "r13"}, {"r13b", "r13"}, {"r14", "r14"}, {"r14d", "r14"}, {"r14w", "r14"}, {"r14b", "r14"}, {"r15", "r15"}, {"r15d", "r15"}, {"r15w", "r15"}, {"r15b", "r15"}};
+
+        if (reg.starts_with("xmm"))
+        {
+            return reg;
+        }
 
         auto it = reg_to_base.find(reg);
         if (it == reg_to_base.end())
@@ -49,10 +54,11 @@ namespace zlang
             {
                 return;
             }
+            std::cout << "Free Normal" << std::endl;
             throw std::runtime_error("RegisterAllocator: attempted to free unallocated register '" + reg + "'");
         }
         inUse.erase(it);
-        available.push_back(reg);
+        available.push_back(getBaseReg(reg));
     }
 
     void RegisterAllocator::reset()
@@ -66,7 +72,10 @@ namespace zlang
     std::string RegisterAllocator::allocateXMM()
     {
         if (availableXMM.empty())
+        {
+            std::cout << "Free XMM" << std::endl;
             throw std::runtime_error("RegisterAllocator: no XMM registers available");
+        }
         std::string reg = availableXMM.back();
         availableXMM.pop_back();
         inUseXMM.insert(reg);

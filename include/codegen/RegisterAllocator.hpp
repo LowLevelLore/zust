@@ -30,6 +30,7 @@ namespace zlang
         /// Reset allocator state (mark all as free)
         void reset();
         RegisterAllocator() = default;
+        static std::string getBaseReg(const std::string &reg);
 
     private:
         RegisterAllocator(std::vector<std::string> regs);

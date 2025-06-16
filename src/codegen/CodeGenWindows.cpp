@@ -8,13 +8,12 @@ namespace zlang
         const char *cvt = (bits == 32 ? "cvtsi2ss" : "cvtsi2sd");
         out << "    " << cvt
             << " " << r_xmm
-            << " " << register_int
+            << ", " << register_int
             << "\n";
         alloc.free(register_int);
         noteType(r_xmm, {bits, bits / 8, true, true});
         return r_xmm;
     }
-
     std::string CodeGenWindows::generateIntegerLiteral(std::unique_ptr<ASTNode> node)
     {
         TypeInfo ti = node->scope->lookupType("int64_t");
@@ -178,8 +177,8 @@ namespace zlang
                 auto result8 = adjustReg(result, 8);
                 out << "    " << assembly_comparison_operations.at(op) << " " << result8 << "\n";
                 out << "    movzx " << result << ", " << result8 << "\n";
-                alloc.freeXMM(xl);
-                alloc.freeXMM(xr);
+                alloc.free(xl);
+                alloc.free(xr);
                 noteType(result, node->scope->lookupType("boolean"));
                 return result;
             }
@@ -188,7 +187,7 @@ namespace zlang
                 throw std::runtime_error("Unsupported FP op: " + op);
             }
 
-            alloc.freeXMM(xr);
+            alloc.free(xr);
             noteType(xl, tr);
             return xl;
         }
@@ -232,7 +231,6 @@ namespace zlang
             {
                 throw std::runtime_error("Unsupported integer op: " + op);
             }
-
             alloc.free(rr);
             noteType(rl, tr);
             return rl;
@@ -304,7 +302,6 @@ namespace zlang
         }
         throw std::runtime_error("Unknown Unary Operator: " + op);
     }
-
     std::string CodeGenWindows::emitExpression(std::unique_ptr<ASTNode> node)
     {
         switch (node->type)
@@ -388,7 +385,7 @@ namespace zlang
             std::string movInstr = (bits == 32) ? "movss" : "movsd";
 
             out << "    " << movInstr << " " << destAddr() << ", " << r_xmm << "\n";
-            alloc.freeXMM(r_xmm);
+            alloc.free(r_xmm);
         }
         else
         {
@@ -464,7 +461,7 @@ namespace zlang
                 std::string r_xmm = emitExpression(std::move(statement->children.back()));
                 std::string movInstr = (bits == 32) ? "movss" : "movsd";
                 out << "    " << movInstr << " " << destAddr() << ", " << r_xmm << "\n";
-                alloc.freeXMM(r_xmm);
+                alloc.free(r_xmm);
             }
             else
             {
@@ -481,7 +478,7 @@ namespace zlang
                 std::string r_xmm = alloc.allocateXMM();
                 out << "    pxor " << r_xmm << ", " << r_xmm << "\n";
                 out << "    movsd " << destAddr() << ", " << r_xmm << "\n";
-                alloc.freeXMM(r_xmm);
+                alloc.free(r_xmm);
             }
             else
             {

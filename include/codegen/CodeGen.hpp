@@ -40,8 +40,9 @@ namespace zlang
         std::ostringstream outGlobal;
         std::ostringstream out;
 
-        static std::string adjustReg(const std::string &r64, uint64_t bits)
+        std::string adjustReg(std::string &r64, uint64_t bits)
         {
+            r64 = RegisterAllocator::getBaseReg(r64);
             static const std::unordered_map<std::string, std::array<std::string, 4>> registers_based_on_bytes = {
                 {"rax", {"rax", "eax", "ax", "al"}},
                 {"rbx", {"rbx", "ebx", "bx", "bl"}},
@@ -62,7 +63,7 @@ namespace zlang
 
             auto it = registers_based_on_bytes.find(r64);
             if (it == registers_based_on_bytes.end())
-                throw std::runtime_error("Unknown register '" + r64 + "'");
+                throw std::runtime_error("Unknown register '" + r64 + "'\n\n" + out.str());
             const auto &ents = it->second;
 
             switch (bits)
@@ -163,7 +164,7 @@ namespace zlang
 
     public:
         ~CodeGenLinux() override = default;
-        CodeGenLinux(std::ostream &outstream) : CodeGen(RegisterAllocator::forSysV(), outstream) {};
+        CodeGenLinux(std::ostream &outstream) : CodeGen(RegisterAllocator::forSysV(), outstream){};
         void generate(std::unique_ptr<ASTNode> program) override;
     };
 
@@ -193,7 +194,7 @@ namespace zlang
 
     public:
         ~CodeGenWindows() override = default;
-        CodeGenWindows(std::ostream &outstream) : CodeGen(RegisterAllocator::forMSVC(), outstream) {};
+        CodeGenWindows(std::ostream &outstream) : CodeGen(RegisterAllocator::forMSVC(), outstream){};
         void generate(std::unique_ptr<ASTNode> program) override;
     };
 
@@ -224,7 +225,7 @@ namespace zlang
 
     public:
         ~CodeGenLLVM() override = default;
-        CodeGenLLVM(std::ostream &outstream) : CodeGen(RegisterAllocator(), outstream) {};
+        CodeGenLLVM(std::ostream &outstream) : CodeGen(RegisterAllocator(), outstream){};
         void generate(std::unique_ptr<ASTNode> program) override;
     };
 } // namespace zlang

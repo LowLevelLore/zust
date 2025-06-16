@@ -27,7 +27,8 @@ TARGETS = {
     "windows": {
         "zpiler_flag": "--format x86_64-mswin",
         "asm_ext": ".asm",
-        "assemble": lambda asm, obj: ["ml64", "/nologo", "/c", asm, "/Fo " + obj],
+        # Produce obj in cwd, move manually
+        "assemble": lambda asm, obj: ["ml64", "/nologo", "/c", asm],
         "link": lambda obj, exe: [
             "link",
             "/nologo",
@@ -43,7 +44,6 @@ TARGETS = {
         "assemble": lambda ir, obj: ["llc", "-filetype=obj", ir, "-o", obj],
         "link": lambda obj, exe: ["clang", obj, "-o", exe, "-no-pie"],
     },
-    #  Please Make windows work.
 }
 
 ROOT = Path(__file__).parent.resolve()
@@ -118,7 +118,18 @@ def main():
                 p.mkdir(parents=True, exist_ok=True)
 
             run([ZPILER] + cfg["zpiler_flag"].split() + ["-o", str(asm_out), str(zz)])
-            run(cfg["assemble"](str(asm_out), str(obj_out)))
+
+            if target == "windows":
+                # Run ml64, obj will be produced in cwd
+                obj_temp = asm_out.stem + ".obj"
+                run(cfg["assemble"](str(asm_out), None))
+                if not Path(obj_temp).exists():
+                    print(f"{RED}Expected obj file {obj_temp} not found{RESET}")
+                    sys.exit(1)
+                shutil.move(obj_temp, obj_out)
+            else:
+                run(cfg["assemble"](str(asm_out), str(obj_out)))
+
             run(cfg["link"](str(obj_out), str(exe_out)))
 
             print(f"Running {exe_out} …")

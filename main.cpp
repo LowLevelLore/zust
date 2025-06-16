@@ -127,8 +127,14 @@ int main(int argc, char *argv[])
         std::cerr << "This should not happen, ACP Pradhyumn...\n";
         exit(1);
     }
-
-    cg->generate(std::move(program));
+    try
+    {
+        cg->generate(std::move(program));
+    }
+    catch (std::exception const &exc)
+    {
+        std::cerr << "ERROR: " << exc.what() << "\n";
+    }
 
     return 0;
 }
