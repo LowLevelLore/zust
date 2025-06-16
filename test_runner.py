@@ -140,7 +140,7 @@ def main():
                 )
                 sys.exit(res.returncode)
             else:
-                print(f"{GREEN}PASS: {rel} ✓{RESET}")
+                print(f"{GREEN}PASS: {rel} {RESET}")
 
     print(f"\n{CYAN}Cleaning up trash{RESET}")
     shutil.rmtree(EXE_DIR)
