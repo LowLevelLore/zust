@@ -72,4 +72,6 @@ jobs:
 
       - name: Run Tests
         shell: cmd
-        run: python test_runner.py
+        run: |
+          chcp 65001
+          python test_runner.py
