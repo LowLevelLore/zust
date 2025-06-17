@@ -321,7 +321,7 @@ namespace zlang
         case NodeType::UnaryOp:
             return generateUnaryOperation(std::move(node));
         default:
-            throw std::runtime_error("Unknown statement encountered.");
+            throw std::runtime_error("Unknown expression encountered.");
         }
     }
 
@@ -357,6 +357,21 @@ namespace zlang
         case NodeType::IfStatement:
         {
             generateIfStatement(std::move(statement));
+            break;
+        }
+        case NodeType::UnaryOp:
+        {
+            if (statement->value == "--" or statement->value == "++")
+            {
+                std::string reg = emitExpression(std::move(statement));
+                alloc.free(reg);
+            }
+            break;
+        }
+        case NodeType::BinaryOp:
+        {
+            std::string reg = emitExpression(std::move(statement)); // I am doing this just so the increments/decrements work in x + y-- -> this itself must not have any result, but y-- should still be effective.
+            alloc.free(reg);
             break;
         }
         default:
@@ -492,53 +507,72 @@ namespace zlang
     {
         int id = blockLabelCount++;
         std::string endLbl = "Lend" + std::to_string(id);
-        std::string nextLbl = "Lelse" + std::to_string(id);
 
-        auto emitBlock = [&](std::unique_ptr<ASTNode> block)
-        {
-            std::vector<std::unique_ptr<ASTNode>> stmts = std::move(block->children);
-            emitPrologue(std::move(block));
-            for (auto &stmt : stmts)
-                generateStatement(std::move(stmt));
-            emitEpilogue();
-        };
-
-        auto condReg = emitExpression(std::move(statement->children[0]));
-        out << "    cmp " << condReg << ", 0\n";
-        out << "    je " << nextLbl << "\n";
-        alloc.free(condReg);
-
-        emitBlock(std::move(statement->children[1]));
-        out << "    jmp " << endLbl << "\n";
-        out << nextLbl << ":\n";
-
+        std::vector<std::string> elseLabels;
         ASTNode *branch = statement->getElseBranch();
         while (branch)
         {
+            elseLabels.push_back("Lelse" + std::to_string(blockLabelCount++));
+            branch = branch->getElseBranch();
+        }
+
+        size_t elseIdx = 0;
+
+        auto condReg = emitExpression(std::move(statement->children[0]));
+        out << "    cmp " << condReg << ", 0\n";
+        if (!elseLabels.empty())
+            out << "    je " << elseLabels[elseIdx] << "\n";
+        else
+            out << "    je " << endLbl << "\n";
+        alloc.free(condReg);
+
+        auto ifBlock = std::move(statement->children[1]);
+        auto stmts = std::move(ifBlock->children);
+        emitPrologue(std::move(ifBlock));
+        for (auto &stmt : stmts)
+            generateStatement(std::move(stmt));
+        emitEpilogue();
+        out << "    jmp " << endLbl << "\n";
+
+        branch = statement->getElseBranch();
+        while (branch)
+        {
+            out << elseLabels[elseIdx++] << ":\n";
+
             if (branch->type == NodeType::ElseIfStatement)
             {
-                std::string elseIfNextLbl = "Lelse" + std::to_string(blockLabelCount++);
-
                 auto r = emitExpression(std::move(branch->children[0]));
                 out << "    cmp " << r << ", 0\n";
-                out << "    je " << elseIfNextLbl << "\n";
+                if (elseIdx < elseLabels.size())
+                    out << "    je " << elseLabels[elseIdx] << "\n";
+                else
+                    out << "    je " << endLbl << "\n";
                 alloc.free(r);
 
-                emitBlock(std::move(branch->children[1]));
+                auto elifBlock = std::move(branch->children[1]);
+                auto stmts = std::move(elifBlock->children);
+                emitPrologue(std::move(elifBlock));
+                for (auto &stmt : stmts)
+                    generateStatement(std::move(stmt));
+                emitEpilogue();
                 out << "    jmp " << endLbl << "\n";
-                out << elseIfNextLbl << ":\n";
-
-                branch = branch->getElseBranch();
             }
             else if (branch->type == NodeType::ElseStatement)
             {
-                emitBlock(std::move(branch->children[0]));
+                auto elseBlock = std::move(branch->children[0]);
+                auto stmts = std::move(elseBlock->children);
+                emitPrologue(std::move(elseBlock));
+                for (auto &stmt : stmts)
+                    generateStatement(std::move(stmt));
+                emitEpilogue();
                 break;
             }
             else
             {
                 throw std::runtime_error("Unexpected node type in else chain");
             }
+
+            branch = branch->getElseBranch();
         }
 
         out << endLbl << ":\n\n";

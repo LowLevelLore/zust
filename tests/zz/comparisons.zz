@@ -1,4 +1,0 @@
-let x: integer = 10;
-let y: boolean = x > 5;
-
-let z: boolean = !y;

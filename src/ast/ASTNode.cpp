@@ -29,33 +29,58 @@ namespace zlang
 
     void ASTNode::setElseBranch(std::unique_ptr<ASTNode> elseNode)
     {
-        children.push_back(std::move(elseNode));
+        if (children.size() < 2)
+        {
+            throw std::logic_error("setElseBranch on a non‑conditional node");
+        }
+
+        if (children.size() == 2)
+        {
+            // no else/elif attached yet: attach here
+            children.push_back(std::move(elseNode));
+        }
+        else
+        {
+            // we already have an elseBranch in children[2]:
+            // forward the new elseNode into _that_ node
+            ASTNode *existing = children[2].get();
+            existing->setElseBranch(std::move(elseNode));
+        }
     }
 
     ASTNode *ASTNode::getElseBranch() const
     {
-        if (children.empty() or children.back().get() == nullptr)
+        if (children.size() < 3 || children[2] == nullptr)
             return nullptr;
-        if (children.back().get()->type != NodeType::ElseIfStatement || children.back().get()->type != NodeType::ElseStatement)
-        {
+
+        auto *branch = children[2].get();
+        if (branch->type != NodeType::ElseIfStatement && branch->type != NodeType::ElseStatement)
             return nullptr;
-        }
-        return children.back().get();
+
+        return branch;
     }
 
-    std::unique_ptr<ASTNode> ASTNode::makeVariableDeclarationNode(
+    std::optional<std::unique_ptr<ASTNode>>
+    ASTNode::makeVariableDeclarationNode(
         const std::string &name,
         std::unique_ptr<ASTNode> typeAnnotation,
         std::unique_ptr<ASTNode> initializer,
         const std::shared_ptr<ScopeContext> scope)
     {
         auto node = std::make_unique<ASTNode>(NodeType::VariableDeclaration, name, scope);
-        scope.get()->defineVariable(name, {typeAnnotation.get()->value});
-        if (typeAnnotation)
-            node->addChild(std::move(typeAnnotation));
-        if (initializer)
-            node->addChild(std::move(initializer));
-        return node;
+        bool result = scope.get()->defineVariable(name, {typeAnnotation.get()->value});
+        if (result)
+        {
+            if (typeAnnotation)
+                node->addChild(std::move(typeAnnotation));
+            if (initializer)
+                node->addChild(std::move(initializer));
+            return node;
+        }
+        else
+        {
+            return std::nullopt;
+        }
     }
 
     std::unique_ptr<ASTNode> ASTNode::makeSymbolNode(const std::string &name, const std::shared_ptr<ScopeContext> scope)

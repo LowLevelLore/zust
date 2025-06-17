@@ -19,6 +19,7 @@ namespace zlang
         }
 
     private:
+        int blockNumber = 0;
         Lexer &lexer;
         Token currentToken;
         std::shared_ptr<ScopeContext> currentScope;
@@ -32,14 +33,14 @@ namespace zlang
         std::unique_ptr<ASTNode> parseVariableDeclaration();
         std::unique_ptr<ASTNode> parseVariableReassignment();
         std::unique_ptr<ASTNode> parseConditionals();
-        std::unique_ptr<ASTNode> parseExpression();
+        std::unique_ptr<ASTNode> parseExpression(bool expect_exclaim = false);
         std::unique_ptr<ASTNode> parsePrimary();
 
         int getPrecedence(const std::string &op) const;
         std::unique_ptr<ASTNode> parseUnary();
         std::unique_ptr<ASTNode> parseBinaryRHS(int exprPrec, std::unique_ptr<ASTNode> lhs);
 
-        void enterScope();
+        void enterScope(std::string name);
         void exitScope();
         std::unique_ptr<ASTNode> parseBlock();
     };

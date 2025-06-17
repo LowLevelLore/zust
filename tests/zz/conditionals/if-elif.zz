@@ -1,0 +1,13 @@
+let a: int64_t = 50;
+let f: double = 25.25;
+let u: uint32_t = 50;
+
+if (a < 0) {
+    let res: int64_t = a - 1;
+}
+elif (f >= 25.0) {
+    let res: double = f * 1.1;
+}
+elif (u != a) {
+    let res: uint32_t = u + 10;
+}

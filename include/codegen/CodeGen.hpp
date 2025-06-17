@@ -164,7 +164,7 @@ namespace zlang
 
     public:
         ~CodeGenLinux() override = default;
-        CodeGenLinux(std::ostream &outstream) : CodeGen(RegisterAllocator::forSysV(), outstream){};
+        CodeGenLinux(std::ostream &outstream) : CodeGen(RegisterAllocator::forSysV(), outstream) {};
         void generate(std::unique_ptr<ASTNode> program) override;
     };
 
@@ -194,7 +194,7 @@ namespace zlang
 
     public:
         ~CodeGenWindows() override = default;
-        CodeGenWindows(std::ostream &outstream) : CodeGen(RegisterAllocator::forMSVC(), outstream){};
+        CodeGenWindows(std::ostream &outstream) : CodeGen(RegisterAllocator::forMSVC(), outstream) {};
         void generate(std::unique_ptr<ASTNode> program) override;
     };
 
@@ -223,9 +223,11 @@ namespace zlang
         std::string generateBinaryOperation(std::unique_ptr<ASTNode> node) override;
         std::string generateUnaryOperation(std::unique_ptr<ASTNode> node) override;
 
+        std::string castValue(const std::string &val, const TypeInfo &fromType, const TypeInfo &toType);
+
     public:
         ~CodeGenLLVM() override = default;
-        CodeGenLLVM(std::ostream &outstream) : CodeGen(RegisterAllocator(), outstream){};
+        CodeGenLLVM(std::ostream &outstream) : CodeGen(RegisterAllocator(), outstream) {};
         void generate(std::unique_ptr<ASTNode> program) override;
     };
 } // namespace zlang

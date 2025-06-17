@@ -1,8 +1,0 @@
-let a: uint32_t = 123;
-let b: float = 12.3f;
-
-let z: uint64_t = 0;
-
-if(a > b + 10){
-    z = 69;
-}

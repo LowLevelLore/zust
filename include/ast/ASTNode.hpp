@@ -39,7 +39,7 @@ namespace zlang
             : type(t), value(val), scope(sc) {}
 
         static std::unique_ptr<ASTNode> makeProgramNode(const std::shared_ptr<ScopeContext> scope);
-        static std::unique_ptr<ASTNode> makeVariableDeclarationNode(
+        static std::optional<std::unique_ptr<ASTNode>> makeVariableDeclarationNode(
             const std::string &name,
             std::unique_ptr<ASTNode> typeAnnotation,
             std::unique_ptr<ASTNode> initializer, const std::shared_ptr<ScopeContext> scope);

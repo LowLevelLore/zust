@@ -164,8 +164,8 @@ namespace zlang
                 auto r_bool = alloc.allocate();
                 out << "    movzbq %al, %" << r_bool << "\n";
                 noteType(r_bool, node->scope->lookupType("boolean"));
-                alloc.freeXMM(xr);
-                alloc.freeXMM(xl);
+                alloc.free(xr);
+                alloc.free(xl);
                 return r_bool;
             }
             else
@@ -174,7 +174,7 @@ namespace zlang
             }
 
             noteType(xl, tr);
-            alloc.freeXMM(xr);
+            alloc.free(xr);
             return xl;
         }
 
@@ -228,12 +228,14 @@ namespace zlang
         }
         else if (assembly_comparison_operations.count(op))
         {
+            std::string r_bool = alloc.allocate();
             out << "    cmp" << suf << " %" << r_r << ", %" << r_l << "\n"
                 << "    " << assembly_comparison_operations[op] << " %al\n"
-                << "    movzbq %al, %" << r_l << "\n";
+                << "    movzbq %al, %" << r_bool << "\n";
             alloc.free(rr);
-            noteType(rl, node->scope->lookupType("boolean"));
-            return rl;
+            alloc.free(rl);
+            noteType(r_bool, node->scope->lookupType("boolean"));
+            return r_bool;
         }
         else if (op == "&&" || op == "||" || op == "&" || op == "|")
         {
@@ -377,6 +379,21 @@ namespace zlang
             generateIfStatement(std::move(statement));
             break;
         }
+        case NodeType::UnaryOp:
+        {
+            if (statement->value == "--" or statement->value == "++")
+            {
+                std::string reg = emitExpression(std::move(statement));
+                alloc.free(reg);
+            }
+            break;
+        }
+        case NodeType::BinaryOp:
+        {
+            std::string reg = emitExpression(std::move(statement)); // I am doing this just so the increments/decrements work in x + y-- -> this itself must not have any result, but y-- should still be effective.
+            alloc.free(reg);
+            break;
+        }
         default:
             throw std::runtime_error("Unknown statement encountered.");
         }
@@ -384,7 +401,6 @@ namespace zlang
     void CodeGenLinux::generateVariableReassignment(
         std::unique_ptr<ASTNode> statement)
     {
-        logMessage("Inside Reassignment");
         auto &scp = *statement->scope;
         auto nm = statement->value;
         auto ti = scp.lookupType(scp.lookupVariable(nm).type);
@@ -398,7 +414,7 @@ namespace zlang
                         ? nm + "(%rip)"
                         : std::to_string(scp.getVariableOffset(nm)) + "(%rbp)")
                 << "\n";
-            alloc.freeXMM(r);
+            alloc.free(r);
         }
         else
         {
@@ -431,7 +447,7 @@ namespace zlang
                     out << "    " << (sz == 4 ? "movss %" : "movsd %") << r << ", "
                         << std::to_string(scp.getVariableOffset(nm)) + "(%rbp)"
                         << "\n";
-                    alloc.freeXMM(r);
+                    alloc.free(r);
                 }
                 else
                 {
@@ -467,7 +483,7 @@ namespace zlang
                 {
                     out << "    " << (sz == 4 ? "movss %" : "movsd %") << r << ", "
                         << nm + "(%rip)" << "\n";
-                    alloc.freeXMM(r);
+                    alloc.free(r);
                 }
                 else
                 {
@@ -499,55 +515,66 @@ namespace zlang
     void CodeGenLinux::generateIfStatement(std::unique_ptr<ASTNode> statement)
     {
         int id = blockLabelCount++;
-        std::string elseLbl = ".Lelse" + std::to_string(id);
         std::string endLbl = ".Lend" + std::to_string(id);
-        auto condR = emitExpression(std::move(statement->children[0]));
-        out << "    cmpq $0, %" << condR << "\n";
-        out << "    je " << elseLbl << "\n";
-        alloc.free(condR);
-        std::unique_ptr<ASTNode> ifBlock = std::move(statement->children[1]);
-        std::vector<std::unique_ptr<zlang::ASTNode>> children = std::move(ifBlock->children);
-        emitPrologue(std::move(ifBlock));
-        for (auto &stmt : children)
-        {
-            generateStatement(std::move(stmt));
-        }
-        emitEpilogue();
-        out << "    jmp   " << endLbl << "\n";
-        out << elseLbl << ":\n";
+        std::vector<std::string> elseLabels;
+
+        // Precompute labels for each else-if / else branch
         ASTNode *branch = statement->getElseBranch();
         while (branch)
         {
+            elseLabels.push_back(".Lelse" + std::to_string(blockLabelCount++));
+            branch = branch->getElseBranch();
+        }
+
+        size_t elseIdx = 0;
+
+        auto condR = emitExpression(std::move(statement->children[0]));
+        out << "    cmpq $0, %" << condR << "\n";
+        out << "    je " << (elseLabels.empty() ? endLbl : elseLabels[elseIdx]) << "\n";
+        alloc.free(condR);
+
+        auto ifBlock = std::move(statement->children[1]);
+        auto children = std::move(ifBlock->children);
+        emitPrologue(std::move(ifBlock));
+        for (auto &stmt : children)
+            generateStatement(std::move(stmt));
+        emitEpilogue();
+        out << "    jmp " << endLbl << "\n";
+
+        branch = statement->getElseBranch();
+        while (branch)
+        {
+            out << elseLabels[elseIdx++] << ":\n";
+
             if (branch->type == NodeType::ElseIfStatement)
             {
                 auto r2 = emitExpression(std::move(branch->children[0]));
                 out << "    cmpq $0, %" << r2 << "\n";
-                out << "    je   " << elseLbl << "\n";
+                out << "    je " << (elseIdx < elseLabels.size() ? elseLabels[elseIdx] : endLbl) << "\n";
                 alloc.free(r2);
 
-                std::unique_ptr<ASTNode> elifBlock = std::move(branch->children[1]);
-                std::vector<std::unique_ptr<zlang::ASTNode>> children = std::move(elifBlock->children);
+                auto elifBlock = std::move(branch->children[1]);
+                auto children = std::move(elifBlock->children);
                 emitPrologue(std::move(elifBlock));
                 for (auto &stmt : children)
                     generateStatement(std::move(stmt));
                 emitEpilogue();
-                out << "    jmp   " << endLbl << "\n";
-
-                branch = branch->getElseBranch();
+                out << "    jmp " << endLbl << "\n";
             }
             else if (branch->type == NodeType::ElseStatement)
             {
-                std::unique_ptr<ASTNode> elseBlock = std::move(branch->children[0]);
-                std::vector<std::unique_ptr<zlang::ASTNode>> children = std::move(elseBlock->children);
+                auto elseBlock = std::move(branch->children[0]);
+                auto children = std::move(elseBlock->children);
                 emitPrologue(std::move(elseBlock));
                 for (auto &stmt : children)
                     generateStatement(std::move(stmt));
                 emitEpilogue();
-                break;
             }
+
+            branch = branch->getElseBranch();
         }
+
         out << endLbl << ":\n\n";
-        return;
     }
     void CodeGenLinux::generate(std::unique_ptr<ASTNode> program)
     {

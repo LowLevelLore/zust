@@ -1,6 +1,0 @@
-let a: integer = 10;
-if (2 >= 5){
-    a = 12;
-}else{
-    a = 20;
-}
