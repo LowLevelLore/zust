@@ -9,12 +9,12 @@ namespace zlang
     {
         if (fromType.bits == toType.bits && fromType.isFloat == toType.isFloat)
         {
-            if (!fromType.isFloat && fromType.bits == toType.bits &&
-                fromType.isSigned != toType.isSigned)
+            if (!fromType.isFloat && fromType.isSigned != toType.isSigned)
             {
                 std::string dst = alloc.allocate();
-                out << "    mov " << adjustReg(dst, fromType.bits) << ", "
-                    << adjustReg(val, fromType.bits) << "\n";
+                // AT&T: source, destination
+                out << "    mov %" << adjustReg(val, fromType.bits)
+                    << ", %" << adjustReg(dst, fromType.bits) << "\n";
                 alloc.free(val);
                 noteType(dst, toType);
                 return dst;
@@ -26,7 +26,8 @@ namespace zlang
         {
             std::string dstX = alloc.allocateXMM();
             auto instr = (fromType.bits < toType.bits) ? "cvtss2sd" : "cvtsd2ss";
-            out << "    " << instr << " " << dstX << ", " << val << "\n";
+            // AT&T: source, destination
+            out << "    " << instr << " %" << val << ", %" << dstX << "\n";
             alloc.free(val);
             noteType(dstX, toType);
             return dstX;
@@ -36,8 +37,8 @@ namespace zlang
         {
             std::string dstX = alloc.allocateXMM();
             auto instr = (toType.bits == 32) ? "cvtsi2ss" : "cvtsi2sd";
-            out << "    " << instr << " " << dstX << ", "
-                << adjustReg(val, fromType.bits) << "\n";
+            out << "    " << instr << " %" << adjustReg(val, fromType.bits)
+                << ", %" << dstX << "\n";
             alloc.free(val);
             noteType(dstX, toType);
             return dstX;
@@ -47,75 +48,61 @@ namespace zlang
         {
             std::string dstG = alloc.allocate();
             auto instr = (fromType.bits == 32) ? "cvttss2si" : "cvttsd2si";
-            out << "    " << instr << " " << adjustReg(dstG, toType.bits)
-                << ", " << val << "\n";
+            out << "    " << instr << " %" << val
+                << ", %" << adjustReg(dstG, toType.bits) << "\n";
             alloc.free(val);
             noteType(dstG, toType);
             return dstG;
         }
 
+        // Integer casts
         if (!fromType.isFloat && !toType.isFloat)
         {
             std::string dstG = alloc.allocate();
             std::string srcAdj = adjustReg(val, fromType.bits);
-            std::string dstAdjFull = adjustReg(dstG, toType.bits);
+            std::string dstAdj = adjustReg(dstG, toType.bits);
 
             if (toType.bits > fromType.bits)
             {
+                // Extension
                 if (fromType.isSigned)
                 {
                     if (fromType.bits == 32 && toType.bits == 64)
                     {
-                        out << "    movsxd " << dstAdjFull << ", " << srcAdj << "\n";
+                        // AT&T: source, destination
+                        out << "    movsxd %" << srcAdj << ", %" << dstAdj << "\n";
                     }
                     else
                     {
-                        out << "    movsx " << dstAdjFull << ", " << adjustReg(val, fromType.bits) << "\n";
+                        // movsx for 8/16 -> larger
+                        out << "    movsx %" << srcAdj << ", %" << dstAdj << "\n";
                     }
                 }
                 else
                 {
                     if (fromType.bits == 8 || fromType.bits == 16)
                     {
-                        out << "    movzx " << dstAdjFull << ", " << adjustReg(val, fromType.bits) << "\n";
-                    }
-                    else if (fromType.bits == 32 && toType.bits == 64)
-                    {
-                        out << "    mov " << adjustReg(dstG, 32) << ", " << adjustReg(val, 32) << "\n";
+                        // AT&T: source, destination
+                        out << "    movzx %" << srcAdj << ", %" << dstAdj << "\n";
                     }
                     else
                     {
-                        throw std::runtime_error("Unsupported unsigned cast: " +
-                                                 std::to_string(fromType.bits) + " -> " +
-                                                 std::to_string(toType.bits));
+                        // 32->64: normal mov zero-extends
+                        out << "    movl %" << adjustReg(val, 32)
+                            << ", %" << adjustReg(dstG, 32) << "\n";
                     }
                 }
             }
             else if (toType.bits < fromType.bits)
             {
-                if (toType.bits == 8 || toType.bits == 16)
-                {
-                    if (toType.isSigned)
-                    {
-                        out << "    movsx " << dstAdjFull << ", " << adjustReg(val, toType.bits) << "\n";
-                    }
-                    else
-                    {
-                        out << "    movzx " << dstAdjFull << ", " << adjustReg(val, toType.bits) << "\n";
-                    }
-                }
-                else if (toType.bits == 32)
-                {
-                    out << "    mov " << adjustReg(dstAdjFull, 32) << ", " << adjustReg(val, 32) << "\n";
-                }
-                else
-                {
-                    throw std::runtime_error("Unsupported downcast to " + std::to_string(toType.bits));
-                }
+                // Truncation: move smaller portion
+                out << "    mov %" << adjustReg(val, toType.bits)
+                    << ", %" << dstAdj << "\n";
             }
             else
             {
-                out << "    mov " << dstAdjFull << ", " << srcAdj << "\n";
+                // Same size: simple move
+                out << "    mov %" << srcAdj << ", %" << dstAdj << "\n";
             }
 
             alloc.free(val);
@@ -239,21 +226,20 @@ namespace zlang
         if (tr.isFloat)
         {
             bool isF32 = (tr.bits == 32);
-            char suf = isF32 ? 's' : 'd'; // movss/addss vs movsd/addsd
+            std::string vsuf = isF32 ? "ss" : "sd";
             std::string xl = rl, xr = rr;
 
             if (op == "+")
-                out << "    add" << suf << suf << " %" << xr << ", %" << xl << "\n";
+                out << "    add" << vsuf << " %" << xr << ", %" << xl << "\n";
             else if (op == "-")
-                out << "    sub" << suf << suf << " %" << xr << ", %" << xl << "\n";
+                out << "    sub" << vsuf << " %" << xr << ", %" << xl << "\n";
             else if (op == "*")
-                out << "    mul" << suf << suf << " %" << xr << ", %" << xl << "\n";
+                out << "    mul" << vsuf << " %" << xr << ", %" << xl << "\n";
             else if (op == "/")
-                out << "    div" << suf << suf << " %" << xr << ", %" << xl << "\n";
+                out << "    div" << vsuf << " %" << xr << ", %" << xl << "\n";
             else if (assembly_comparison_operations.count(op))
             {
-                // unordered compare + set
-                out << "    ucomi" << suf << suf << " %" << xr << ", %" << xl << "\n"
+                out << "    ucomi" << vsuf << " %" << xr << ", %" << xl << "\n"
                     << "    " << assembly_comparison_operations.at(op) << " %al\n";
                 auto r_bool = alloc.allocate();
                 out << "    movzbq %al, %" << r_bool << "\n";

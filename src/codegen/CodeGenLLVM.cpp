@@ -224,7 +224,7 @@ namespace zlang
                 noteType(res, tr);
                 return res;
             }
-            else 
+            else
             {
                 std::string cmpop = fcmp_ops.at(node->value);
                 out << "  " << res << " = fcmp " << cmpop << " " << target << " " << L << ", " << R << "\n";
@@ -257,7 +257,7 @@ namespace zlang
             }
 
             static const std::unordered_map<std::string, std::pair<std::string, std::string>> cmp_map = {
-                {"==", {"eq", "ueq"}}, {"!=", {"ne", "une"}}, {"<", {"slt", "ult"}}, {"<=", {"sle", "ule"}}, {">", {"sgt", "ugt"}}, {">=", {"sge", "uge"}}};
+                {"==", {"eq", "eq"}}, {"!=", {"ne", "ne"}}, {"<", {"slt", "ult"}}, {"<=", {"sle", "ule"}}, {">", {"sgt", "ugt"}}, {">=", {"sge", "uge"}}};
 
             auto it = cmp_map.find(node->value);
             if (it != cmp_map.end())
@@ -281,7 +281,7 @@ namespace zlang
         auto &scope = *node->children[0]->scope;
         auto varName = node->children[0]->value;
         TypeInfo ti = scope.lookupType(scope.lookupVariable(varName).type);
-
+        NodeType child_type = node->children[0]->type;
         auto val = emitExpression(std::move(node->children[0]));
 
         std::string llvmType;
@@ -303,7 +303,7 @@ namespace zlang
         }
         else if (node->value == "++" || node->value == "--")
         {
-            if (node->children[0]->type != NodeType::VariableAccess)
+            if (child_type != NodeType::VariableAccess)
                 throw std::runtime_error(node->value + " can only be applied to variables");
 
             if (ti.isFloat)
