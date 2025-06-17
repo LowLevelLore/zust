@@ -1,3 +1,0 @@
-let x: integer = 2;
-let y: integer = 2 * x - x;
-let k: int32_t = ++x;

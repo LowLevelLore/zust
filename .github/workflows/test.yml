@@ -2,16 +2,9 @@ name: CI
 
 on:
   push:
-    paths:
-      - "**.zz"
-      - "src/**"
-      - "test/zz/**"
-      - "include/**"
-      - "main.cpp"
-      - "**.yml"
-      - "**.py"
-      - "CMakeLists.txt"
-  pull_request: {}
+    branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
   test-linux-llvm:

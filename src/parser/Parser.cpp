@@ -4,7 +4,7 @@ namespace zlang
 {
     Parser::Parser(Lexer &lex) : lexer(lex)
     {
-        currentScope = std::make_shared<ScopeContext>(nullptr);
+        currentScope = std::make_shared<ScopeContext>(nullptr, "GLOBAL SCOPE");
         // TODO: This is controversial, lets make something in the near future that gets these (size_t, integer, float, double, etc) sizes dynamically
         currentScope->defineType("boolean", TypeInfo{8, 1, false, false});
         currentScope->defineType("string", TypeInfo{64, 8, false, false}); // Assuming pointer to heap
@@ -78,6 +78,8 @@ namespace zlang
             return parseVariableReassignment();
         if (currentToken.kind == Token::Kind::If || currentToken.kind == Token::Kind::ElseIf || currentToken.kind == Token::Kind::Else)
             return parseConditionals();
+        if (currentToken.kind == Token::Kind::Symbol || currentToken.kind == Token::Kind::Identifier)
+            return parseExpression(true);
         logError({ErrorType::Syntax,
                   "Unexpected token '" + currentToken.text +
                       "' at line " + std::to_string(currentToken.line) +
@@ -89,7 +91,7 @@ namespace zlang
     std::unique_ptr<ASTNode> Parser::parseBlock()
     {
         expect(Token::Kind::LeftBrace, "Expected a '{' to open a scope, at line " + std::to_string(currentToken.line) + ", column " + std::to_string(currentToken.column) + ".");
-        enterScope();
+        enterScope("blockNumber" + std::to_string(blockNumber++));
         auto blockNode = std::make_unique<ASTNode>(NodeType::Program, "", currentScope);
         while (!match(Token::Kind::RightBrace) && currentToken.kind != Token::Kind::EndOfFile)
         {
@@ -189,7 +191,17 @@ namespace zlang
             }
         }
         expect(Token::Kind::SemiColon, "Expected ';' after declaration");
-        return ASTNode::makeVariableDeclarationNode(name, std::move(typeNode), std::move(initNode), currentScope);
+        std::optional<std::unique_ptr<ASTNode>> result = ASTNode::makeVariableDeclarationNode(name, std::move(typeNode), std::move(initNode), currentScope);
+        if (!result.has_value())
+        {
+            logError(Error(ErrorType::Generic, "Variable '" + name + "' already defined in current scope."));
+            shouldTypecheck = false;
+            return nullptr;
+        }
+        else
+        {
+            return std::move(result.value());
+        }
     }
 
     std::unique_ptr<ASTNode> Parser::parseVariableReassignment()
@@ -203,10 +215,15 @@ namespace zlang
         return ASTNode::makeVariableReassignmentNode(name, std::move(expr), currentScope);
     }
 
-    std::unique_ptr<ASTNode> Parser::parseExpression()
+    std::unique_ptr<ASTNode> Parser::parseExpression(bool expect_exclaim)
     {
         auto lhs = parseUnary();
-        return parseBinaryRHS(0, std::move(lhs));
+        auto ans = parseBinaryRHS(0, std::move(lhs));
+        if (expect_exclaim)
+        {
+            expect(Token::Kind::SemiColon, "';' Expected at the end of statement at line " + std::to_string(currentToken.line) + ", column " + std::to_string(currentToken.column) + ".");
+        }
+        return ans;
     }
 
     std::unique_ptr<ASTNode> Parser::parsePrimary()
@@ -280,18 +297,22 @@ namespace zlang
     {
         while (true)
         {
-            if (currentToken.kind != Token::Kind::Symbol)
+            // Only consider tokens that can represent binary operators
+            if (!(currentToken.kind == Token::Kind::Symbol || (currentToken.kind == Token::Kind::Equal and currentToken.text == "==")))
                 break;
-            int tokPrec = getPrecedence(currentToken.text);
+
+            std::string op = currentToken.text;
+            int tokPrec = getPrecedence(op);
+
             if (tokPrec < exprPrec)
                 return lhs;
 
-            std::string op = currentToken.text;
             advance();
 
             // parse RHS
             auto rhs = parseUnary();
             int nextPrec = getPrecedence(currentToken.text);
+
             if (tokPrec < nextPrec)
                 rhs = parseBinaryRHS(tokPrec + 1, std::move(rhs));
 
@@ -309,9 +330,9 @@ namespace zlang
         return it == prec.end() ? -1 : it->second;
     }
 
-    void Parser::enterScope()
+    void Parser::enterScope(std::string name)
     {
-        currentScope = std::make_shared<ScopeContext>(currentScope);
+        currentScope = std::make_shared<ScopeContext>(currentScope, name);
     }
     void Parser::exitScope()
     {

@@ -35,7 +35,7 @@ namespace zlang
         size_t line;
         size_t column;
 
-        std::string toString() const
+        std::string to_string() const
         {
             return "Token { kind = " + kindToString(kind) +
                    ", text = \"" + text +
@@ -95,7 +95,7 @@ namespace zlang
 
     inline std::ostream &operator<<(std::ostream &os, const Token &token)
     {
-        return os << token.toString();
+        return os << token.to_string();
     }
     using Error = zlang::Error;
     class Lexer

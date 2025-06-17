@@ -1,0 +1,18 @@
+let x: int64_t = 5;
+++x;
+--x;
+
+let y: uint8_t = 255;
+++y;
+--y;
+
+let z: size_t = 100;
+++z;
+--z;
+
+// Logical NOT on boolean
+let b1: boolean = true;
+let nb1: boolean = !b1;
+
+let b2: boolean = false;
+let nb2: boolean = !b2;

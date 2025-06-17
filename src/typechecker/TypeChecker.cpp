@@ -11,10 +11,7 @@ namespace zlang
             shouldCodegen_ = false;
             return;
         }
-        for (auto &child : program->children)
-        {
-            checkNode(child.get());
-        }
+        checkNode(program.get());
     }
 
     std::string TypeChecker::checkNode(const ASTNode *node)
@@ -25,6 +22,13 @@ namespace zlang
         switch (node->type)
         {
 
+        case NodeType::Program:
+            for (auto &child : node->children)
+            {
+                checkNode(child.get());
+            }
+            return "";
+
         case NodeType::VariableDeclaration:
         {
             std::string annotatedType, initType;
@@ -34,7 +38,9 @@ namespace zlang
                 annotatedType = node->children[0]->value;
             }
             if (node->children.size() == 2)
+            {
                 initType = checkNode(node->children[1].get());
+            }
 
             if (annotatedType.empty() && initType.empty())
             {
@@ -56,13 +62,13 @@ namespace zlang
                                   "' does not match annotation '" + annotatedType +
                                   "' on variable '" + node->value + "'"});
                     shouldCodegen_ = false;
+                    return "";
                 }
             }
 
             // final type is the annotation if provided, else the inferred
             std::string finalType =
                 !annotatedType.empty() ? annotatedType : initType;
-            scope->defineVariable(node->value, VariableInfo{finalType});
             return finalType;
         }
 
@@ -209,18 +215,28 @@ namespace zlang
             return "";
         }
 
-        // handle if / else etc by checking their children
         case NodeType::IfStatement:
         case NodeType::ElseIfStatement:
+        {
+            if (node->children.size() > 0)
+                checkNode(node->children[0].get());
+
+            if (node->children.size() > 1)
+                checkNode(node->children[1].get());
+
+            if (node->children.size() > 2 && node->children[2])
+                checkNode(node->children[2].get());
+
+            return "";
+        }
         case NodeType::ElseStatement:
-            for (auto &c : node->children)
-                checkNode(c.get());
-            return ""; // control node itself has no type
+        {
+            if (!node->children.empty())
+                checkNode(node->children[0].get());
+            return "";
+        }
 
         default:
-            // propagate into any other children
-            for (auto &c : node->children)
-                checkNode(c.get());
             return "";
         }
     }

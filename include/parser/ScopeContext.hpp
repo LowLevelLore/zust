@@ -4,6 +4,8 @@
 #include <memory>
 #include <stdexcept>
 #include <vector>
+#include <optional>
+#include <map>
 
 namespace zlang
 {
@@ -28,7 +30,7 @@ namespace zlang
         bool isFloat;
         bool isSigned;
 
-        std::string to_string()
+        std::string to_string() const
         {
             std::string ret = "";
             ret += "TypeInfo( .bits: " + std::to_string(bits) + ", .align: " + std::to_string(align) + ", .isFloat: " + (isFloat ? "true" : "false") + ", .isSigned: " + (isSigned ? "true" : "false") + " )\n";
@@ -36,17 +38,21 @@ namespace zlang
         }
     };
 
+    static int variableNumber = 0;
+
     class ScopeContext
     {
     public:
-        ScopeContext(std::shared_ptr<ScopeContext> parent = nullptr) : stackOffset(0), parent_(parent) {};
-
+        std::string name;
+        ScopeContext(std::shared_ptr<ScopeContext> parent = nullptr) : stackOffset(0), parent_(parent){};
+        ScopeContext(std::shared_ptr<ScopeContext> parent = nullptr, std::string name = "") : name(name), stackOffset(0), parent_(parent){};
+        std::unordered_map<std::string, std::string> name_mappings;
         std::int64_t stackOffset;
         std::shared_ptr<ScopeContext> parent_;
-        void defineVariable(const std::string &name, const VariableInfo &info);
+        bool defineVariable(const std::string &name, const VariableInfo &info);
         void defineFunction(const std::string &name, const FunctionInfo &info);
         void defineType(const std::string &name, const TypeInfo &info);
-
+        std::string getMapping(std::string varName);
         VariableInfo lookupVariable(const std::string &name) const;
         FunctionInfo lookupFunction(const std::string &name) const;
         TypeInfo lookupType(const std::string &name) const;
@@ -101,6 +107,7 @@ namespace zlang
             }
             std::cout << std::endl;
         }
+        std::optional<VariableInfo> lookupVariableInCurrentContext(const std::string &name) const;
 
     private:
         std::unordered_map<std::string, VariableInfo> vars_;

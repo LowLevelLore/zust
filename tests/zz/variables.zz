@@ -1,10 +1,14 @@
-let x: integer = 10;
-let z: integer;
+let x: int64_t = 42;
+let y: uint8_t;
+let f: float = 3.14f;
+let d: double = 2.718;
+let flag: boolean = true;
+let other: boolean = false;
+let s: string = "hello";
+let a: string;
 
-z = 13;
-x = 11;
+let x1: int64_t = 10;
+x = 20;
 
-let k: string = "Hello World";
-let g: double = 32.11;
-let h: float = 3.14f;
-
+let f1: float = 1.5f;
+f = 2.5f;

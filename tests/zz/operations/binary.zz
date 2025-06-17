@@ -1,0 +1,48 @@
+// Integer + Integer
+let a: int64_t = 10;
+let b: int64_t = 20;
+let sum_i: int64_t = a + b;
+let diff_i: int64_t = a - b;
+let prod_i: int64_t = a * b;
+let div_i: int64_t = b / a;
+
+// Integer + Float (promote to float)
+let c: float = 2.5;
+let sum_if: float = a + c;
+let diff_if: float = c - a;
+let prod_if: float = a * c;
+let div_if: float = a / c;
+
+// Float + Float
+let d: double = 3.1415;
+let e: double = 2.718;
+let sum_f: double = d + e;
+let diff_f: double = d - e;
+let prod_f: double = d * e;
+let div_f: double = d / e;
+
+// Unsigned + Signed
+let ua: uint8_t = 5;
+let sb: int8_t = -2;
+let sum_us: int16_t = ua + sb;
+
+// Comparisons int
+let cmp_lt: boolean = a < b;
+let cmp_le: boolean = a <= b;
+let cmp_gt: boolean = a > b;
+let cmp_ge: boolean = a >= b;
+let cmp_eq: boolean = a == b;
+let cmp_ne: boolean = a != b;
+
+// Comparisons float
+let cmpf_lt: boolean = d < e;
+let cmpf_eq: boolean = d == e;
+
+// Mixed Comparison
+let cmpmix: boolean = a < d;
+
+// Comparison boolean (only ==, != valid)
+let ba: boolean = true;
+let bb: boolean = false;
+let cmpb_eq: boolean = ba == bb;
+let cmpb_ne: boolean = ba != bb;

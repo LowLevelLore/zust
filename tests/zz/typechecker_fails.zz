@@ -1,2 +1,0 @@
-let x: string = "Hello World";
-let y: integer = 10;

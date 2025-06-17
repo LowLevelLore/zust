@@ -58,15 +58,15 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    if (!program.get())
+    {
+        zlang::logError(Error(ErrorType::Generic, "Parsing Failed"));
+        return 1;
+    }
     if (cli.printAST())
     {
-        if (!program.get())
-        {
-            zlang::logError(Error(ErrorType::Generic, "Parsing Failed"));
-            return 1;
-        }
+        program.get()->print(std::cout);
     }
-    program.get()->print(std::cout);
 
     // Type checking
     TypeChecker typeChecker;
