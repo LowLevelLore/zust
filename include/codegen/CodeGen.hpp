@@ -40,9 +40,9 @@ namespace zlang
         std::ostringstream outGlobal;
         std::ostringstream out;
 
-        std::string adjustReg(std::string &r64, uint64_t bits)
+        std::string adjustReg(const std::string &r64, uint64_t bits)
         {
-            r64 = RegisterAllocator::getBaseReg(r64);
+            std::string baseRegister = RegisterAllocator::getBaseReg(r64);
             static const std::unordered_map<std::string, std::array<std::string, 4>> registers_based_on_bytes = {
                 {"rax", {"rax", "eax", "ax", "al"}},
                 {"rbx", {"rbx", "ebx", "bx", "bl"}},
@@ -61,9 +61,9 @@ namespace zlang
                 {"r14", {"r14", "r14d", "r14w", "r14b"}},
                 {"r15", {"r15", "r15d", "r15w", "r15b"}}};
 
-            auto it = registers_based_on_bytes.find(r64);
+            auto it = registers_based_on_bytes.find(baseRegister);
             if (it == registers_based_on_bytes.end())
-                throw std::runtime_error("Unknown register '" + r64 + "'\n\n" + out.str());
+                throw std::runtime_error("Unknown register '" + baseRegister + "'\n\n" + out.str());
             const auto &ents = it->second;
 
             switch (bits)
@@ -111,8 +111,6 @@ namespace zlang
 
         void noteType(const std::string &register_, const TypeInfo &type_) { regType[register_] = type_; }
 
-        virtual std::string intToXmm(const std::string &r_int, uint32_t bits) = 0;
-
         virtual void generateStatement(std::unique_ptr<ASTNode> statement) = 0;
 
         virtual std::string emitExpression(std::unique_ptr<ASTNode> node) = 0;
@@ -142,15 +140,10 @@ namespace zlang
     {
     private:
         std::unordered_map<std::uint32_t, char> integer_suffixes = {{8, 'b'}, {16, 'w'}, {32, 'l'}, {64, 'q'}};
-        std::string intToXmm(const std::string &r_int, uint32_t bits) override;
-
         void generateStatement(std::unique_ptr<ASTNode> statement) override;
-
         std::string emitExpression(std::unique_ptr<ASTNode> node) override;
-
         void emitEpilogue() override;
         void emitPrologue(std::unique_ptr<ASTNode> blockNode) override;
-
         std::string generateIntegerLiteral(std::unique_ptr<ASTNode> node) override;
         std::string generateFloatLiteral(std::unique_ptr<ASTNode> node) override;
         std::string generateStringLiteral(std::unique_ptr<ASTNode> node) override;
@@ -161,10 +154,11 @@ namespace zlang
         void generateIfStatement(std::unique_ptr<ASTNode> node) override;
         std::string generateBinaryOperation(std::unique_ptr<ASTNode> node) override;
         std::string generateUnaryOperation(std::unique_ptr<ASTNode> node) override;
+        std::string castValue(const std::string &val, const TypeInfo &fromType, const TypeInfo &toType);
 
     public:
         ~CodeGenLinux() override = default;
-        CodeGenLinux(std::ostream &outstream) : CodeGen(RegisterAllocator::forSysV(), outstream) {};
+        CodeGenLinux(std::ostream &outstream) : CodeGen(RegisterAllocator::forSysV(), outstream){};
         void generate(std::unique_ptr<ASTNode> program) override;
     };
 
@@ -172,15 +166,10 @@ namespace zlang
     {
     private:
         std::unordered_map<std::uint32_t, char> integer_suffixes = {{8, 'b'}, {16, 'w'}, {32, 'l'}, {64, 'q'}};
-        std::string intToXmm(const std::string &r_int, uint32_t bits) override;
-
         void generateStatement(std::unique_ptr<ASTNode> statement) override;
-
         std::string emitExpression(std::unique_ptr<ASTNode> node) override;
-
         void emitEpilogue() override;
         void emitPrologue(std::unique_ptr<ASTNode> blockNode) override;
-
         std::string generateIntegerLiteral(std::unique_ptr<ASTNode> node) override;
         std::string generateFloatLiteral(std::unique_ptr<ASTNode> node) override;
         std::string generateStringLiteral(std::unique_ptr<ASTNode> node) override;
@@ -191,10 +180,12 @@ namespace zlang
         void generateIfStatement(std::unique_ptr<ASTNode> node) override;
         std::string generateBinaryOperation(std::unique_ptr<ASTNode> node) override;
         std::string generateUnaryOperation(std::unique_ptr<ASTNode> node) override;
+        std::string castValue(const std::string &reg, const TypeInfo &fromType, const TypeInfo &toType);
+        std::string getVariableAddress(const ScopeContext &scope, const std::string &name) const;
 
     public:
         ~CodeGenWindows() override = default;
-        CodeGenWindows(std::ostream &outstream) : CodeGen(RegisterAllocator::forMSVC(), outstream) {};
+        CodeGenWindows(std::ostream &outstream) : CodeGen(RegisterAllocator::forMSVC(), outstream){};
         void generate(std::unique_ptr<ASTNode> program) override;
     };
 
@@ -203,15 +194,10 @@ namespace zlang
     private:
         std::unordered_map<std::uint32_t, char> integer_suffixes = {{8, 'b'}, {16, 'w'}, {32, 'l'}, {64, 'q'}};
         std::unordered_map<std::string, std::string> stringLiterals;
-        std::string intToXmm(const std::string &r_int, uint32_t bits) override;
-
         void generateStatement(std::unique_ptr<ASTNode> statement) override;
-
         std::string emitExpression(std::unique_ptr<ASTNode> node) override;
-
         void emitEpilogue() override;
         void emitPrologue(std::unique_ptr<ASTNode> blockNode) override;
-
         std::string generateIntegerLiteral(std::unique_ptr<ASTNode> node) override;
         std::string generateFloatLiteral(std::unique_ptr<ASTNode> node) override;
         std::string generateStringLiteral(std::unique_ptr<ASTNode> node) override;
@@ -222,12 +208,11 @@ namespace zlang
         void generateIfStatement(std::unique_ptr<ASTNode> node) override;
         std::string generateBinaryOperation(std::unique_ptr<ASTNode> node) override;
         std::string generateUnaryOperation(std::unique_ptr<ASTNode> node) override;
-
         std::string castValue(const std::string &val, const TypeInfo &fromType, const TypeInfo &toType);
 
     public:
         ~CodeGenLLVM() override = default;
-        CodeGenLLVM(std::ostream &outstream) : CodeGen(RegisterAllocator(), outstream) {};
+        CodeGenLLVM(std::ostream &outstream) : CodeGen(RegisterAllocator(), outstream){};
         void generate(std::unique_ptr<ASTNode> program) override;
     };
 } // namespace zlang

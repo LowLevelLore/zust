@@ -7,7 +7,6 @@ namespace zlang
         static int cnt = 0;
         return "%tmp" + std::to_string(cnt++);
     }
-
     std::string toHexFloatFromStr(const std::string &valStr, bool isF32)
     {
         std::ostringstream oss;
@@ -24,13 +23,10 @@ namespace zlang
         }
         return oss.str();
     }
-
     std::string CodeGenLLVM::castValue(const std::string &val, const TypeInfo &fromType, const TypeInfo &toType)
     {
         if (fromType.isFloat == toType.isFloat && fromType.bits == toType.bits)
-        {
             return val;
-        }
 
         std::string tmp = fresh();
 
@@ -38,13 +34,15 @@ namespace zlang
         {
             std::string intTy = "i" + std::to_string(fromType.bits);
             std::string floatTy = (toType.bits == 64 ? "double" : "float");
-            out << "  " << tmp << " = sitofp " << intTy << " " << val << " to " << floatTy << "\n";
+            std::string instr = fromType.isSigned ? "sitofp" : "uitofp";
+            out << "  " << tmp << " = " << instr << " " << intTy << " " << val << " to " << floatTy << "\n";
         }
         else if (fromType.isFloat && !toType.isFloat)
         {
             std::string floatTy = (fromType.bits == 64 ? "double" : "float");
             std::string intTy = "i" + std::to_string(toType.bits);
-            out << "  " << tmp << " = fptosi " << floatTy << " " << val << " to " << intTy << "\n";
+            std::string instr = toType.isSigned ? "fptosi" : "fptoui";
+            out << "  " << tmp << " = " << instr << " " << floatTy << " " << val << " to " << intTy << "\n";
         }
         else if (!fromType.isFloat && !toType.isFloat)
         {
@@ -52,11 +50,17 @@ namespace zlang
             std::string toTy = "i" + std::to_string(toType.bits);
             if (fromType.bits < toType.bits)
             {
-                out << "  " << tmp << " = sext " << fromTy << " " << val << " to " << toTy << "\n";
+                std::string instr = fromType.isSigned ? "sext" : "zext";
+                out << "  " << tmp << " = " << instr << " " << fromTy << " " << val << " to " << toTy << "\n";
             }
             else if (fromType.bits > toType.bits)
             {
                 out << "  " << tmp << " = trunc " << fromTy << " " << val << " to " << toTy << "\n";
+            }
+            else if (fromType.isSigned != toType.isSigned)
+            {
+                // Retag value if signedness differs but bit-width is the same
+                out << "  " << tmp << " = add " << fromTy << " " << val << ", 0\n";
             }
             else
             {
@@ -87,12 +91,6 @@ namespace zlang
 
         noteType(tmp, toType);
         return tmp;
-    }
-
-    std::string CodeGenLLVM::intToXmm(const std::string &register_int,
-                                      uint32_t bits)
-    {
-        return "";
     }
     std::string CodeGenLLVM::generateIntegerLiteral(std::unique_ptr<ASTNode> node)
     {
@@ -210,59 +208,72 @@ namespace zlang
         TypeInfo t1 = regType[lhs];
         TypeInfo t2 = regType[rhs];
         TypeInfo tr = TypeChecker::promoteType(t1, t2);
-        std::string res = fresh();
         std::string L = castValue(lhs, t1, tr);
         std::string R = castValue(rhs, t2, tr);
+        std::string res = fresh();
 
         if (tr.isFloat)
         {
             std::string target = (tr.bits == 64 ? "double" : "float");
+            static const std::unordered_map<std::string, std::string> fp_ops = {{"+", "fadd"}, {"-", "fsub"}, {"*", "fmul"}, {"/", "fdiv"}};
+            static const std::unordered_map<std::string, std::string> fcmp_ops = {{"==", "oeq"}, {"!=", "one"}, {"<", "olt"}, {"<=", "ole"}, {">", "ogt"}, {">=", "oge"}};
 
-            if (node->value == "+" || node->value == "-" || node->value == "*" || node->value == "/")
+            if (fp_ops.count(node->value))
             {
-                static const std::unordered_map<std::string, std::string> fp_ops = {
-                    {"+", "fadd"}, {"-", "fsub"}, {"*", "fmul"}, {"/", "fdiv"}};
-                auto op = fp_ops.at(node->value);
-                out << "  " << res << " = " << op << " " << target << " " << L << ", " << R << "\n";
+                out << "  " << res << " = " << fp_ops.at(node->value) << " " << target << " " << L << ", " << R << "\n";
                 noteType(res, tr);
                 return res;
             }
-            else
+            else 
             {
-                static const std::unordered_map<std::string, std::string> fcmp_ops = {
-                    {"==", "oeq"}, {"!=", "one"}, {"<", "olt"}, {"<=", "ole"}, {">", "ogt"}, {">=", "oge"}};
-                auto cmpop = fcmp_ops.at(node->value);
+                std::string cmpop = fcmp_ops.at(node->value);
                 out << "  " << res << " = fcmp " << cmpop << " " << target << " " << L << ", " << R << "\n";
-                std::string zero = fresh();
-                out << "  " << zero << " = zext i1 " << res << " to i8\n";
-                noteType(zero, node->scope->lookupType("boolean"));
-                return zero;
+                std::string zext = fresh();
+                out << "  " << zext << " = zext i1 " << res << " to i8\n";
+                noteType(zext, node->scope->lookupType("boolean"));
+                return zext;
             }
         }
         else
         {
             std::string intTy = "i" + std::to_string(tr.bits);
+            bool isSigned = tr.isSigned;
 
             if (node->value == "+" || node->value == "-" || node->value == "*" || node->value == "/")
             {
-                static const std::unordered_map<std::string, std::string> int_ops = {
-                    {"+", "add"}, {"-", "sub"}, {"*", "mul"}, {"/", "sdiv"}};
-                auto op = int_ops.at(node->value);
+                std::string op;
+                if (node->value == "+")
+                    op = "add";
+                else if (node->value == "-")
+                    op = "sub";
+                else if (node->value == "*")
+                    op = "mul";
+                else /* "/" */
+                    op = (isSigned ? "sdiv" : "udiv");
+
                 out << "  " << res << " = " << op << " " << intTy << " " << L << ", " << R << "\n";
                 noteType(res, tr);
                 return res;
             }
-            else
+
+            static const std::unordered_map<std::string, std::pair<std::string, std::string>> cmp_map = {
+                {"==", {"eq", "ueq"}}, {"!=", {"ne", "une"}}, {"<", {"slt", "ult"}}, {"<=", {"sle", "ule"}}, {">", {"sgt", "ugt"}}, {">=", {"sge", "uge"}}};
+
+            auto it = cmp_map.find(node->value);
+            if (it != cmp_map.end())
             {
-                static const std::unordered_map<std::string, std::string> icmp_ops = {
-                    {"==", "eq"}, {"!=", "ne"}, {"<", "slt"}, {"<=", "sle"}, {">", "sgt"}, {">=", "sge"}};
-                auto cmpop = icmp_ops.at(node->value);
+                std::string signedOp = it->second.first;
+                std::string unsignedOp = it->second.second;
+                std::string cmpop = isSigned ? signedOp : unsignedOp;
+
                 out << "  " << res << " = icmp " << cmpop << " " << intTy << " " << L << ", " << R << "\n";
-                std::string zero = fresh();
-                out << "  " << zero << " = zext i1 " << res << " to i8\n";
-                noteType(zero, node->scope->lookupType("boolean"));
-                return zero;
+                std::string zext = fresh();
+                out << "  " << zext << " = zext i1 " << res << " to i8\n";
+                noteType(zext, node->scope->lookupType("boolean"));
+                return zext;
             }
+
+            throw std::runtime_error("Unsupported integer op " + node->value);
         }
     }
     std::string CodeGenLLVM::generateUnaryOperation(std::unique_ptr<ASTNode> node)
@@ -281,6 +292,8 @@ namespace zlang
 
         if (node->value == "!")
         {
+            TypeInfo boolType = node->scope->lookupType("boolean");
+            val = castValue(val, regType.at(val), boolType);
             std::string res = fresh();
             out << "  " << res << " = icmp eq " << llvmType << " " << val << ", 0\n";
             std::string zero = fresh();
@@ -288,22 +301,11 @@ namespace zlang
             noteType(zero, node->scope->lookupType("boolean"));
             return zero;
         }
-        else if (node->value == "-")
-        {
-            std::string res = fresh();
-            if (ti.isFloat)
-            {
-                out << "  " << res << " = fsub " << llvmType << " 0.0, " << val << "\n";
-            }
-            else
-            {
-                out << "  " << res << " = sub " << llvmType << " 0, " << val << "\n";
-            }
-            noteType(res, ti);
-            return res;
-        }
         else if (node->value == "++" || node->value == "--")
         {
+            if (node->children[0]->type != NodeType::VariableAccess)
+                throw std::runtime_error(node->value + " can only be applied to variables");
+
             if (ti.isFloat)
                 throw std::runtime_error("Increment/Decrement not supported on float");
 
@@ -548,7 +550,6 @@ namespace zlang
         // 5) end label
         out << endLbl << ":\n";
     }
-
     void CodeGenLLVM::generate(std::unique_ptr<ASTNode> program)
     {
         outGlobal << "; ModuleID = 'zlang'\n";

@@ -30,7 +30,7 @@ namespace zlang
         bool isFloat;
         bool isSigned;
 
-        std::string to_string()
+        std::string to_string() const
         {
             std::string ret = "";
             ret += "TypeInfo( .bits: " + std::to_string(bits) + ", .align: " + std::to_string(align) + ", .isFloat: " + (isFloat ? "true" : "false") + ", .isSigned: " + (isSigned ? "true" : "false") + " )\n";
@@ -44,8 +44,8 @@ namespace zlang
     {
     public:
         std::string name;
-        ScopeContext(std::shared_ptr<ScopeContext> parent = nullptr) : stackOffset(0), parent_(parent) {};
-        ScopeContext(std::shared_ptr<ScopeContext> parent = nullptr, std::string name = "") : name(name), stackOffset(0), parent_(parent) {};
+        ScopeContext(std::shared_ptr<ScopeContext> parent = nullptr) : stackOffset(0), parent_(parent){};
+        ScopeContext(std::shared_ptr<ScopeContext> parent = nullptr, std::string name = "") : name(name), stackOffset(0), parent_(parent){};
         std::unordered_map<std::string, std::string> name_mappings;
         std::int64_t stackOffset;
         std::shared_ptr<ScopeContext> parent_;

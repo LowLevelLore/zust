@@ -2,17 +2,147 @@
 
 namespace zlang
 {
-    std::string CodeGenWindows::intToXmm(const std::string &register_int, uint32_t bits)
+    std::string CodeGenWindows::castValue(const std::string &srcReg, const TypeInfo &fromType, const TypeInfo &toType)
     {
-        std::string r_xmm = alloc.allocateXMM();
-        const char *cvt = (bits == 32 ? "cvtsi2ss" : "cvtsi2sd");
-        out << "    " << cvt
-            << " " << r_xmm
-            << ", " << register_int
-            << "\n";
-        alloc.free(register_int);
-        noteType(r_xmm, {bits, bits / 8, true, true});
-        return r_xmm;
+        if (fromType.bits == toType.bits && fromType.isFloat == toType.isFloat)
+        {
+            if (!fromType.isFloat && fromType.bits == toType.bits &&
+                fromType.isSigned != toType.isSigned)
+            {
+                std::string dst = alloc.allocate();
+                out << "    mov " << adjustReg(dst, fromType.bits)
+                    << ", " << adjustReg(srcReg, fromType.bits) << "\n";
+                alloc.free(srcReg);
+                noteType(dst, toType);
+                return dst;
+            }
+            return RegisterAllocator::getBaseReg(srcReg);
+        }
+
+        if (fromType.isFloat && toType.isFloat)
+        {
+            std::string dst = alloc.allocateXMM();
+            auto instr = (fromType.bits < toType.bits)
+                             ? "cvtss2sd"
+                             : "cvtsd2ss";
+            out << "    " << instr << " " << dst << ", " << srcReg << "\n";
+            alloc.free(srcReg);
+            noteType(dst, toType);
+            return dst;
+        }
+
+        if (!fromType.isFloat && toType.isFloat)
+        {
+            std::string dst = alloc.allocateXMM();
+            auto instr = (toType.bits == 32)
+                             ? "cvtsi2ss"
+                             : "cvtsi2sd";
+            out << "    " << instr << " " << dst
+                << ", " << adjustReg(srcReg, fromType.bits) << "\n";
+            alloc.free(srcReg);
+            noteType(dst, toType);
+            return dst;
+        }
+
+        if (fromType.isFloat && !toType.isFloat)
+        {
+            std::string dst = alloc.allocate();
+            auto instr = (fromType.bits == 32)
+                             ? "cvttss2si"
+                             : "cvttsd2si";
+            out << "    " << instr << " " << dst << ", " << srcReg << "\n";
+            alloc.free(srcReg);
+            noteType(dst, toType);
+            return dst;
+        }
+
+        if (!fromType.isFloat && !toType.isFloat)
+        {
+            std::string dst = alloc.allocate();
+            std::string srcAdj = adjustReg(srcReg, fromType.bits);
+            std::string dstAdj = dst;
+
+            if (toType.bits > fromType.bits)
+            {
+                if (fromType.isSigned)
+                {
+                    if (fromType.bits == 32 && toType.bits == 64)
+                    {
+                        out << "    movsxd " << dstAdj << ", " << srcAdj << "\n";
+                    }
+                    else
+                    {
+                        out << "    movsx " << dstAdj << ", " << srcAdj << "\n";
+                    }
+                }
+                else
+                {
+                    if (fromType.bits == 8 || fromType.bits == 16)
+                    {
+                        out << "    movzx " << dstAdj << ", " << srcAdj << "\n";
+                    }
+                    else if (fromType.bits == 32 && toType.bits == 64)
+                    {
+                        out << "    mov " << dstAdj << "d, " << srcAdj << "\n";
+                    }
+                    else
+                    {
+                        throw std::runtime_error("Unsupported unsigned cast: " + std::to_string(fromType.bits) + " -> " + std::to_string(toType.bits));
+                    }
+                }
+            }
+            else if (toType.bits < fromType.bits)
+            {
+                if (toType.bits == 8 || toType.bits == 16)
+                {
+                    if (toType.isSigned)
+                    {
+                        out << "    movsx " << dstAdj << ", " << adjustReg(srcReg, toType.bits) << "\n";
+                    }
+                    else
+                    {
+                        out << "    movzx " << dstAdj << ", " << adjustReg(srcReg, toType.bits) << "\n";
+                    }
+                }
+                else if (toType.bits == 32)
+                {
+                    out << "    mov " << adjustReg(dstAdj, 32) << ", " << adjustReg(srcReg, 32) << "\n";
+                }
+                else
+                {
+                    throw std::runtime_error("Unsupported downcast to " + std::to_string(toType.bits));
+                }
+            }
+            else
+            {
+                out << "    mov " << adjustReg(dstAdj, toType.bits) << ", " << srcAdj << "\n";
+            }
+
+            alloc.free(srcReg);
+            noteType(dst, toType);
+            return dst;
+        }
+
+        throw std::runtime_error(
+            "Unsupported cast from " +
+            fromType.to_string() +
+            " to " +
+            toType.to_string());
+    }
+
+    std::string CodeGenWindows::getVariableAddress(const ScopeContext &scope, const std::string &name) const
+    {
+        if (scope.isGlobalVariable(name))
+        {
+            return "[" + name + "]";
+        }
+        else
+        {
+            int offset = scope.getVariableOffset(name);
+            return (offset < 0)
+                       ? "[rbp - " + std::to_string(-offset) + "]"
+                       : "[rbp + " + std::to_string(offset) + "]";
+        }
     }
     std::string CodeGenWindows::generateIntegerLiteral(std::unique_ptr<ASTNode> node)
     {
@@ -53,19 +183,8 @@ namespace zlang
     std::string CodeGenWindows::generateStringLiteral(std::unique_ptr<ASTNode> node)
     {
         std::string lbl = "Lstr" + std::to_string(stringLabelCount++);
-
-        std::ostringstream escaped;
-        for (char c : node->value)
-        {
-            if (c == '"')
-                escaped << "\"\""; // MASM doubles quotes inside strings
-            else
-                escaped << c;
-        }
-
         outGlobal << lbl << " BYTE "
-                  << '"' << escaped.str() << '"' << ", 0\n";
-
+                  << '"' << ((node->value.length() == 0) ? "\\0" : node->value) << '"' << ", 0\n";
         auto r = alloc.allocate();
         out << "    lea " << r << ", [" << lbl << "]\n";
         noteType(r, node->scope->lookupType("string"));
@@ -87,27 +206,18 @@ namespace zlang
         uint64_t sz = ti.bits / 8;
         uint64_t bits = ti.bits;
 
-        std::string address;
-        if (scope.isGlobalVariable(name))
-        {
-            address = name;
-        }
-        else
-        {
-            int64_t off = scope.getVariableOffset(name);
-            address = "rbp - " + std::to_string(off);
-        }
+        std::string address = getVariableAddress(scope, name); // Use helper
 
         if (ti.isFloat)
         {
             auto r_xmm = alloc.allocateXMM();
             if (sz == 4)
             {
-                out << "    movss " << r_xmm << ", DWORD PTR [" << address << "]\n";
+                out << "    movss " << r_xmm << ", DWORD PTR " << address << "\n";
             }
             else if (sz == 8)
             {
-                out << "    movsd " << r_xmm << ", QWORD PTR [" << address << "]\n";
+                out << "    movsd " << r_xmm << ", QWORD PTR " << address << "\n";
             }
             else
             {
@@ -140,7 +250,7 @@ namespace zlang
                 throw std::runtime_error("Unsupported integer size: " + std::to_string(sz));
             }
 
-            out << "    mov " << r_adj << ", " << ptrSize << "[" << address << "]\n";
+            out << "    mov " << r_adj << ", " << ptrSize << address << "\n";
             noteType(r_adj, ti);
             return r_adj;
         }
@@ -156,29 +266,31 @@ namespace zlang
         uint64_t bits = tr.bits;
         const std::string &op = node->value;
 
+        // Cast operands to the promoted type
+        rl = castValue(rl, t1, tr);
+        rr = castValue(rr, t2, tr);
+
         if (tr.isFloat)
         {
             const char *suf = (bits == 32 ? "ss" : "sd");
-            std::string xl = (t1.isFloat ? rl : intToXmm(rl, bits));
-            std::string xr = (t2.isFloat ? rr : intToXmm(rr, bits));
 
             if (op == "+")
-                out << "    add" << suf << " " << xl << ", " << xr << "\n";
+                out << "    add" << suf << " " << rl << ", " << rr << "\n";
             else if (op == "-")
-                out << "    sub" << suf << " " << xl << ", " << xr << "\n";
+                out << "    sub" << suf << " " << rl << ", " << rr << "\n";
             else if (op == "*")
-                out << "    mul" << suf << " " << xl << ", " << xr << "\n";
+                out << "    mul" << suf << " " << rl << ", " << rr << "\n";
             else if (op == "/")
-                out << "    div" << suf << " " << xl << ", " << xr << "\n";
+                out << "    div" << suf << " " << rl << ", " << rr << "\n";
             else if (assembly_comparison_operations.count(op))
             {
-                out << "    ucomi" << suf << " " << xl << ", " << xr << "\n";
+                out << "    ucomi" << suf << " " << rl << ", " << rr << "\n";
                 auto result = alloc.allocate();
                 auto result8 = adjustReg(result, 8);
                 out << "    " << assembly_comparison_operations.at(op) << " " << result8 << "\n";
                 out << "    movzx " << result << ", " << result8 << "\n";
-                alloc.free(xl);
-                alloc.free(xr);
+                alloc.free(rl);
+                alloc.free(rr);
                 noteType(result, node->scope->lookupType("boolean"));
                 return result;
             }
@@ -187,14 +299,14 @@ namespace zlang
                 throw std::runtime_error("Unsupported FP op: " + op);
             }
 
-            alloc.free(xr);
-            noteType(xl, tr);
-            return xl;
+            alloc.free(rr);
+            noteType(rl, tr);
+            return rl;
         }
         else
         {
-            auto dl = adjustReg(rl, bits);
-            auto dr = adjustReg(rr, bits);
+            std::string dl = rl;
+            std::string dr = rr;
 
             if (op == "+")
                 out << "    add " << dl << ", " << dr << "\n";
@@ -231,6 +343,7 @@ namespace zlang
             {
                 throw std::runtime_error("Unsupported integer op: " + op);
             }
+
             alloc.free(rr);
             noteType(rl, tr);
             return rl;
@@ -244,6 +357,12 @@ namespace zlang
         if (op == "!")
         {
             std::string r = emitExpression(std::move(child));
+            TypeInfo t = regType.at(r);
+
+            // Cast value to boolean-compatible type (e.g., integer of any size)
+            TypeInfo boolType = node->scope->lookupType("boolean");
+            r = castValue(r, t, boolType);
+
             out << "    cmp " << r << ", 0\n";
 
             std::string result = alloc.allocate();
@@ -253,27 +372,29 @@ namespace zlang
             out << "    movzx " << result << ", " << result8 << "\n";
 
             alloc.free(r);
-
-            noteType(result, node->scope->lookupType("boolean"));
+            noteType(result, boolType);
             return result;
         }
         else if (op == "++" || op == "--")
         {
+            if (child->type != NodeType::VariableAccess)
+                throw std::runtime_error(op + " can only be applied to variables");
+
             std::string var = child->value;
             auto &scp = *child->scope;
             TypeInfo ti = scp.lookupType(scp.lookupVariable(var).type);
-            uint64_t bits = ti.bits;
 
             if (ti.isFloat)
                 throw std::runtime_error("Increment/Decrement not supported on float");
 
             std::string reg = generateVariableAccess(std::move(child));
-            std::string adj = adjustReg(reg, bits);
+            reg = castValue(reg, regType.at(reg), ti); // Ensure reg is properly typed
+            std::string adj = adjustReg(reg, ti.bits);
 
             out << "    " << (op == "++" ? "inc" : "dec") << " " << adj << "\n";
 
             std::string ptrSize;
-            switch (bits)
+            switch (ti.bits)
             {
             case 64:
                 ptrSize = "QWORD PTR ";
@@ -288,18 +409,16 @@ namespace zlang
                 ptrSize = "BYTE PTR ";
                 break;
             default:
-                throw std::runtime_error("Unsupported variable size: " + std::to_string(bits));
+                throw std::runtime_error("Unsupported variable size: " + std::to_string(ti.bits));
             }
 
-            std::string addr = scp.isGlobalVariable(var)
-                                   ? var
-                                   : "rbp - " + std::to_string(scp.getVariableOffset(var));
-
-            out << "    mov " << ptrSize << "[" << addr << "], " << adj << "\n";
+            std::string addr = getVariableAddress(scp, var);
+            out << "    mov " << ptrSize << addr << ", " << adj << "\n";
 
             noteType(reg, ti);
             return reg;
         }
+
         throw std::runtime_error("Unknown Unary Operator: " + op);
     }
     std::string CodeGenWindows::emitExpression(std::unique_ptr<ASTNode> node)
@@ -324,7 +443,6 @@ namespace zlang
             throw std::runtime_error("Unknown expression encountered.");
         }
     }
-
     void CodeGenWindows::emitPrologue(std::unique_ptr<ASTNode> blockNode)
     {
         auto size = -blockNode->scope->stackOffset + 32; // +32 for shadow space
@@ -333,13 +451,11 @@ namespace zlang
         out << "    mov rbp, rsp\n";
         out << "    sub rsp, " << size << "\n";
     }
-
     void CodeGenWindows::emitEpilogue()
     {
         out << "    ; Block Ends (scope exit)\n";
         out << "    leave\n";
     }
-
     void CodeGenWindows::generateStatement(std::unique_ptr<ASTNode> statement)
     {
         switch (statement->type)
@@ -378,35 +494,30 @@ namespace zlang
             throw std::runtime_error("Unknown statement encountered.");
         }
     }
-
     void CodeGenWindows::generateVariableReassignment(std::unique_ptr<ASTNode> statement)
     {
         auto &scope = *statement->scope;
         const std::string &name = statement->value;
         TypeInfo ti = scope.lookupType(scope.lookupVariable(name).type);
         uint64_t bits = ti.bits;
+        std::string dest = getVariableAddress(scope, name);
 
-        auto destAddr = [&]() -> std::string
-        {
-            if (scope.isGlobalVariable(name))
-                return "[" + name + "]";
-            else
-                return "[rbp - " + std::to_string(scope.getVariableOffset(name)) + "]";
-        };
+        std::string r = emitExpression(std::move(statement->children.back()));
+        TypeInfo rt = regType.at(r);
+
+        r = castValue(r, rt, ti);
 
         if (ti.isFloat)
         {
-            std::string r_xmm = emitExpression(std::move(statement->children.back()));
-            std::string movInstr = (bits == 32) ? "movss" : "movsd";
-
-            out << "    " << movInstr << " " << destAddr() << ", " << r_xmm << "\n";
-            alloc.free(r_xmm);
+            std::string movInstr = (bits == 32 ? "movss" : "movsd");
+            std::string ptrPrefix = (bits == 32 ? "DWORD PTR " : "QWORD PTR ");
+            out << "    " << movInstr << " "
+                << ptrPrefix << dest << ", " << r << "\n";
+            alloc.free(r);
         }
         else
         {
-            std::string r = emitExpression(std::move(statement->children.back()));
             std::string adj = adjustReg(r, bits);
-
             std::string ptrPrefix;
             switch (bits)
             {
@@ -423,29 +534,18 @@ namespace zlang
                 ptrPrefix = "BYTE PTR ";
                 break;
             default:
-                throw std::runtime_error("Unsupported variable size in reassignment: " + std::to_string(bits));
+                throw std::runtime_error("Unsupported size in reassignment: " + std::to_string(bits));
             }
-
-            out << "    mov " << ptrPrefix << destAddr() << ", " << adj << "\n";
+            out << "    mov " << ptrPrefix << dest << ", " << adj << "\n";
             alloc.free(r);
         }
     }
-
     void CodeGenWindows::generateVariableDeclaration(std::unique_ptr<ASTNode> statement)
     {
         auto &scope = *statement->scope;
         const std::string &name = statement->value;
         TypeInfo ti = scope.lookupType(scope.lookupVariable(name).type);
         uint64_t bits = ti.bits;
-        uint64_t sz = bits / 8;
-
-        auto destAddr = [&]() -> std::string
-        {
-            if (scope.isGlobalVariable(name))
-                return "[" + name + "]";
-            else
-                return "[rbp - " + std::to_string(scope.getVariableOffset(name)) + "]";
-        };
 
         auto ptrPrefix = [&]() -> std::string
         {
@@ -464,45 +564,45 @@ namespace zlang
             }
         };
 
-        if (!scope.isGlobalVariable(name))
-        {
-            out << "    sub rsp, " << sz << "\n";
-        }
-
         if (statement->children.size() >= 2)
         {
+            std::string r = emitExpression(std::move(statement->children.back()));
+            TypeInfo rt = regType.at(r);
+            r = castValue(r, rt, ti);
+
+            std::string addr = getVariableAddress(scope, name);
             if (ti.isFloat)
             {
-                std::string r_xmm = emitExpression(std::move(statement->children.back()));
-                std::string movInstr = (bits == 32) ? "movss" : "movsd";
-                out << "    " << movInstr << " " << destAddr() << ", " << r_xmm << "\n";
-                alloc.free(r_xmm);
+                std::string movInstr = (bits == 32 ? "movss" : "movsd");
+                out << "    " << movInstr << " "
+                    << ptrPrefix() << addr << ", " << r << "\n";
             }
             else
             {
-                std::string r = emitExpression(std::move(statement->children.back()));
                 std::string adj = adjustReg(r, bits);
-                out << "    mov " << ptrPrefix() << destAddr() << ", " << adj << "\n";
-                alloc.free(r);
+                out << "    mov " << ptrPrefix() << addr << ", " << adj << "\n";
             }
+            alloc.free(r);
         }
         else
         {
+            std::string addr = getVariableAddress(scope, name);
             if (ti.isFloat)
             {
                 std::string r_xmm = alloc.allocateXMM();
-                out << "    pxor " << r_xmm << ", " << r_xmm << "\n";
-                out << "    movsd " << destAddr() << ", " << r_xmm << "\n";
+                std::string movInstr = (bits == 32 ? "movss" : "movsd");
+                out << "    pxor " << r_xmm << ", " << r_xmm << "\n"
+                    << "    " << movInstr << " "
+                    << ptrPrefix() << addr << ", " << r_xmm << "\n";
                 alloc.free(r_xmm);
             }
             else
             {
-                out << "    xor rax, rax\n";
-                out << "    mov " << ptrPrefix() << destAddr() << ", rax\n";
+                out << "    xor rax, rax\n"
+                    << "    mov " << ptrPrefix() << addr << ", rax\n";
             }
         }
     }
-
     void CodeGenWindows::generateIfStatement(std::unique_ptr<ASTNode> statement)
     {
         int id = blockLabelCount++;
@@ -577,7 +677,6 @@ namespace zlang
 
         out << endLbl << ":\n\n";
     }
-
     void CodeGenWindows::generate(std::unique_ptr<ASTNode> program)
     {
         std::vector<ASTNode *> globals;
@@ -628,5 +727,4 @@ namespace zlang
                  << "\n; ============== Globals End Here ==============\n"
                  << out.str() << "END\n\n";
     }
-
 } // namespace zlang
