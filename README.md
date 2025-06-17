@@ -10,7 +10,7 @@ A lightweight statically typed programming language that compiles to **x86_64 Li
 - Strong type-checking with custom-defined numeric and non-numeric types
 - Expressions: arithmetic, comparison, logic, and unary operations
 - String literals and numeric constants
-- Control flow: `if`, `else if`, `else`
+- Control flow: `if`, `elif`, `else`
 - Typed AST with scoped variable tracking
 - Code generation to ELF-compatible x86_64 assembly
 - Symbol table management and register allocation
@@ -143,6 +143,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 Feel free to reach out for contributions, discussions, or collaborations!
 
-```
-
-```
