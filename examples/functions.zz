@@ -1,0 +1,11 @@
+extern fn putchar(c: int32_t) -> int32_t;
+
+fn add(a: int32_t, b: int32_t) -> int32_t {
+    return a + b;
+}
+
+fn main() {
+    let sum: int32_t = add(1, add(3, 4)); 
+    let ch: int32_t = sum + 48;
+    putchar(ch); 
+}

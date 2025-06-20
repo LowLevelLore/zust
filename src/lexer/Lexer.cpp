@@ -118,6 +118,15 @@ namespace zlang
         if (text == "else")
             return {Token::Kind::Else, text, startLine, startCol};
 
+        if (text == "fn")
+            return {Token::Kind::Function, text, startLine, startCol};
+
+        if (text == "extern")
+            return {Token::Kind::Symbol, text, startLine, startCol};
+
+        if (text == "return")
+            return {Token::Kind::Return, text, startLine, startCol};
+
         return Token{Token::Kind::Identifier, text, startLine, startCol};
     }
 
@@ -168,6 +177,13 @@ namespace zlang
         char c = advance();
         std::string text(1, c);
         char next = peekChar();
+
+        if (c == '-' && next == '>')
+        {
+            text.push_back(advance());
+            return Token{Token::Kind::Arrow, text, startLine, startCol};
+        }
+
         // Multi-char operators
         if ((c == '&' && next == '&') ||
             (c == '|' && next == '|') ||
@@ -199,6 +215,8 @@ namespace zlang
             return Token{Token::Kind::LeftParen, text, startLine, startCol};
         case ')':
             return Token{Token::Kind::RightParen, text, startLine, startCol};
+        case ',':
+            return Token{Token::Kind::Comma, text, startLine, startCol};
         case '+':
         case '-':
         case '*':
@@ -213,5 +231,4 @@ namespace zlang
             return Token{Token::Kind::Symbol, text, startLine, startCol};
         }
     }
-
 } // namespace zlang

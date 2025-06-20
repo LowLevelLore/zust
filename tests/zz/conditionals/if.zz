@@ -3,14 +3,16 @@ let b: int64_t = 20;
 let f: float = 10.5f;
 let u: uint8_t = 10;
 
-if (a < b) {
-    let x: int64_t = 1;
-}
+fn main() {
+    if (a < b) {
+        let x: int64_t = 1;
+    }
 
-if (f > 5.5) {
-    let y: float = f * 2.0;
-}
+    if (f > 5.5) {
+        let y: float = f * 2.0;
+    }
 
-if (u == a) {
-    let z: uint8_t = u + 1;
+    if (u == a) {
+        let z: uint8_t = u + 1;
+    }
 }

@@ -1,4 +1,5 @@
 #pragma once
+
 #include "common/Colors.hpp"
 #include "common/Errors.hpp"
 #include "common/Logging.hpp"
@@ -11,6 +12,7 @@
 
 #include "parser/Parser.hpp"
 #include "parser/ScopeContext.hpp"
+#include "parser/NameMapper.hpp"
 
 #include "lexer/Lexer.hpp"
 
@@ -18,6 +20,7 @@
 
 #include "codegen/CodeGen.hpp"
 #include "codegen/RegisterAllocator.hpp"
+#include "codegen/Canaries.hpp"
 
 #include <sstream>
 #include <map>
@@ -26,3 +29,5 @@
 #include <fstream>
 #include <assert.h>
 #include <iomanip>
+
+static NameMapper GLOBAL_NAME_MAPPER;

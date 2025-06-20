@@ -1,20 +1,19 @@
 #pragma once
 
+#include <iostream>
+#include <memory>
 #include <string>
 #include <vector>
-#include <memory>
-#include <iostream>
+
 #include "parser/ScopeContext.hpp"
 
-namespace zlang
-{
-    enum class NodeType
-    {
+namespace zlang {
+    enum class NodeType {
         Program,
-        VariableDeclaration,  // let x: int; or let x = 10;
-        VariableReassignment, // x = 42;
-        VariableAccess,       // just x
-        IntegerLiteral,       // 10, 42
+        VariableDeclaration,   // let x: int; or let x = 10;
+        VariableReassignment,  // x = 42;
+        VariableAccess,        // just x
+        IntegerLiteral,        // 10, 42
         FloatLiteral,
         StringLiteral,
         BooleanLiteral,
@@ -24,26 +23,30 @@ namespace zlang
         BinaryOp,
         UnaryOp,
         Symbol,
+        Function,
+        ExternFunction,
+        FunctionParameter,
+        FunctionParameterList,
+        FunctionReturnType,
+        ReturnStatement,
+        FunctionCall,
+        FunctionCallArgumentList
     };
 
-    class ASTNode
-    {
+    class ASTNode {
     public:
         NodeType type;
         std::string value;
         std::vector<std::unique_ptr<ASTNode>> children;
         std::shared_ptr<ScopeContext> scope;
-
         ASTNode() = default;
         ASTNode(NodeType t, const std::string &val = "", std::shared_ptr<ScopeContext> sc = nullptr)
             : type(t), value(val), scope(sc) {}
-
         static std::unique_ptr<ASTNode> makeProgramNode(const std::shared_ptr<ScopeContext> scope);
         static std::optional<std::unique_ptr<ASTNode>> makeVariableDeclarationNode(
             const std::string &name,
             std::unique_ptr<ASTNode> typeAnnotation,
             std::unique_ptr<ASTNode> initializer, const std::shared_ptr<ScopeContext> scope);
-
         static std::unique_ptr<ASTNode> makeVariableReassignmentNode(
             const std::string &name,
             std::unique_ptr<ASTNode> expr, const std::shared_ptr<ScopeContext> scope);
@@ -58,9 +61,16 @@ namespace zlang
         static std::unique_ptr<ASTNode> makeIfStatement(std::unique_ptr<ASTNode> condition, std::unique_ptr<ASTNode> program, const std::shared_ptr<ScopeContext> scope);
         static std::unique_ptr<ASTNode> makeElseIfStatement(std::unique_ptr<ASTNode> condition, std::unique_ptr<ASTNode> program, const std::shared_ptr<ScopeContext> scope);
         static std::unique_ptr<ASTNode> makeElseStatement(std::unique_ptr<ASTNode> program, const std::shared_ptr<ScopeContext> scope);
+        static std::unique_ptr<ASTNode> makeExternFunctionDeclaration(std::string name, const std::shared_ptr<ScopeContext> scope, std::vector<ParamInfo> params, std::string returnType);
+        static std::unique_ptr<ASTNode> makeFunctionDeclaration(std::string name, const std::shared_ptr<ScopeContext> scope, std::vector<ParamInfo> params, std::string returnType, std::unique_ptr<ASTNode> body);
+        static std::unique_ptr<ASTNode> makeFunctionCall(std::string name, std::vector<std::unique_ptr<ASTNode>> arguments, const std::shared_ptr<ScopeContext> scope);
+        static std::unique_ptr<ASTNode> makeFunctionParameterList(const std::vector<ParamInfo> params, const std::shared_ptr<ScopeContext> scope);
         void addChild(std::unique_ptr<ASTNode> child);
         void setElseBranch(std::unique_ptr<ASTNode> elseNode);
         ASTNode *getElseBranch() const;
+        ASTNode *getFunctionParamList() const;
+        ASTNode *getFunctionParamReturnType() const;
+        ASTNode *getFunctionBody() const;
         void print(std::ostream &out, int indent = 0) const;
     };
-}
+}  // namespace zlang

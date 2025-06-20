@@ -17,15 +17,18 @@ namespace zlang
             StringLiteral,
             BoolLiteral,
             Symbol,
-            Keyword,
+            Comma,
+            Arrow,
             EndOfFile,
             SemiColon,
             Equal,
+            Return,
             If,
             ElseIf,
             Else,
             LeftBrace,
             RightBrace,
+            Function,
             LeftParen,
             RightParen,
             Unknown
@@ -64,8 +67,6 @@ namespace zlang
                 return "StringLiteral";
             case Kind::Symbol:
                 return "Symbol";
-            case Kind::Keyword:
-                return "Keyword";
             case Kind::EndOfFile:
                 return "EndOfFile";
             case Kind::SemiColon:
@@ -88,6 +89,14 @@ namespace zlang
                 return "RightParen";
             case Kind::LeftParen:
                 return "LeftParen";
+            case Kind::Arrow:
+                return "Arrow";
+            case Kind::Comma:
+                return "Comma";
+            case Kind::Function:
+                return "Function";
+            case Kind::Return:
+                return "Return";
             }
             return "Invalid";
         }

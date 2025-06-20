@@ -2,15 +2,17 @@ let a: int64_t = 10;
 let f: float = 20.5;
 let u: uint8_t = 10;
 
-if (a > 100) {
-    let res: int64_t = a * 2;
-}
-elif (f < 10.0) {
-    let res: float = f + 1.0;
-}
-elif (u == a) {
-    let res: uint8_t = u + 1;
-}
-else {
-    let res: int64_t = -1;
+fn main() {
+    if (a > 100) {
+        let res: int64_t = a * 2;
+    }
+    elif (f < 10.0) {
+        let res: float = f + 1.0;
+    }
+    elif (u == a) {
+        let res: uint8_t = u + 1;
+    }
+    else {
+        let res: int64_t = -1;
+    }
 }

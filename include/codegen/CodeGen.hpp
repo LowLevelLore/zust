@@ -1,25 +1,24 @@
 #pragma once
 
+#include <array>
+#include <functional>
+#include <map>
 #include <memory>
 #include <ostream>
-#include <map>
-#include <array>
+#include <sstream>
+
 #include "ast/ASTNode.hpp"
 #include "codegen/RegisterAllocator.hpp"
 #include "typechecker/TypeChecker.hpp"
-#include <sstream>
 
-namespace zlang
-{
-    enum class TargetTriple
-    {
+namespace zlang {
+    enum class TargetTriple {
         X86_64_LINUX,
         X86_64_WINDOWS,
         LLVM_IR
     };
 
-    class CodeGen
-    {
+    class CodeGen {
     protected:
         std::map<std::string, std::string> assembly_comparison_operations = {
             {">=", "setge"},
@@ -37,11 +36,10 @@ namespace zlang
         RegisterAllocator alloc;
         std::ostream &outfinal;
 
-        std::ostringstream outGlobal;
-        std::ostringstream out;
+        std::ostringstream outGlobalStream;
+        std::ostringstream outStream;
 
-        std::string adjustReg(const std::string &r64, uint64_t bits)
-        {
+        std::string adjustReg(const std::string &r64, uint64_t bits) {
             std::string baseRegister = RegisterAllocator::getBaseReg(r64);
             static const std::unordered_map<std::string, std::array<std::string, 4>> registers_based_on_bytes = {
                 {"rax", {"rax", "eax", "ax", "al"}},
@@ -63,11 +61,10 @@ namespace zlang
 
             auto it = registers_based_on_bytes.find(baseRegister);
             if (it == registers_based_on_bytes.end())
-                throw std::runtime_error("Unknown register '" + baseRegister + "'\n\n" + out.str());
+                throw std::runtime_error("Unknown register '" + baseRegister + "'\n\n");
             const auto &ents = it->second;
 
-            switch (bits)
-            {
+            switch (bits) {
             case 64:
                 return ents[0];
             case 32:
@@ -81,21 +78,16 @@ namespace zlang
             }
         }
 
-        static std::string getCorrectMove(uint64_t size_bytes, bool isfloat)
-        {
-            if (isfloat)
-            {
+        static std::string getCorrectMove(uint64_t size_bytes, bool isfloat) {
+            if (isfloat) {
                 if (size_bytes == 4)
                     return "movss";
                 else if (size_bytes == 8)
                     return "movsd";
                 else
                     throw std::runtime_error("Bad float move size");
-            }
-            else
-            {
-                switch (size_bytes)
-                {
+            } else {
+                switch (size_bytes) {
                 case 8:
                     return "movq";
                 case 4:
@@ -111,23 +103,29 @@ namespace zlang
 
         void noteType(const std::string &register_, const TypeInfo &type_) { regType[register_] = type_; }
 
-        virtual void generateStatement(std::unique_ptr<ASTNode> statement) = 0;
+        virtual void generateStatement(std::unique_ptr<ASTNode> statement, std::ostringstream &out) = 0;
 
-        virtual std::string emitExpression(std::unique_ptr<ASTNode> node) = 0;
+        virtual std::string emitExpression(std::unique_ptr<ASTNode> node, std::ostringstream &out) = 0;
 
-        virtual void emitEpilogue() = 0;
-        virtual void emitPrologue(std::unique_ptr<ASTNode> blockNode) = 0;
+        virtual void emitEpilogue(std::shared_ptr<ScopeContext> scope, std::ostringstream &out, bool clearRax = false) = 0;
+        virtual void emitPrologue(std::shared_ptr<ScopeContext> scope, std::ostringstream &out) = 0;
 
-        virtual std::string generateIntegerLiteral(std::unique_ptr<ASTNode> node) = 0;
-        virtual std::string generateFloatLiteral(std::unique_ptr<ASTNode> node) = 0;
-        virtual std::string generateStringLiteral(std::unique_ptr<ASTNode> node) = 0;
-        virtual std::string generateBooleanLiteral(std::unique_ptr<ASTNode> node) = 0;
-        virtual std::string generateVariableAccess(std::unique_ptr<ASTNode> node) = 0;
-        virtual void generateVariableReassignment(std::unique_ptr<ASTNode> node) = 0;
-        virtual void generateVariableDeclaration(std::unique_ptr<ASTNode> node) = 0;
-        virtual void generateIfStatement(std::unique_ptr<ASTNode> node) = 0;
-        virtual std::string generateBinaryOperation(std::unique_ptr<ASTNode> node) = 0;
-        virtual std::string generateUnaryOperation(std::unique_ptr<ASTNode> node) = 0;
+        virtual std::string generateIntegerLiteral(std::unique_ptr<ASTNode> node, std::ostringstream &out) = 0;
+        virtual std::string generateFloatLiteral(std::unique_ptr<ASTNode> node, std::ostringstream &out) = 0;
+        virtual std::string generateStringLiteral(std::unique_ptr<ASTNode> node, std::ostringstream &out) = 0;
+        virtual std::string generateBooleanLiteral(std::unique_ptr<ASTNode> node, std::ostringstream &out) = 0;
+        virtual std::string generateVariableAccess(std::unique_ptr<ASTNode> node, std::ostringstream &out) = 0;
+
+        virtual void generateVariableReassignment(std::unique_ptr<ASTNode> node, std::ostringstream &out) = 0;
+        virtual void generateVariableDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out) = 0;
+        virtual void generateIfStatement(std::unique_ptr<ASTNode> node, std::ostringstream &out) = 0;
+
+        virtual std::string generateBinaryOperation(std::unique_ptr<ASTNode> node, std::ostringstream &out) = 0;
+        virtual std::string generateUnaryOperation(std::unique_ptr<ASTNode> node, std::ostringstream &out) = 0;
+
+        virtual std::string generateFunctionCall(std::unique_ptr<ASTNode> node, std::ostringstream &out) = 0;                      // Expression
+        virtual void generateFunctionDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out, bool force = false) = 0;  // Statement
+        virtual void generateExternFunctionDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out) = 0;                // Statement
 
     public:
         CodeGen(RegisterAllocator alloc, std::ostream &outstream) : stringLabelCount(0), blockLabelCount(0), doubleLabelCount(0), floatLabelCount(0), alloc(alloc), outfinal(outstream) {}
@@ -136,25 +134,39 @@ namespace zlang
         static std::unique_ptr<CodeGen> create(TargetTriple target, std::ostream &outstream);
     };
 
-    class CodeGenLinux : public CodeGen
-    {
+    class CodeGenLinux : public CodeGen {
     private:
         std::unordered_map<std::uint32_t, char> integer_suffixes = {{8, 'b'}, {16, 'w'}, {32, 'l'}, {64, 'q'}};
-        void generateStatement(std::unique_ptr<ASTNode> statement) override;
-        std::string emitExpression(std::unique_ptr<ASTNode> node) override;
-        void emitEpilogue() override;
-        void emitPrologue(std::unique_ptr<ASTNode> blockNode) override;
-        std::string generateIntegerLiteral(std::unique_ptr<ASTNode> node) override;
-        std::string generateFloatLiteral(std::unique_ptr<ASTNode> node) override;
-        std::string generateStringLiteral(std::unique_ptr<ASTNode> node) override;
-        std::string generateBooleanLiteral(std::unique_ptr<ASTNode> node) override;
-        std::string generateVariableAccess(std::unique_ptr<ASTNode> node) override;
-        void generateVariableReassignment(std::unique_ptr<ASTNode> node) override;
-        void generateVariableDeclaration(std::unique_ptr<ASTNode> node) override;
-        void generateIfStatement(std::unique_ptr<ASTNode> node) override;
-        std::string generateBinaryOperation(std::unique_ptr<ASTNode> node) override;
-        std::string generateUnaryOperation(std::unique_ptr<ASTNode> node) override;
-        std::string castValue(const std::string &val, const TypeInfo &fromType, const TypeInfo &toType);
+
+        std::string allocateOrSpill(bool isXMM, std::shared_ptr<ScopeContext> scope, std::ostringstream &out);
+        void restoreIfSpilled(const std::string &reg, std::shared_ptr<ScopeContext> scope, std::ostringstream &out);
+
+        void generateStatement(std::unique_ptr<ASTNode> statement, std::ostringstream &out) override;
+
+        std::string emitExpression(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
+
+        void emitEpilogue(std::shared_ptr<ScopeContext> scope, std::ostringstream &out, bool clearRax = false) override;
+        void emitPrologue(std::shared_ptr<ScopeContext> scope, std::ostringstream &out) override;
+
+        std::string generateIntegerLiteral(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
+        std::string generateFloatLiteral(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
+        std::string generateStringLiteral(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
+        std::string generateBooleanLiteral(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
+        std::string generateVariableAccess(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
+
+        void generateVariableReassignment(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
+        void generateVariableDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
+        void generateIfStatement(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
+
+        std::string generateBinaryOperation(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
+        std::string generateUnaryOperation(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
+
+        std::string castValue(const std::string &val, const TypeInfo &fromType, const TypeInfo &toType, const std::shared_ptr<ScopeContext> currentScope, std::ostringstream &out);
+
+        std::string generateFunctionCall(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;                      // Expression
+        void generateFunctionDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out, bool force = false) override;  // Statement
+        void generateExternFunctionDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;                // Statement
+        void generateReturnstatement(std::unique_ptr<ASTNode> node, std::ostringstream &out);                                   // Statement
 
     public:
         ~CodeGenLinux() override = default;
@@ -162,57 +174,73 @@ namespace zlang
         void generate(std::unique_ptr<ASTNode> program) override;
     };
 
-    class CodeGenWindows : public CodeGen
-    {
-    private:
-        std::unordered_map<std::uint32_t, char> integer_suffixes = {{8, 'b'}, {16, 'w'}, {32, 'l'}, {64, 'q'}};
-        void generateStatement(std::unique_ptr<ASTNode> statement) override;
-        std::string emitExpression(std::unique_ptr<ASTNode> node) override;
-        void emitEpilogue() override;
-        void emitPrologue(std::unique_ptr<ASTNode> blockNode) override;
-        std::string generateIntegerLiteral(std::unique_ptr<ASTNode> node) override;
-        std::string generateFloatLiteral(std::unique_ptr<ASTNode> node) override;
-        std::string generateStringLiteral(std::unique_ptr<ASTNode> node) override;
-        std::string generateBooleanLiteral(std::unique_ptr<ASTNode> node) override;
-        std::string generateVariableAccess(std::unique_ptr<ASTNode> node) override;
-        void generateVariableReassignment(std::unique_ptr<ASTNode> node) override;
-        void generateVariableDeclaration(std::unique_ptr<ASTNode> node) override;
-        void generateIfStatement(std::unique_ptr<ASTNode> node) override;
-        std::string generateBinaryOperation(std::unique_ptr<ASTNode> node) override;
-        std::string generateUnaryOperation(std::unique_ptr<ASTNode> node) override;
-        std::string castValue(const std::string &reg, const TypeInfo &fromType, const TypeInfo &toType);
-        std::string getVariableAddress(const ScopeContext &scope, const std::string &name) const;
+    // class CodeGenWindows : public CodeGen {
+    // private:
+    //     std::unordered_map<std::uint32_t, char> integer_suffixes = {{8, 'b'}, {16, 'w'}, {32, 'l'}, {64, 'q'}};
 
-    public:
-        ~CodeGenWindows() override = default;
-        CodeGenWindows(std::ostream &outstream) : CodeGen(RegisterAllocator::forMSVC(), outstream) {};
-        void generate(std::unique_ptr<ASTNode> program) override;
-    };
+    //     void generateStatement(std::unique_ptr<ASTNode> statement) override;
+    //     std::string emitExpression(std::unique_ptr<ASTNode> node) override;
 
-    class CodeGenLLVM : public CodeGen
-    {
-    private:
-        std::unordered_map<std::uint32_t, char> integer_suffixes = {{8, 'b'}, {16, 'w'}, {32, 'l'}, {64, 'q'}};
-        std::unordered_map<std::string, std::string> stringLiterals;
-        void generateStatement(std::unique_ptr<ASTNode> statement) override;
-        std::string emitExpression(std::unique_ptr<ASTNode> node) override;
-        void emitEpilogue() override;
-        void emitPrologue(std::unique_ptr<ASTNode> blockNode) override;
-        std::string generateIntegerLiteral(std::unique_ptr<ASTNode> node) override;
-        std::string generateFloatLiteral(std::unique_ptr<ASTNode> node) override;
-        std::string generateStringLiteral(std::unique_ptr<ASTNode> node) override;
-        std::string generateBooleanLiteral(std::unique_ptr<ASTNode> node) override;
-        std::string generateVariableAccess(std::unique_ptr<ASTNode> node) override;
-        void generateVariableReassignment(std::unique_ptr<ASTNode> node) override;
-        void generateVariableDeclaration(std::unique_ptr<ASTNode> node) override;
-        void generateIfStatement(std::unique_ptr<ASTNode> node) override;
-        std::string generateBinaryOperation(std::unique_ptr<ASTNode> node) override;
-        std::string generateUnaryOperation(std::unique_ptr<ASTNode> node) override;
-        std::string castValue(const std::string &val, const TypeInfo &fromType, const TypeInfo &toType);
+    //     void emitEpilogue(std::shared_ptr<ScopeContext> scope) override;
+    //     void emitPrologue(std::shared_ptr<ScopeContext> scope) override;
 
-    public:
-        ~CodeGenLLVM() override = default;
-        CodeGenLLVM(std::ostream &outstream) : CodeGen(RegisterAllocator(), outstream) {};
-        void generate(std::unique_ptr<ASTNode> program) override;
-    };
-} // namespace zlang
+    //     std::string generateIntegerLiteral(std::unique_ptr<ASTNode> node) override;
+    //     std::string generateFloatLiteral(std::unique_ptr<ASTNode> node) override;
+    //     std::string generateStringLiteral(std::unique_ptr<ASTNode> node) override;
+    //     std::string generateBooleanLiteral(std::unique_ptr<ASTNode> node) override;
+    //     std::string generateVariableAccess(std::unique_ptr<ASTNode> node) override;
+
+    //     void generateVariableReassignment(std::unique_ptr<ASTNode> node) override;
+    //     void generateVariableDeclaration(std::unique_ptr<ASTNode> node) override;
+    //     void generateIfStatement(std::unique_ptr<ASTNode> node) override;
+
+    //     std::string generateBinaryOperation(std::unique_ptr<ASTNode> node) override;
+    //     std::string generateUnaryOperation(std::unique_ptr<ASTNode> node) override;
+    //     std::string castValue(const std::string &reg, const TypeInfo &fromType, const TypeInfo &toType);
+    //     std::string getVariableAddress(const ScopeContext &scope, const std::string &name) const;
+
+    //     std::string generateFunctionCall(std::unique_ptr<ASTNode> node) override;        // Expression
+    //     void generateFunctionDeclaration(std::unique_ptr<ASTNode> node) override;        // Statement
+    //     void generateExternFunctionDeclaration(std::unique_ptr<ASTNode> node) override;  // Statement
+
+    // public:
+    //     ~CodeGenWindows() override = default;
+    //     CodeGenWindows(std::ostream &outstream) : CodeGen(RegisterAllocator::forMSVC(), outstream) {};
+    //     void generate(std::unique_ptr<ASTNode> program) override;
+    // };
+
+    // class CodeGenLLVM : public CodeGen {
+    // private:
+    //     std::unordered_map<std::uint32_t, char> integer_suffixes = {{8, 'b'}, {16, 'w'}, {32, 'l'}, {64, 'q'}};
+    //     std::unordered_map<std::string, std::string> stringLiterals;
+
+    //     void generateStatement(std::unique_ptr<ASTNode> statement) override;
+    //     std::string emitExpression(std::unique_ptr<ASTNode> node) override;
+
+    //     void emitEpilogue(std::shared_ptr<ScopeContext> scope) override;
+    //     void emitPrologue(std::shared_ptr<ScopeContext> scope) override;
+
+    //     std::string generateIntegerLiteral(std::unique_ptr<ASTNode> node) override;
+    //     std::string generateFloatLiteral(std::unique_ptr<ASTNode> node) override;
+    //     std::string generateStringLiteral(std::unique_ptr<ASTNode> node) override;
+    //     std::string generateBooleanLiteral(std::unique_ptr<ASTNode> node) override;
+    //     std::string generateVariableAccess(std::unique_ptr<ASTNode> node) override;
+
+    //     void generateVariableReassignment(std::unique_ptr<ASTNode> node) override;
+    //     void generateVariableDeclaration(std::unique_ptr<ASTNode> node) override;
+    //     void generateIfStatement(std::unique_ptr<ASTNode> node) override;
+
+    //     std::string generateBinaryOperation(std::unique_ptr<ASTNode> node) override;
+    //     std::string generateUnaryOperation(std::unique_ptr<ASTNode> node) override;
+    //     std::string castValue(const std::string &val, const TypeInfo &fromType, const TypeInfo &toType);
+
+    //     std::string generateFunctionCall(std::unique_ptr<ASTNode> node) override;        // Expression
+    //     void generateFunctionDeclaration(std::unique_ptr<ASTNode> node) override;        // Statement
+    //     void generateExternFunctionDeclaration(std::unique_ptr<ASTNode> node) override;  // Statement
+
+    // public:
+    //     ~CodeGenLLVM() override = default;
+    //     CodeGenLLVM(std::ostream &outstream) : CodeGen(RegisterAllocator(), outstream) {};
+    //     void generate(std::unique_ptr<ASTNode> program) override;
+    // };
+}  // namespace zlang
