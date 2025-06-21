@@ -1,11 +1,18 @@
-extern fn putchar(c: int32_t) -> int32_t;
+extern fn printf(fmt: string, ...) -> int32_t;
+extern fn putchar(ch: int32_t) -> int32_t;
 
-fn add(a: int32_t, b: int32_t) -> int32_t {
-    return a + b;
+fn get_factorial(a: uint32_t) -> uint64_t{
+    fn factorial(a: uint32_t) -> uint32_t{
+        if(a <= 1){
+            return 1;
+        }else{
+            return a * factorial(a - 1);
+        }
+    }
+    let ans: int32_t = factorial(a);
+    return ans;
 }
 
 fn main() {
-    let sum: int32_t = add(1, add(3, 4)); 
-    let ch: int32_t = sum + 48;
-    putchar(ch); 
+    printf("Factorial: %d\n", get_factorial(10));
 }

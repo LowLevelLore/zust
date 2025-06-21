@@ -1,8 +1,5 @@
 #include "all.hpp"
 
-// TODO: Generate a main label, scrap start, make main function compulsory.
-// TODO: Link with GCC, please.
-
 namespace zlang {
     std::string CodeGenLinux::castValue(
         const std::string &val,
@@ -65,7 +62,6 @@ namespace zlang {
             std::string dstAdj = adjustReg(dstG, toType.bits);
 
             if (toType.bits > fromType.bits) {
-                // Sign or zero extension
                 if (fromType.isSigned) {
                     if (fromType.bits == 32 && toType.bits == 64) {
                         out << "    movsxd %" << srcAdj << ", %" << dstAdj << "\n";
@@ -116,7 +112,7 @@ namespace zlang {
             if (victim.empty())
                 throw std::runtime_error("No available registers and no victim found");
 
-            std::string spillSlot = funcScope->allocateSpillSlot(isXMM ? 16 : 8);
+            std::string spillSlot = funcScope->allocateSpillSlot(isXMM ? 16 : 8, CodegenOutputFormat::X86_64_LINUX);
 
             if (isXMM) {
                 alloc.markSpilledXMM(victim, spillSlot);
@@ -253,7 +249,9 @@ namespace zlang {
 
         // Cast operands to common type
         rl = castValue(rl, t1, tr, node->scope, out);
+        restoreIfSpilled(rl, node->scope, out);
         rr = castValue(rr, t2, tr, node->scope, out);
+        restoreIfSpilled(rl, node->scope, out);
 
         if (tr.isFloat) {
             bool isF32 = (tr.bits == 32);
@@ -374,9 +372,10 @@ namespace zlang {
             restoreIfSpilled(r, node->scope, out);
             TypeInfo boolType = node->scope->lookupType("boolean");
             r = castValue(r, regType.at(r), boolType, node->scope, out);
+            restoreIfSpilled(r, node->scope, out);
 
             auto res = allocateOrSpill(false, node->scope, out);
-            out << "    cmpq $0, %" << r << "\n"
+            out << "    cmpb $0, %" << adjustReg(r, 8) << "\n"
                 << "    sete %al\n"
                 << "    movzbq %al, %" << res << "\n";
             noteType(res, boolType);
@@ -440,61 +439,77 @@ namespace zlang {
             out << "    push   %rbp\n";
             out << "    mov    %rsp, %rbp\n";
 
-            // --- save all callee-saved GPRs ---
-            for (const auto &reg : CALLEE_GPR_LINUX) {
-                out << "    push   %" << reg << "\n";
-            }
-
             auto funcScope = std::dynamic_pointer_cast<FunctionScope>(scope);
             if (!funcScope)
                 throw std::runtime_error("Expected FunctionScope for function prologue");
 
-            // compute aligned subSize exactly as before...
+            size_t regsCount = CALLEE_GPR_LINUX.size();
             std::uint64_t spillSize = std::abs(funcScope->getSpillSize());
-            std::uint64_t rawSize = std::uint64_t(std::abs(funcScope->getStackOffset())) + 8 + spillSize;
-            std::uint64_t alignedRaw = (rawSize + 15) & ~15ULL;
-            std::uint64_t subSize = (alignedRaw + 8) & ~15ULL;
-            if (subSize > 0) {
-                out << "    sub    $" << subSize << ", %rsp\n";
+            std::uint64_t localSize = std::abs(funcScope->getStackOffset());
+            std::uint64_t rawSize = 8 + localSize + spillSize;
+            std::uint64_t stackReserve = (rawSize + 15) & ~15ULL;
+
+            std::string canaryReg = allocateOrSpill(false, scope, out);
+            out << std::hex
+                << "    movabs $0x" << funcScope->getCanary() << ", %" << canaryReg << "    # load canary\n"
+                << std::dec
+                << "    movq   %" << canaryReg << ", -8(%rbp)    # store canary at [rbp - 8]\n";
+            alloc.free(canaryReg);
+
+            if (stackReserve > 0) {
+                out << "    sub    $" << stackReserve << ", %rsp    # reserve locals + spills\n";
             }
 
-            // load + store canary
-            std::string canaryReg = alloc.allocate();
-            out << std::hex
-                << "    movabs $0x" << funcScope->getCanary() << ", %" << canaryReg << "  # load canary value\n"
-                << std::dec
-                << "    movq    %" << canaryReg << ", -8(%rbp)  # store canary at -8(%rbp)\n";
-            alloc.free(canaryReg);
+            for (const auto &reg : CALLEE_GPR_LINUX) {
+                out << "    push   %" << reg << "    # save callee-saved GPR\n";
+            }
+            if (regsCount & 1) {
+                out << "    push   %" << CALLEE_GPR_LINUX.back() << "    # just for alignment\n";
+            }
         }
     }
     void CodeGenLinux::emitEpilogue(std::shared_ptr<ScopeContext> scope, std::ostringstream &out, bool clearRax) {
         if (scope->kind() == "Function") {
-            auto funcScope = std::dynamic_pointer_cast<FunctionScope>(scope);
             out << "    # Function Epilogue with Canary Check\n";
 
-            // canary check
-            std::string regStored = alloc.allocate();
-            std::string regExpected = alloc.allocate();
-            out << "    mov    -8(%rbp), %" << regStored << "  # load stored canary\n"
+            auto funcScope = std::dynamic_pointer_cast<FunctionScope>(scope);
+            if (!funcScope)
+                throw std::runtime_error("Expected FunctionScope for function epilogue");
+
+            size_t regsCount = CALLEE_GPR_LINUX.size();
+            std::uint64_t spillSize = std::abs(funcScope->getSpillSize());
+            std::uint64_t localSize = std::abs(funcScope->getStackOffset());
+            std::uint64_t rawSize = 8 + localSize + spillSize;
+            std::uint64_t stackReserve = (rawSize + 15) & ~15ULL;
+
+            std::string regStored = allocateOrSpill(false, scope, out);
+            std::string regExpected = allocateOrSpill(false, scope, out);
+            out << "    movq   -8(%rbp), %" << regStored << "    # load stored canary\n"
                 << std::hex
-                << "    movabs $0x" << funcScope->getCanary() << ", %" << regExpected << "  # load expected canary\n"
+                << "    movabs $0x" << funcScope->getCanary() << ", %" << regExpected << "    # load expected canary\n"
                 << std::dec
-                << "    cmp    %" << regExpected << ", %" << regStored << "  # compare canary\n"
-                << "    jne    __stack_smash_detected  # mismatch -> abort\n";
+                << "    cmp    %" << regExpected << ", %" << regStored << "    # compare canary\n"
+                << "    jne    __stack_smash_detected    # abort on mismatch\n";
             alloc.free(regStored);
             alloc.free(regExpected);
+
+            if (stackReserve > 0) {
+                out << "    add    $" << stackReserve << ", %rsp    # free locals + spills\n";
+            }
+
+            if (regsCount & 1) {
+                out << "    pop    %" << CALLEE_GPR_LINUX.back() << "    # pop alignment\n";
+            }
+
+            for (auto it = CALLEE_GPR_LINUX.rbegin(); it != CALLEE_GPR_LINUX.rend(); ++it) {
+                out << "    pop    %" << *it << "    # restore callee-saved GPR\n";
+            }
 
             if (clearRax) {
                 out << "    xor    %rax, %rax\n";
             }
 
-            // pop in reverse order
-            for (auto it = CALLEE_GPR_LINUX.rbegin(); it != CALLEE_GPR_LINUX.rend(); ++it) {
-                out << "    pop    %" << *it << "\n";
-            }
-
-            // restore stack frame and pop callee-saved GPRs
-            out << "    leave\n";  // restores RSP and pops RBP
+            out << "    leave    # restore RSP, pop RBP\n";
             out << "    ret\n";
         }
     }
@@ -518,7 +533,9 @@ namespace zlang {
         }
         case NodeType::UnaryOp: {
             std::string op = statement->value;
+            auto scope = statement->scope;
             std::string reg = emitExpression(std::move(statement), out);
+            restoreIfSpilled(reg, scope, out);
             if (op == "--" or op == "++") {
                 alloc.free(reg);
             }
@@ -526,7 +543,9 @@ namespace zlang {
             break;
         }
         case NodeType::BinaryOp: {
+            auto scope = statement->scope;
             std::string reg = emitExpression(std::move(statement), out);  // I am doing this just so the increments/decrements work in x + y-- -> this itself must not have any result, but y-- should still be effective.
+            restoreIfSpilled(reg, scope, out);
             alloc.free(reg);
             out << "\n";
             break;
@@ -566,6 +585,7 @@ namespace zlang {
         restoreIfSpilled(r, statement->scope, out);
 
         r = castValue(r, regType.at(r), ti, statement->scope, out);
+        restoreIfSpilled(r, statement->scope, out);
 
         std::string addr = scp.isGlobalVariable(nm)
                                ? nm + "(%rip)"
@@ -603,7 +623,7 @@ namespace zlang {
             auto r = emitExpression(std::move(statement->children.back()), out);
             restoreIfSpilled(r, statement->scope, out);
             r = castValue(r, regType.at(r), ti, statement->scope, out);
-
+            restoreIfSpilled(r, statement->scope, out);
             emitStore(r);
             alloc.free(r);
         } else {
@@ -729,17 +749,23 @@ namespace zlang {
         outStream << ".global main\n";
 
         std::unique_ptr<ASTNode> mainFunction;
+        std::vector<std::unique_ptr<ASTNode>> declarationsAndReassignments;
 
         // Generate code for all top-level statements
         for (auto &statement : program->children) {
             if (statement->type == NodeType::Function and statement->value == "main") {
                 mainFunction = std::move(statement);
+            } else if (statement->type == NodeType::VariableDeclaration || statement->type == NodeType::VariableReassignment || (statement->type == NodeType::UnaryOp and (statement->value == "++" || statement->value == "--"))) {
+                declarationsAndReassignments.push_back(std::move(statement));
             } else {
                 generateStatement(std::move(statement), outStream);
             }
         }
 
         outStream << "main:\n";
+        for (auto &s : declarationsAndReassignments) {
+            generateStatement(std::move(s), outStream);
+        }
         generateFunctionDeclaration(std::move(mainFunction), outStream, true);
 
         // Final output
@@ -768,7 +794,7 @@ namespace zlang {
         for (const auto &reg : CALLER_XMM_LINUX) {
             if (alloc.isInUseXMM(reg)) {
                 auto funcScope = std::static_pointer_cast<FunctionScope>(node->scope->findEnclosingFunctionScope());
-                std::string slot = funcScope->allocateSpillSlot(16);
+                std::string slot = funcScope->allocateSpillSlot(16, CodegenOutputFormat::X86_64_LINUX);
                 alloc.markSpilledXMM(reg, slot);
                 out << "    movdqu %" << reg << ", " << slot << "    # save caller-saved XMM\n";
                 savedXMM.emplace_back(reg, slot);
@@ -778,7 +804,20 @@ namespace zlang {
         // calculate stack space for overflow arguments
         uint64_t gpCount = 0, xmmCount = 0, stackOffset = 0;
         for (size_t i = 0; i < args.size(); ++i) {
-            bool isFloat = node->scope->lookupType(functionParams[i].type).isFloat;
+            bool isFloat;
+            if (i < functionParams.size()) {
+                isFloat = node->scope->lookupType(functionParams[i].type).isFloat;
+            } else if (fnInfo.isVariadic) {
+                // Promote variadic argument based on the actual passed type
+                // We cannot know actual float/int until expression emitted; assume float if expression type is float
+                // For stack-space calculation, we'll conservatively treat variadic floats as double
+                // so count toward xmmCount
+                // Here, default to integer (non-float) stack slot; actual float moved will go to xmm later
+                isFloat = false;
+            } else {
+                throw std::runtime_error("Too many arguments passed to non-variadic function '" + node->value + "'");
+            }
+
             if (!isFloat) {
                 if (gpCount < ARG_GPR_LINUX.size())
                     gpCount++;
@@ -806,16 +845,30 @@ namespace zlang {
             restoreIfSpilled(src, node->scope, out);
 
             TypeInfo passed = regType.at(src);
-            TypeInfo expect = node->scope->lookupType(functionParams[i].type);
+            bool passedIsFloat = passed.isFloat;
+
+            TypeInfo expect;
+            if (i < functionParams.size()) {
+                expect = node->scope->lookupType(functionParams[i].type);
+            } else if (fnInfo.isVariadic) {
+                if (passedIsFloat) {
+                    expect = node->scope->lookupType("double");
+                } else {
+                    expect = node->scope->lookupType("int64_t");
+                }
+            } else {
+                throw std::runtime_error("Too many arguments passed to non-variadic function '" + node->value + "'");
+            }
+
             std::string cvt = castValue(src, passed, expect, node->scope, out);
             restoreIfSpilled(cvt, node->scope, out);
 
-            bool isFloat = expect.isFloat;
-            if (!isFloat && gpCount < ARG_GPR_LINUX.size()) {
+            bool isFloatArg = expect.isFloat;
+            if (!isFloatArg && gpCount < ARG_GPR_LINUX.size()) {
                 std::string dst = ARG_GPR_LINUX[gpCount];
                 if (alloc.isInUseArgument(dst)) {
                     auto funcScope = std::static_pointer_cast<FunctionScope>(node->scope->findEnclosingFunctionScope());
-                    std::string slot = funcScope->allocateSpillSlot(8);
+                    std::string slot = funcScope->allocateSpillSlot(8, CodegenOutputFormat::X86_64_LINUX);
                     alloc.markSpilled(dst, slot);
                     spilledArgumentRegs.push_back(dst);
                     out << "    movq   %" << dst << ", " << slot << "    # spill GPR\n";
@@ -825,11 +878,11 @@ namespace zlang {
                 }
                 gpCount++;
                 out << "    movq   %" << cvt << ", %" << dst << "\n";
-            } else if (isFloat && xmmCount < ARG_XMM_LINUX.size()) {
+            } else if (isFloatArg && xmmCount < ARG_XMM_LINUX.size()) {
                 std::string dst = ARG_XMM_LINUX[xmmCount];
                 if (alloc.isInUseArgumentXMM(dst)) {
                     auto funcScope = std::static_pointer_cast<FunctionScope>(node->scope->findEnclosingFunctionScope());
-                    std::string slot = funcScope->allocateSpillSlot(16);
+                    std::string slot = funcScope->allocateSpillSlot(16, CodegenOutputFormat::X86_64_LINUX);
                     alloc.markSpilledXMM(dst, slot);
                     spilledArgumentRegs.push_back(dst);
                     out << "    movdqu %" << dst << ", " << slot << "    # spill XMM\n";
@@ -838,13 +891,16 @@ namespace zlang {
                     reservedArgumentRegs.emplace_back(dst);
                 }
                 xmmCount++;
-                out << "    movss  %" << cvt << ", %" << dst << "\n";
+                out << "    movsd  %" << cvt << ", %" << dst << "\n";
             } else {
-                out << "    mov" << (isFloat ? "ss  %" : "q   %") << cvt << ", " << stackOffset << "(%rsp)\n";
+                out << "    mov" << (isFloatArg ? "ss  %" : "q   %") << cvt << ", " << stackOffset << "(%rsp)\n";
                 stackOffset += 8;
             }
             alloc.free(cvt);
         }
+
+        // tell ABI how many float args are in XMM regs
+        out << "    mov    $" << xmmCount << ", %rax    # variadic ABI float count\n";
 
         // --- Call ---
         out << "    call   " << label << "    # function call\n";
@@ -883,7 +939,6 @@ namespace zlang {
         }
         return holder;
     }
-
     void CodeGenLinux::generateFunctionDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out, bool force) {
         if (node->value == "main" && !force) {
             return;
@@ -903,6 +958,8 @@ namespace zlang {
         // Canary setup
         std::uint64_t canary = CanaryGenerator::generate();
         funcScope->setCanary(canary);
+
+        std::vector<std::unique_ptr<ASTNode>> nestedFunctions;
 
         // SysV argument register order
         const auto &ARG_GPR_LINUX = alloc.availableArgumentRegs;     // {"rdi","rsi","rdx","rcx","r8","r9"}
@@ -950,13 +1007,20 @@ namespace zlang {
 
         // Generate the function body
         for (auto &stmt : bodyNode->children) {
-            generateStatement(std::move(stmt), body);
+            if (stmt->type == NodeType::Function) {
+                nestedFunctions.push_back(std::move(stmt));  // defer
+            } else {
+                generateStatement(std::move(stmt), body);
+            }
         }
         emitPrologue(funcScope, prologue);
         if (bodyNode->scope->returnType == "none") {
             emitEpilogue(funcScope, body, force);
         }
         out << prologue.str() + body.str();
+        for (auto &nestedFn : nestedFunctions) {
+            generateFunctionDeclaration(std::move(nestedFn), out, false);
+        }
     }
     void CodeGenLinux::generateExternFunctionDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out) {
         auto fnInfo = node->scope->lookupFunction(node->value);
@@ -967,13 +1031,17 @@ namespace zlang {
     void CodeGenLinux::generateReturnstatement(std::unique_ptr<ASTNode> node, std::ostringstream &out) {
         // TODO: Ensure that we are not returning a local type, at this point I assume that typechecker handles this.
         std::string result = emitExpression(std::move(node->children[0]), out);
+
         std::shared_ptr<FunctionScope> funcScope = node->scope->findEnclosingFunctionScope();
         restoreIfSpilled(result, funcScope, out);
+
         TypeInfo actual = regType.at(result);
         TypeInfo expected = funcScope->lookupType(funcScope->returnType);
         std::string casted = castValue(result, actual, expected, funcScope, out);
         restoreIfSpilled(casted, funcScope, out);
+
         std::string retReg = expected.isFloat ? "xmm0" : "rax";
+
         if (expected.name == "none") {
             out << "    xor %rax, %rax\n";
         } else if (!expected.isFloat) {
@@ -988,3 +1056,6 @@ namespace zlang {
         emitEpilogue(funcScope, out);
     }
 }  // namespace zlang
+
+// TODO: Dont nest the code generation of nested functions.
+// This leads to disasters.

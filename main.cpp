@@ -93,35 +93,35 @@ int main(int argc, char *argv[]) {
     std::unique_ptr<zlang::CodeGen> cg =
         CodeGen::create(TargetTriple::X86_64_LINUX, *outstream);
 
-    //     switch (cli.getFormat()) {
-    //     case CodegenOutputFormat::Default:
-    // #ifdef _WIN64
-    //         cg = CodeGen::create(TargetTriple::X86_64_WINDOWS, *outstream);
-    // #endif
-    // #ifdef __linux__
-    //         cg = CodeGen::create(TargetTriple::X86_64_LINUX, *outstream);
-    // #endif
-    //         break;
+    switch (cli.getFormat()) {
+    case CodegenOutputFormat::Default:
+#ifdef _WIN64
+        cg = CodeGen::create(TargetTriple::X86_64_WINDOWS, *outstream);
+#endif
+#ifdef __linux__
+        cg = CodeGen::create(TargetTriple::X86_64_LINUX, *outstream);
+#endif
+        break;
 
-    //     case CodegenOutputFormat::X86_64_MSWIN: {
-    //         cg = CodeGen::create(TargetTriple::X86_64_WINDOWS, *outstream);
-    //         break;
-    //     }
+    case CodegenOutputFormat::X86_64_MSWIN: {
+        cg = CodeGen::create(TargetTriple::X86_64_WINDOWS, *outstream);
+        break;
+    }
 
-    //     case CodegenOutputFormat::X86_64_LINUX: {
-    //         cg = CodeGen::create(TargetTriple::X86_64_LINUX, *outstream);
-    //         break;
-    //     }
+    case CodegenOutputFormat::X86_64_LINUX: {
+        cg = CodeGen::create(TargetTriple::X86_64_LINUX, *outstream);
+        break;
+    }
 
-    //     case CodegenOutputFormat::LLVM_IR: {
-    //         cg = CodeGen::create(TargetTriple::LLVM_IR, *outstream);
-    //         break;
-    //     }
+    case CodegenOutputFormat::LLVM_IR: {
+        cg = CodeGen::create(TargetTriple::LLVM_IR, *outstream);
+        break;
+    }
 
-    //     default:
-    //         std::cerr << "This should not happen, ACP Pradhyumn...\n";
-    //         exit(1);
-    //     }
+    default:
+        std::cerr << "This should not happen, ACP Pradhyumn...\n";
+        exit(1);
+    }
     try {
         cg->generate(std::move(program));
     } catch (std::exception const &exc) {

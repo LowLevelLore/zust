@@ -2,17 +2,32 @@ let a: int64_t = 10;
 let f: float = 20.5;
 let u: uint8_t = 10;
 
+extern fn printf(fmt: string, ...) -> int32_t;
+
+fn print_int(x: int64_t) -> none {
+    printf("%d\n", x);
+}
+
+fn print_float(x: float) -> none {
+    printf("%f\n", x);
+}
+
 fn main() {
     if (a > 100) {
         let res: int64_t = a * 2;
+        print_int(res);
     }
     elif (f < 10.0) {
         let res: float = f + 1.0;
+        print_float(res);
     }
     elif (u == a) {
         let res: uint8_t = u + 1;
+        print_int(res);
     }
     else {
         let res: int64_t = -1;
+        print_int(res);
     }
+
 }

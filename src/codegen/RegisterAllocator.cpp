@@ -186,12 +186,12 @@ namespace zlang {
                 out << "    movdqu " << slot << ", %" << reg << "\n";
             else
                 out << "    mov " << slot << ", %" << reg << "\n";
-        }
-        if (format == CodegenOutputFormat::X86_64_MSWIN) {
-            if (isXMM)
-                out << "    movdqu " << reg << ", " << slot << "\n";
-            else
-                out << "    mov " << reg << ", " << slot << "\n";
+        } else if (format == CodegenOutputFormat::X86_64_MSWIN) {
+            if (isXMM) {
+                out << "    movdqu " << reg << ", XMMWORD PTR " << slot << "\n";
+            } else {
+                out << "    mov " << reg << ", QWORD PTR " << slot << "\n";
+            }
         }
     }
 

@@ -45,6 +45,7 @@ namespace zlang {
         std::string name;
         std::string label;
         bool isExtern;
+        bool isVariadic;
         std::string to_string() const;
     };
 
@@ -98,6 +99,7 @@ namespace zlang {
         std::shared_ptr<ScopeContext> parent() const { return parent_; }
         const std::string &name() const { return name_; }
         std::string getMapping(std::string name);
+        void setMapping(const std::string &name, const std::string &llvmName);
         virtual void printScope(std::ostream &out, int indent = 0) const;
         std::shared_ptr<FunctionScope> findEnclosingFunctionScope();
         std::shared_ptr<ScopeContext> getGlobal();
@@ -124,14 +126,12 @@ namespace zlang {
                                    const TypeInfo &type) override;
         std::int64_t getStackOffset() const;
         void setCanary(std::uint64_t canary) {
-            logMessage("Setting canary of: " + name_);
             this->canary = canary;
         }
         std::uint64_t getCanary() {
-            logMessage("Getting canary of: " + name_);
             return this->canary;
         }
-        std::string allocateSpillSlot(std::int64_t size);
+        std::string allocateSpillSlot(std::int64_t size, CodegenOutputFormat format);
         std::int64_t getSpillSize() const;
         void freeSpillSlot(const std::string &slot, std::int64_t size);
 

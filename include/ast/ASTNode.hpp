@@ -61,8 +61,8 @@ namespace zlang {
         static std::unique_ptr<ASTNode> makeIfStatement(std::unique_ptr<ASTNode> condition, std::unique_ptr<ASTNode> program, const std::shared_ptr<ScopeContext> scope);
         static std::unique_ptr<ASTNode> makeElseIfStatement(std::unique_ptr<ASTNode> condition, std::unique_ptr<ASTNode> program, const std::shared_ptr<ScopeContext> scope);
         static std::unique_ptr<ASTNode> makeElseStatement(std::unique_ptr<ASTNode> program, const std::shared_ptr<ScopeContext> scope);
-        static std::unique_ptr<ASTNode> makeExternFunctionDeclaration(std::string name, const std::shared_ptr<ScopeContext> scope, std::vector<ParamInfo> params, std::string returnType);
-        static std::unique_ptr<ASTNode> makeFunctionDeclaration(std::string name, const std::shared_ptr<ScopeContext> scope, std::vector<ParamInfo> params, std::string returnType, std::unique_ptr<ASTNode> body);
+        static std::unique_ptr<ASTNode> makeExternFunctionDeclaration(std::string name, const std::shared_ptr<ScopeContext> scope, std::vector<ParamInfo> params, std::string returnType, bool isVariadic);
+        static std::unique_ptr<ASTNode> makeFunctionDeclaration(std::string name, const std::shared_ptr<ScopeContext> scope, std::vector<ParamInfo> params, std::string returnType, std::unique_ptr<ASTNode> body, bool isVariadic);
         static std::unique_ptr<ASTNode> makeFunctionCall(std::string name, std::vector<std::unique_ptr<ASTNode>> arguments, const std::shared_ptr<ScopeContext> scope);
         static std::unique_ptr<ASTNode> makeFunctionParameterList(const std::vector<ParamInfo> params, const std::shared_ptr<ScopeContext> scope);
         void addChild(std::unique_ptr<ASTNode> child);

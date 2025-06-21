@@ -1,5 +1,11 @@
 #include "all.hpp"
 
+// TODO: 4 Things then I'm done
+// Loops
+// Pointers
+// Structures
+// Stdlib
+
 namespace zlang {
     Parser::Parser(Lexer& lex) : lexer(lex) {
         currentScope = std::make_shared<NamespaceScope>("GLOBAL__SCOPE", nullptr);
@@ -234,7 +240,7 @@ namespace zlang {
             return parseFunctionDeclaration();
         if (match(Token::Token::Kind::Let))
             return parseVariableDeclaration();
-        if (currentToken.kind == Token::Token::Kind::Identifier and lexer.peek().kind != Token::Kind::LeftParen)
+        if (currentToken.kind == Token::Token::Kind::Identifier and lexer.peek().kind == Token::Kind::Equal)
             return parseVariableReassignment();
         if (currentToken.kind == Token::Kind::If ||
             currentToken.kind == Token::Kind::ElseIf ||
@@ -253,6 +259,7 @@ namespace zlang {
 
     std::unique_ptr<ASTNode> Parser::parseFunctionDeclaration() {
         bool isExtern = false;
+        bool isVariadic = false;
         if (currentToken.kind == Token::Kind::Symbol &&
             currentToken.text == "extern") {
             isExtern = true;
@@ -292,6 +299,27 @@ namespace zlang {
             params.push_back(ParamInfo{.name = paramName, .type = typeName});
 
             while (match(Token::Kind::Comma)) {
+                if (currentToken.kind == Token::Kind::Ellipsis) {
+                    if (!isExtern) {
+                        logError(Error{ErrorType::Generic, "We only support variadic arguments with extern functions"});
+                        shouldTypecheck = false;
+                        return nullptr;
+                    }
+                    isVariadic = true;
+                    advance();
+
+                    // Ellipsis must be the last thing before ')'
+                    if (currentToken.kind != Token::Kind::RightParen) {
+                        logError(Error{ErrorType::Syntax,
+                                       "Variadic parameter '...' must be the last in the parameter list at line " +
+                                           std::to_string(currentToken.line) + ", column " +
+                                           std::to_string(currentToken.column)});
+                        shouldTypecheck = false;
+                        return nullptr;
+                    }
+                    break;
+                }
+
                 std::string nextName = currentToken.text;
                 expect(Token::Kind::Identifier,
                        "Expected parameter name after ','");
@@ -335,9 +363,9 @@ namespace zlang {
             expect(Token::Kind::SemiColon,
                    "Expected ';' after extern function declaration");
             return ASTNode::makeExternFunctionDeclaration(name, currentScope,
-                                                          params, returnTypeName);
+                                                          params, returnTypeName, isVariadic);
         }
-        enterScope(name, true);
+        enterScope(currentScope->name() + "___" + name, true);
         auto body = parseBlock();
         exitScope();
         if (name == "main") {
@@ -348,7 +376,7 @@ namespace zlang {
             }
         }
         return ASTNode::makeFunctionDeclaration(name, currentScope, params,
-                                                returnTypeName, std::move(body));
+                                                returnTypeName, std::move(body), isVariadic);
     }
 
     std::unique_ptr<ASTNode> Parser::parseBlock() {

@@ -1,0 +1,39 @@
+extern fn printf(fmt: string, ...) -> int32_t;
+
+fn print_int(x: int64_t) -> none {
+    printf("%d\n", x);
+}
+
+fn print_float(x: float) -> none {
+    printf("%f\n", x);
+}
+
+fn print_bool(x: boolean) -> none {
+    if(x == 1){
+        printf("true\n");
+    }else{
+        printf("false\n");
+    }
+}
+
+fn add(x: int64_t, y: int64_t) -> int64_t {
+    return x + y;
+}
+
+fn square(f: float) -> float {
+    return f * f;
+}
+
+fn negate(b: boolean) -> boolean {
+    return !b;
+}
+
+fn main() {
+    let a: int64_t = add(10, 32);         // 42
+    let s: float = square(3.0);           // 9.0
+    let b: boolean = negate(false);       // true
+
+    print_int(a);
+    print_float(s);
+    print_bool(b);
+}

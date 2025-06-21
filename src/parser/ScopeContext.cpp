@@ -120,6 +120,10 @@ namespace zlang {
         }
         throw std::runtime_error("Mapping not found for variable: " + name);
     }
+    void ScopeContext::setMapping(const std::string &name,
+                                  const std::string &llvmName) {
+        variable_name_mappings[name] = llvmName;
+    }
     void ScopeContext::printScope(std::ostream &out, int indent) const {
         std::string pad(indent, ' ');
         out << pad << kind() << " Scope: " << name_ << "\n";
@@ -182,17 +186,31 @@ namespace zlang {
     std::int64_t FunctionScope::getStackOffset() const {
         return stackOffset_;
     }
-    std::string FunctionScope::allocateSpillSlot(std::int64_t size) {
+    std::string FunctionScope::allocateSpillSlot(std::int64_t size, CodegenOutputFormat format) {
         for (auto it = freeSpillSlots_.begin(); it != freeSpillSlots_.end(); ++it) {
             if (it->second == size) {
                 std::int64_t offset = it->first;
                 freeSpillSlots_.erase(it);
-                return "-" + std::to_string(offset) + " (%rbp)";
+                switch (format) {
+                case CodegenOutputFormat::X86_64_LINUX:
+                    return "-" + std::to_string(offset) + "(%rbp)";
+                case CodegenOutputFormat::X86_64_MSWIN:
+                    return "[rbp - " + std::to_string(stackOffset_ + offset) + "]";
+                default:
+                    return "";
+                }
             }
         }
         nextSpillOffset_ -= size;
         std::int64_t offset = nextSpillOffset_;
-        return std::to_string(stackOffset_ + offset) + " (%rbp)";
+        switch (format) {
+        case CodegenOutputFormat::X86_64_LINUX:
+            return std::to_string(offset) + "(%rbp)";
+        case CodegenOutputFormat::X86_64_MSWIN:
+            return "[rbp - " + std::to_string(stackOffset_ + offset) + "]";
+        default:
+            return "";
+        }
     }
     std::int64_t FunctionScope::getSpillSize() const {
         return nextSpillOffset_;

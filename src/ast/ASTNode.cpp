@@ -139,17 +139,17 @@ namespace zlang {
         return node;
     }
 
-    std::unique_ptr<ASTNode> ASTNode::makeExternFunctionDeclaration(std::string name, const std::shared_ptr<ScopeContext> scope, std::vector<ParamInfo> params, std::string returnType) {
+    std::unique_ptr<ASTNode> ASTNode::makeExternFunctionDeclaration(std::string name, const std::shared_ptr<ScopeContext> scope, std::vector<ParamInfo> params, std::string returnType, bool isVariadic) {
         auto node = std::make_unique<ASTNode>(NodeType::ExternFunction, name, scope);
         auto paramsList = ASTNode::makeFunctionParameterList(params, scope);
         auto returnType_ = std::make_unique<ASTNode>(NodeType::FunctionReturnType, returnType, scope);
         node->children.push_back(std::move(paramsList));
         node->children.push_back(std::move(returnType_));
-        scope->defineFunction(name, FunctionInfo{.paramTypes = params, .returnType = returnType, .name = name, .label = "", .isExtern = true});
+        scope->defineFunction(name, FunctionInfo{.paramTypes = params, .returnType = returnType, .name = name, .label = "", .isExtern = true, .isVariadic = isVariadic});
         return node;
     }
 
-    std::unique_ptr<ASTNode> ASTNode::makeFunctionDeclaration(std::string name, const std::shared_ptr<ScopeContext> scope, std::vector<ParamInfo> params, std::string returnType, std::unique_ptr<ASTNode> body) {
+    std::unique_ptr<ASTNode> ASTNode::makeFunctionDeclaration(std::string name, const std::shared_ptr<ScopeContext> scope, std::vector<ParamInfo> params, std::string returnType, std::unique_ptr<ASTNode> body, bool isVariadic) {
         auto node = std::make_unique<ASTNode>(NodeType::Function, name, scope);
         auto paramsList = ASTNode::makeFunctionParameterList(params, scope);
         auto returnType_ = std::make_unique<ASTNode>(NodeType::FunctionReturnType, returnType, scope);
@@ -160,7 +160,7 @@ namespace zlang {
             body->scope->defineVariable(pi.name, VariableInfo{.type = pi.type});
         }
         node->children.push_back(std::move(body));
-        scope->defineFunction(name, FunctionInfo{.paramTypes = params, .returnType = returnType, .name = name, .label = "", .isExtern = false});
+        scope->defineFunction(name, FunctionInfo{.paramTypes = params, .returnType = returnType, .name = name, .label = "", .isExtern = false, .isVariadic = isVariadic});
         return node;
     }
 
