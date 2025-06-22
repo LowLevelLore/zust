@@ -10,7 +10,7 @@
 
 // TODO: Check that all paths inside the function return appropriate value.
 
-namespace zlang {
+namespace zust {
     static const std::set<std::string> numeric_types = {"integer", "size_t", "uint8_t", "uint16_t", "uint32_t", "uint64_t", "int8_t", "int16_t", "int32_t", "int64_t", "float", "double"};
     static const std::set<std::string> integral_types = {"integer", "size_t", "uint8_t", "uint16_t", "uint32_t", "uint64_t", "int8_t", "int16_t", "int32_t", "int64_t"};
 
@@ -89,4 +89,4 @@ namespace zlang {
         bool shouldCodegen_ = true;
     };
 
-}  // namespace zlang
+}  // namespace zust

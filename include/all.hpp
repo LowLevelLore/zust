@@ -1,33 +1,28 @@
 #pragma once
 
+#include <assert.h>
+
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <map>
+#include <memory>
+#include <sstream>
+
+#include "ast/ASTNode.hpp"
+#include "codegen/Canaries.hpp"
+#include "codegen/CodeGen.hpp"
+#include "codegen/RegisterAllocator.hpp"
 #include "common/Colors.hpp"
 #include "common/Errors.hpp"
 #include "common/Logging.hpp"
 #include "common/StringUtils.hpp"
-
-#include "support/CommandLine.hpp"
-#include "support/File.hpp"
-
-#include "ast/ASTNode.hpp"
-
+#include "lexer/Lexer.hpp"
+#include "parser/NameMapper.hpp"
 #include "parser/Parser.hpp"
 #include "parser/ScopeContext.hpp"
-#include "parser/NameMapper.hpp"
-
-#include "lexer/Lexer.hpp"
-
+#include "support/CommandLine.hpp"
+#include "support/File.hpp"
 #include "typechecker/TypeChecker.hpp"
 
-#include "codegen/CodeGen.hpp"
-#include "codegen/RegisterAllocator.hpp"
-#include "codegen/Canaries.hpp"
-
-#include <sstream>
-#include <map>
-#include <iostream>
-#include <memory>
-#include <fstream>
-#include <assert.h>
-#include <iomanip>
-
-static NameMapper GLOBAL_NAME_MAPPER;
+static zust::NameMapper GLOBAL_NAME_MAPPER;

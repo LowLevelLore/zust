@@ -7,7 +7,7 @@
 
 #include "parser/ScopeContext.hpp"
 
-namespace zlang {
+namespace zust {
     enum class NodeType {
         Program,
         VariableDeclaration,   // let x: int; or let x = 10;
@@ -73,4 +73,4 @@ namespace zlang {
         ASTNode *getFunctionBody() const;
         void print(std::ostream &out, int indent = 0) const;
     };
-}  // namespace zlang
+}  // namespace zust

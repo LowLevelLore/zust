@@ -11,7 +11,7 @@
 #include "codegen/RegisterAllocator.hpp"
 #include "typechecker/TypeChecker.hpp"
 
-namespace zlang {
+namespace zust {
     enum class TargetTriple {
         X86_64_LINUX,
         X86_64_WINDOWS,
@@ -247,4 +247,4 @@ namespace zlang {
         CodeGenLLVM(std::ostream &outstream) : CodeGen(RegisterAllocator(), outstream) {};
         void generate(std::unique_ptr<ASTNode> program) override;
     };
-}  // namespace zlang
+}  // namespace zust

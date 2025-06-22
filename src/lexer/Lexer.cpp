@@ -1,6 +1,6 @@
 #include "all.hpp"
 
-namespace zlang {
+namespace zust {
 
     Lexer::Lexer(const std::string &source)
         : source_(source), pos_(0), line_(1), column_(1) {
@@ -218,4 +218,4 @@ namespace zlang {
             return Token{Token::Kind::Symbol, text, startLine, startCol};
         }
     }
-}  // namespace zlang
+}  // namespace zust

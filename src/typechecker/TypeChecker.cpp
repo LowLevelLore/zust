@@ -1,6 +1,6 @@
 #include "all.hpp"
 
-namespace zlang {
+namespace zust {
     void TypeChecker::check(const std::unique_ptr<ASTNode> &program) {
         if (!program || program->type != NodeType::Program) {
             logError({ErrorType::Type,
@@ -62,7 +62,7 @@ namespace zlang {
                 shouldCodegen_ = false;
                 return "";
             }
-            const std::vector<zlang::ParamInfo> &functionParams = functionInfo.paramTypes;
+            const std::vector<zust::ParamInfo> &functionParams = functionInfo.paramTypes;
             const std::vector<std::unique_ptr<ASTNode>> &functionArguments = node->children[0]->children;
 
             if (functionArguments.size() != functionParams.size()) {
@@ -332,4 +332,4 @@ namespace zlang {
         return isNumeric(ty);
     }
 
-}  // namespace zlang
+}  // namespace zust

@@ -2,7 +2,7 @@
 #include <string>
 #include <vector>
 
-namespace zlang
+namespace zust
 {
 
     enum class CodegenOutputFormat
@@ -54,4 +54,4 @@ namespace zlang
         CodegenOutputFormat format = CodegenOutputFormat::Default;
     };
 
-} // namespace zlang
+} // namespace zust

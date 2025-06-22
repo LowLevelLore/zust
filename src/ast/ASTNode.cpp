@@ -1,6 +1,6 @@
 #include "all.hpp"
 
-namespace zlang {
+namespace zust {
     std::unique_ptr<ASTNode> ASTNode::makeProgramNode(const std::shared_ptr<ScopeContext> scope) {
         return std::make_unique<ASTNode>(NodeType::Program, "", scope);
     }

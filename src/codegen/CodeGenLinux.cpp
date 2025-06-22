@@ -1,6 +1,6 @@
 #include "all.hpp"
 
-namespace zlang {
+namespace zust {
     std::string CodeGenLinux::castValue(
         const std::string &val,
         const TypeInfo &fromType,
@@ -134,9 +134,9 @@ namespace zlang {
         std::string slot = alloc.spillSlotFor(reg);
 
         if (reg.starts_with("xm")) {
-            alloc.unSpillXMM(reg, zlang::CodegenOutputFormat::X86_64_LINUX, out);
+            alloc.unSpillXMM(reg, zust::CodegenOutputFormat::X86_64_LINUX, out);
         } else {
-            alloc.unSpill(reg, zlang::CodegenOutputFormat::X86_64_LINUX, out);
+            alloc.unSpill(reg, zust::CodegenOutputFormat::X86_64_LINUX, out);
         }
 
         auto result_scope = scope->findEnclosingFunctionScope();
@@ -1051,7 +1051,7 @@ namespace zlang {
         alloc.free(casted);
         emitEpilogue(funcScope, out);
     }
-}  // namespace zlang
+}  // namespace zust
 
 // TODO: Dont nest the code generation of nested functions.
 // This leads to disasters.

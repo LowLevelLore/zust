@@ -3,7 +3,7 @@
 #include <iostream>
 #include <system_error>
 
-namespace zlang
+namespace zust
 {
 
     void logSystemError(const std::string &message)
@@ -49,4 +49,4 @@ namespace zlang
                   << std::endl;
     }
 
-} // namespace zlang
+} // namespace zust

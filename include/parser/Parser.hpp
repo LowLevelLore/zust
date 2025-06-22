@@ -7,7 +7,7 @@
 #include "common/Logging.hpp"
 #include "parser/ScopeContext.hpp"
 
-namespace zlang {
+namespace zust {
     class Parser {
     public:
         explicit Parser(Lexer &lexer);

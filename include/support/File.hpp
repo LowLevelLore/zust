@@ -3,7 +3,7 @@
 #include <string>
 #include <optional>
 
-namespace zlang
+namespace zust
 {
 
     class File
@@ -14,4 +14,4 @@ namespace zlang
         static std::optional<std::string> readAllText(const std::string &filepath);
     };
 
-} // namespace zlang
+} // namespace zust
