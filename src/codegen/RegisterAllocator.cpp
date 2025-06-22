@@ -1,6 +1,6 @@
 #include "all.hpp"
 
-namespace zlang {
+namespace zust {
     RegisterAllocator::RegisterAllocator(std::vector<std::string> regs, std::vector<std::string> XMMregs, std::vector<std::string> argumentRegs, std::vector<std::string> argumentXMMRegs)
         : available(std::move(regs)), availableXMM(std::move(XMMregs)), availableArgumentRegs(std::move(argumentRegs)), availableArgumentRegsXMM(std::move(argumentXMMRegs)) {
     }
@@ -161,7 +161,7 @@ namespace zlang {
         return it->second.spillSlot;
     }
 
-    void RegisterAllocator::unSpillXMM(const std::string &reg, zlang::CodegenOutputFormat format, std::ostream &out) {
+    void RegisterAllocator::unSpillXMM(const std::string &reg, zust::CodegenOutputFormat format, std::ostream &out) {
         auto it = spilledRegs.find(reg);
         if (it == spilledRegs.end())
             throw std::runtime_error("XMM reg not spilled: " + reg);
@@ -170,7 +170,7 @@ namespace zlang {
         spilledRegs.erase(it);
     }
 
-    void RegisterAllocator::unSpill(const std::string &reg, zlang::CodegenOutputFormat format, std::ostream &out) {
+    void RegisterAllocator::unSpill(const std::string &reg, zust::CodegenOutputFormat format, std::ostream &out) {
         auto it = spilledRegs.find(reg);
         if (it == spilledRegs.end())
             throw std::runtime_error("GPR reg not spilled: " + reg);
@@ -179,7 +179,7 @@ namespace zlang {
         spilledRegs.erase(it);
     }
 
-    void RegisterAllocator::emitSpillRestore(const std::string &reg, const std::string &slot, bool isXMM, zlang::CodegenOutputFormat format, std::ostream &out) {
+    void RegisterAllocator::emitSpillRestore(const std::string &reg, const std::string &slot, bool isXMM, zust::CodegenOutputFormat format, std::ostream &out) {
         if (format == CodegenOutputFormat::X86_64_LINUX) {
             if (isXMM)
                 out << "    movdqu " << slot << ", %" << reg << "\n";
@@ -207,4 +207,4 @@ namespace zlang {
             lruXMMRegs.push_back(reg);
         }
     }
-}  // namespace zlang
+}  // namespace zust

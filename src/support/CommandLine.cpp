@@ -3,7 +3,7 @@
 #include <cstring>
 #include <iostream>
 
-namespace zlang {
+namespace zust {
 
     CommandLine::CommandLine(int argc, char *argv[]) {
         parseArgs(argc, argv);
@@ -131,4 +131,4 @@ namespace zlang {
                   << " -> x86_64-linux\n";
     }
 
-}  // namespace zlang
+}  // namespace zust

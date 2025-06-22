@@ -2,7 +2,7 @@
 #include <fstream>
 #include <sstream>
 
-namespace zlang
+namespace zust
 {
 
     std::optional<std::string> File::readAllText(const std::string &filepath)
@@ -25,4 +25,4 @@ namespace zlang
         return contents.str();
     }
 
-} // namespace zlang
+} // namespace zust

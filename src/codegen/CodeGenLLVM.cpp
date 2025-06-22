@@ -1,6 +1,6 @@
 #include "all.hpp"
 
-namespace zlang {
+namespace zust {
 
     std::string llvmTypeName(const std::string &typeName) {
         if (typeName == "boolean")
@@ -565,8 +565,8 @@ namespace zlang {
         out << endLbl << ":\n";
     }
     void CodeGenLLVM::generate(std::unique_ptr<ASTNode> program) {
-        outGlobalStream << "; ModuleID = 'zlang'\n"
-                        << "source_filename = \"zlang\"\n\n";
+        outGlobalStream << "; ModuleID = 'zust'\n"
+                        << "source_filename = \"zust\"\n\n";
 
         // Globals
         for (auto &stmt : program->children) {
@@ -785,4 +785,4 @@ namespace zlang {
         std::string llvmTy = llvmTypeName(expected.name);
         out << "  ret " << llvmTy << " " << casted << "\n";
     }
-}  // namespace zlang
+}  // namespace zust

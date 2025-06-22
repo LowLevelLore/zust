@@ -7,7 +7,9 @@
 #include <unordered_set>
 #include <vector>
 
-namespace zlang {
+#include "support/CommandLine.hpp"
+
+namespace zust {
 
     // Tips for noobs: CALLER saved are saved by the caller, CALLEE saved are restored by the function/routine
     // So CALLER Union CALLEE should be equal to the set of all the registers, so the current state will never be corrupted.
@@ -78,11 +80,11 @@ namespace zlang {
         void markSpilled(const std::string &reg, const std::string &spillSlot);
         bool isSpilled(const std::string &reg) const;
         std::string spillSlotFor(const std::string &reg) const;
-        void unSpillXMM(const std::string &reg, zlang::CodegenOutputFormat format, std::ostream &out);
-        void unSpill(const std::string &reg, zlang::CodegenOutputFormat format, std::ostream &out);
+        void unSpillXMM(const std::string &reg, zust::CodegenOutputFormat format, std::ostream &out);
+        void unSpill(const std::string &reg, zust::CodegenOutputFormat format, std::ostream &out);
         void touch(const std::string &reg);
         void touchXMM(const std::string &reg);
-        void emitSpillRestore(const std::string &reg, const std::string &slot, bool isXMM, zlang::CodegenOutputFormat format, std::ostream &out);
+        void emitSpillRestore(const std::string &reg, const std::string &slot, bool isXMM, zust::CodegenOutputFormat format, std::ostream &out);
 
     private:
         RegisterAllocator(std::vector<std::string> regs, std::vector<std::string> XMMregs, std::vector<std::string> argumentRegs, std::vector<std::string> argumentXMMRegs);

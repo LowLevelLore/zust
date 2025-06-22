@@ -4,7 +4,7 @@
 
 #include "../common/Errors.hpp"
 
-namespace zlang {
+namespace zust {
     struct Token {
         enum class Kind {
             Let,
@@ -106,7 +106,7 @@ namespace zlang {
     inline std::ostream &operator<<(std::ostream &os, const Token &token) {
         return os << token.to_string();
     }
-    using Error = zlang::Error;
+    using Error = zust::Error;
     class Lexer {
     public:
         explicit Lexer(const std::string &source);
@@ -130,4 +130,4 @@ namespace zlang {
         Token scanSymbol();
     };
 
-}  // namespace zlang
+}  // namespace zust

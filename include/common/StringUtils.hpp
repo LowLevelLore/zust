@@ -2,7 +2,7 @@
 #include <string>
 #include <vector>
 
-namespace zlang
+namespace zust
 {
 
     bool startsWith(const std::string &str, const std::string &prefix);
@@ -30,4 +30,4 @@ namespace zlang
         return isAlpha(c) || isDigit(c) || c == '_';
     }
 
-} // namespace zlang
+} // namespace zust

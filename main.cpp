@@ -1,6 +1,6 @@
 #include "all.hpp"
 
-using namespace zlang;
+using namespace zust;
 
 int main(int argc, char *argv[]) {
     if (argc < 2) {
@@ -29,14 +29,14 @@ int main(int argc, char *argv[]) {
     assert(inputFile.ends_with(".zz"));
 
     if (inputFile.empty()) {
-        logError(zlang::Error(zlang::ErrorType::Generic, "No input files."));
+        logError(zust::Error(zust::ErrorType::Generic, "No input files."));
         CommandLine::printUsage(argv[0]);
         return 1;
     }
 
-    std::optional<std::string> source = zlang::File::readAllText(inputFile);
+    std::optional<std::string> source = zust::File::readAllText(inputFile);
     if (!source) {
-        logError(zlang::Error(zlang::ErrorType::Generic,
+        logError(zust::Error(zust::ErrorType::Generic,
                               "Failed to read from " + inputFile));
         return 1;
     }
@@ -52,7 +52,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (!program.get()) {
-        zlang::logError(Error(ErrorType::Generic, "Parsing Failed"));
+        zust::logError(Error(ErrorType::Generic, "Parsing Failed"));
         return 1;
     }
     if (cli.printAST()) {
@@ -90,7 +90,7 @@ int main(int argc, char *argv[]) {
         outstream = &ofs;  // now point at the file
     }
 
-    std::unique_ptr<zlang::CodeGen> cg =
+    std::unique_ptr<zust::CodeGen> cg =
         CodeGen::create(TargetTriple::X86_64_LINUX, *outstream);
 
     switch (cli.getFormat()) {

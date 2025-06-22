@@ -16,5 +16,6 @@ tests/object/
 **.exe
 
 zlang-support/
+zust-support/
 
 **/.vscode/

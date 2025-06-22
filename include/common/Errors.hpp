@@ -1,7 +1,7 @@
 #pragma once
 #include <string>
 
-namespace zlang
+namespace zust
 {
     enum class ErrorType
     {
@@ -24,4 +24,4 @@ namespace zlang
         operator bool() const { return type != ErrorType::None; }
     };
 
-} // namespace zlang
+} // namespace zust

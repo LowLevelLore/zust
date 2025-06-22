@@ -1,5 +1,5 @@
 #pragma once
-namespace zlang
+namespace zust
 {
     namespace colors
     {
@@ -13,4 +13,4 @@ namespace zlang
         constexpr const char *WHITE = "\033[0;37m";
     } // namespace colors
 
-} // namespace zlang
+} // namespace zust

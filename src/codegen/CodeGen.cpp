@@ -1,6 +1,6 @@
 #include "all.hpp"
 
-namespace zlang {
+namespace zust {
     CodeGen::~CodeGen() = default;
     std::unique_ptr<CodeGen> CodeGen::create(TargetTriple target, std::ostream &outstream) {
         switch (target) {

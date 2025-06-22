@@ -2,7 +2,7 @@
 #include <algorithm>
 #include <sstream>
 
-namespace zlang
+namespace zust
 {
 
     bool startsWith(const std::string &str, const std::string &prefix)
@@ -42,4 +42,4 @@ namespace zlang
         return std::string(strBegin, strEnd);
     }
 
-} // namespace zlang
+} // namespace zust

@@ -1,4 +1,4 @@
-# zlang
+# zust
 
 A lightweight statically typed programming language that compiles to **x86_64 Linux assembly**, supporting custom data types, conditionals, arithmetic, and type-safe operations. The language was designed for educational and experimental purposes with an emphasis on low-level control and code generation.
 
@@ -21,7 +21,7 @@ A lightweight statically typed programming language that compiles to **x86_64 Li
 ## 📦 Project Structure
 
 ```
-zlang/
+zust/
 ├── include/
 │   ├── common/
 │   │   ├── Colors.hpp
@@ -95,8 +95,8 @@ zlang/
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/zlang.git
-cd zlang
+git clone https://github.com/your-username/zust.git
+cd zust
 
 # Create build directory
 mkdir build && cd build
@@ -177,9 +177,9 @@ gcc out.o -o out
 
 ---
 
-## 🧠 Example Program (zlang)
+## 🧠 Example Program (zust)
 
-```zlang
+```zust
 extern fn printf(fmt: string, ...) -> int32_t;
 
 fn factorial(x: uint64_t) -> uint64_t{

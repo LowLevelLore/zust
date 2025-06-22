@@ -7,7 +7,9 @@
 #include <unordered_map>
 #include <vector>
 
-namespace zlang {
+#include "support/CommandLine.hpp"
+
+namespace zust {
     struct VariableInfo {
         std::string type;
     };
@@ -171,4 +173,4 @@ namespace zlang {
         }
     };
 
-}  // namespace zlang
+}  // namespace zust

@@ -1,6 +1,6 @@
 #include <all.hpp>
 
-namespace zlang {
+namespace zust {
     bool ScopeContext::defineVariable(const std::string &name,
                                       const VariableInfo &info) {
         if (!parent_ || (parent_->kind() == "Namespace" && kind() != "Function")) {
@@ -264,4 +264,4 @@ namespace zlang {
         out << pad << kind() << " Scope: " << name_ << "\n";
         ScopeContext::printScope(out, indent + 2);
     }
-}  // namespace zlang
+}  // namespace zust

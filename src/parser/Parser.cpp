@@ -6,7 +6,7 @@
 // Structures
 // Stdlib
 
-namespace zlang {
+namespace zust {
     Parser::Parser(Lexer& lex) : lexer(lex) {
         currentScope = std::make_shared<NamespaceScope>("GLOBAL__SCOPE", nullptr);
         // TODO: This is controversial, lets make something in the near future that
@@ -483,8 +483,8 @@ namespace zlang {
         }
         if (initNode == nullptr) {
             TypeInfo ty = currentScope->lookupType(typeNode->value);
-            if (zlang::numeric_types.find(typeNode->value) !=
-                zlang::numeric_types.end()) {
+            if (zust::numeric_types.find(typeNode->value) !=
+                zust::numeric_types.end()) {
                 if (ty.isFloat) {
                     if (ty.bits == 32)
                         initNode =
@@ -664,4 +664,4 @@ namespace zlang {
             throw std::runtime_error("Scope underflow");
         currentScope = currentScope->parent();
     }
-}  // namespace zlang
+}  // namespace zust
