@@ -23,26 +23,59 @@ A lightweight statically typed programming language that compiles to **x86_64 Li
 ```
 zlang/
 ├── include/
+│   ├── common/
+│   │   ├── Colors.hpp
+│   │   ├── Errors.hpp
+│   │   ├── Logging.hpp
+│   │   └── StringUtils.hpp
+│   ├── support/
+│   │   ├── CommandLine.hpp
+│   │   └── File.hpp
+│   ├── ast/
+│   │   └── ASTNode.hpp
+│   ├── lexer/
+│   │   └── Lexer.hpp
 │   ├── parser/
-│   │   ├── ASTNode.hpp
 │   │   ├── Parser.hpp
-│   │   ├── ScopeContext.hpp
-│   │   └── Token.hpp
-│   ├── codegen/
-│   │   ├── CodegenLinux.hpp
-│   │   └── RegisterAllocator.hpp
-│   └── typechecker/
-│       └── TypeChecker.hpp
+│   │   └── ScopeContext.hpp
+│   ├── typechecker/
+│   │   └── TypeChecker.hpp
+│   └── codegen/
+│       ├── CodeGen.hpp  
+│       ├── Canaries.hpp
+│       └── RegisterAllocator.hpp
 ├── src/
+│   ├── common/
+│   │   ├── Logging.cpp
+│   │   └── StringUtils.cpp
+│   ├── support/
+│   │   ├── CommandLine.cpp
+│   │   └── File.cpp
+│   ├── ast/
+│   │   └── ASTNode.cpp
+│   ├── lexer/
+│   │   └── Lexer.cpp
 │   ├── parser/
+│   │   ├── ScopeContext.cpp
 │   │   └── Parser.cpp
-│   ├── codegen/
-│   │   └── CodegenLinux.cpp
-│   └── typechecker/
-│       └── TypeChecker.cpp
+│   ├── typechecker/
+│   │   └── TypeChecker.cpp
+│   └── codegen/
+│       ├── CodeGenWindows.cpp
+│       ├── CodeGenLinux.cpp
+│       ├── CodeGenLLVM.cpp
+│       └── RegisterAllocator.cpp
+├── tests/
+│   ├── zz/
+│   |   ├── [Various test categorized in folders]
+├── examples/
+│   ├── [current example we are working on]
 ├── main.cpp
-├── Makefile
+├── CMakeLists.txt
+├── test_runner.py
+├── LICENSE
 └── README.md
+
 ```
 
 ---
@@ -52,9 +85,11 @@ zlang/
 ### Prerequisites
 
 - Linux (x86_64)
-- `gnu` assembler
+- `gnu` (linux)
+- `ml64.exe` (windows)
+- `llc & clang` (LLVM)
 - `g++` or `clang++` compiler
-- `make` or `cmake` (for build automation)
+- `cmake`
 
 ### Build Instructions
 
@@ -74,20 +109,69 @@ make
 
 ## 🔧 Usage
 
+### On Linux when --format is x86_64-linux
+
+- **Compile**
+
 ```bash
-./zpiler <source_file.zz>
+./zpiler --format x86_64-linux -o out.asm <source_file.zz> 
 ```
 
-This will:
+    This will:
 
-1. Parse the input `.zz` file.
-2. Typecheck the AST.
-3. Generate `out.asm` containing x86_64 assembly.
-4. Assemble and link the code to produce an ELF executable.
+    1. Parse the input`.zz` file.
+      2. Typecheck the AST.
+      3. Generate `out.asm` containing x86_64 assembly.
+
+- **Assemble, Link and Run**
 
 ```bash
 as out.asm -o out.o
-ld out.o -o out
+gcc out.o -o out
+./out
+```
+
+### On Linux when --format is llvm-ir
+
+- **Compile**
+
+```bash
+./zpiler --format llvm-ir -o out.ll <source_file.zz> 
+```
+
+    This will:
+
+    1. Parse the input`.zz` file.
+      2. Typecheck the AST.
+      3. Generate `out.ll` containing LLVM IR.
+
+- **Assemble, Link and Run**
+
+```bash
+llc -filetype=obj -o out.ll <llvm_out_path>
+gcc out.o -o out -no-pie
+./out
+```
+
+### On Windows when --format is x86_64-windows
+
+- **Compile**
+
+```bash
+./zpiler --format x86_64-windows -o out.asm <source_file.zz> 
+```
+
+    This will:
+
+    1. Parse the input`.zz` file.
+      2. Typecheck the AST.
+      3. Generate `out.asm` containing x86_64 assembly.
+
+- **Assemble, Link and Run**
+
+```bash
+ml64 /nologo /c .\out.asm
+gcc out.o -o out
 ./out
 ```
 
@@ -96,21 +180,21 @@ ld out.o -o out
 ## 🧠 Example Program (zlang)
 
 ```zlang
-let x: integer = 10;
-let y: integer;
+extern fn printf(fmt: string, ...) -> int32_t;
 
-y = 13;
-x = 11;
+fn factorial(x: uint64_t) -> uint64_t{
+    fn multiply(x: uint64_t, y: uint64_t) -> uint64_t{
+        return x * y;
+    }
+    if(x <= 1){
+        return 1;
+    }else{
+        return multiply(x, factorial(x - 1));
+    }
+}
 
-let msg: string = "Hello World";
-let pi: double = 3.1415;
-let precision: float = 0.0001f;
-
-let a: uint32_t = 123;
-let b: float32_t = 12.3f;
-
-if (a > b + 10) {
-    // do something
+fn main() {
+    printf("Factorial of 10: %d\n", factorial(10));
 }
 ```
 
@@ -142,4 +226,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 **Mihir Patel**
 
 Feel free to reach out for contributions, discussions, or collaborations!
-
