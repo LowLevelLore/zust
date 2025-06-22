@@ -170,7 +170,7 @@ namespace zlang {
 
     FunctionScope::FunctionScope(std::string name,
                                  std::shared_ptr<ScopeContext> parent)
-        : ScopeContext(std::move(name), std::move(parent)), stackOffset_(-8) {}
+        : ScopeContext(std::move(name), std::move(parent)), stackOffset_(-16) {}
     FunctionScope::~FunctionScope() = default;
     std::int64_t FunctionScope::allocateStack(const std::string &varName,
                                               const TypeInfo &type) {
@@ -207,7 +207,7 @@ namespace zlang {
         case CodegenOutputFormat::X86_64_LINUX:
             return std::to_string(offset) + "(%rbp)";
         case CodegenOutputFormat::X86_64_MSWIN:
-            return "[rbp - " + std::to_string(stackOffset_ + offset) + "]";
+            return "[rbp - " + std::to_string(std::abs(stackOffset_ + offset)) + "]";
         default:
             return "";
         }
@@ -216,11 +216,36 @@ namespace zlang {
         return nextSpillOffset_;
     }
     void FunctionScope::freeSpillSlot(const std::string &slot, std::int64_t size) {
-        auto pos = slot.find('(');
-        if (pos == std::string::npos)
-            throw std::runtime_error("Invalid spill slot format: " + slot);
-        std::string offsetStr = slot.substr(1, pos - 1);  // skip '-'
-        std::int64_t offset = std::stoll(offsetStr);
+        std::int64_t offset = 0;
+        if (!slot.empty() && slot.front() == '[') {
+            auto close = slot.find(']');
+            if (close == std::string::npos)
+                throw std::runtime_error("Invalid MASM spill slot format: " + slot);
+
+            std::string inside = slot.substr(1, close - 1);
+            auto opPos = inside.find_first_of("+-", 3);
+            if (opPos == std::string::npos)
+                throw std::runtime_error("No offset operator in MASM spill slot: " + slot);
+
+            char op = inside[opPos];
+            std::string numStr = inside.substr(opPos + 1);
+            numStr.erase(0, numStr.find_first_not_of(" \t"));
+            numStr.erase(numStr.find_last_not_of(" \t") + 1);
+
+            offset = std::stoll(numStr);
+            if (op == '-') offset = -offset;
+        }
+        else {
+            // existing style: "(<offset>)", e.g. "-8(rbp)"
+            auto paren = slot.find('(');
+            if (paren == std::string::npos)
+                throw std::runtime_error("Invalid spill slot format: " + slot);
+
+            // e.g. slot = "-8(rbp)" → offsetStr = "-8"
+            std::string offsetStr = slot.substr(0, paren);
+            offset = std::stoll(offsetStr);
+        }
+
         freeSpillSlots_.emplace_back(offset, size);
     }
 

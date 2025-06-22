@@ -1,18 +1,17 @@
-extern fn printf(fmt: string, ...) -> int32_t;
-extern fn putchar(ch: int32_t) -> int32_t;
 
-fn get_factorial(a: uint32_t) -> uint64_t{
-    fn factorial(a: uint32_t) -> uint32_t{
-        if(a <= 1){
-            return 1;
-        }else{
-            return a * factorial(a - 1);
-        }
-    }
-    let ans: int32_t = factorial(a);
-    return ans;
+extern fn printf(fmt: string, ...) -> int32_t;
+
+let a: int64_t = 10;
+let f: float = 20.5;
+let u: uint8_t = 10;
+
+fn print_int(x: int64_t) -> none {
+    printf("%d\n", x);
 }
 
 fn main() {
-    printf("Factorial: %d\n", get_factorial(10));
+    if (a > 100) {
+        let res: int64_t = a * 2;
+        print_int(res);
+    }
 }

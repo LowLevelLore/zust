@@ -125,8 +125,8 @@ namespace zlang {
         std::int64_t allocateStack(const std::string &varName,
                                    const TypeInfo &type) override;
         std::int64_t getStackOffset() const;
-        void setCanary(std::uint64_t canary) {
-            this->canary = canary;
+        void setCanary(std::uint64_t canary_) {
+            this->canary = canary_;
         }
         std::uint64_t getCanary() {
             return this->canary;

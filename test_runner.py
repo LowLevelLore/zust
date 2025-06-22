@@ -28,14 +28,7 @@ TARGETS = {
         "zpiler_flag": "--format x86_64-mswin",
         "asm_ext": ".asm",
         "assemble": lambda asm, obj: ["ml64", "/nologo", "/c", asm],
-        "link": lambda obj, exe: [
-            "link",
-            "/nologo",
-            "/SUBSYSTEM:CONSOLE",
-            "/ENTRY:main",
-            "/OUT:" + exe,
-            obj,
-        ],
+        "link": lambda obj, exe: ["gcc", obj, "-o", exe],
     },
     "llvm": {
         "zpiler_flag": "--format llvm-ir",

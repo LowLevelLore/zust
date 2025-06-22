@@ -961,10 +961,6 @@ namespace zlang {
 
         std::vector<std::unique_ptr<ASTNode>> nestedFunctions;
 
-        // SysV argument register order
-        const auto &ARG_GPR_LINUX = alloc.availableArgumentRegs;     // {"rdi","rsi","rdx","rcx","r8","r9"}
-        const auto &ARG_XMM_LINUX = alloc.availableArgumentRegsXMM;  // {"xmm0","xmm1",...,"xmm7"}
-
         auto &params = fnInfo.paramTypes;
         size_t gpIdx = 0, xmmIdx = 0, stackArgOffset = 0;
 

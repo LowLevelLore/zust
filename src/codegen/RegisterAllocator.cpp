@@ -60,7 +60,6 @@ namespace zlang {
             if (freeXMM(getBaseReg(reg))) {
                 return;
             }
-            std::cout << "Free Normal" << std::endl;
             throw std::runtime_error("RegisterAllocator: attempted to free unallocated register '" + reg + "'");
         }
         inUse.erase(it);

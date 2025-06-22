@@ -29,5 +29,4 @@ fn main() {
         let res: int64_t = -1;
         print_int(res);
     }
-
 }

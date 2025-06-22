@@ -59,41 +59,43 @@ namespace zlang {
             std::string dstAdj = adjustReg(dst, toType.bits);
 
             if (toType.bits > fromType.bits) {
+                // widening
                 if (fromType.isSigned) {
+                    // signed → use movsxd for 32→64, movsx otherwise
                     if (fromType.bits == 32 && toType.bits == 64) {
                         out << "    movsxd " << dstAdj << ", " << srcAdj << "\n";
                     } else {
-                        out << "    movsx " << dstAdj << ", " << srcAdj << "\n";
+                        out << "    movsx  " << dstAdj << ", " << srcAdj << "\n";
                     }
                 } else {
+                    // unsigned → use movzx for width ≤ 16, plain mov for 32→64
                     if (fromType.bits == 8 || fromType.bits == 16) {
-                        out << "    movzx " << dstAdj << ", " << srcAdj << "\n";
+                        out << "    movzx  " << dstAdj << ", " << srcAdj << "\n";
                     } else if (fromType.bits == 32 && toType.bits == 64) {
-                        out << "    mov " << dstAdj << "d, " << srcAdj << "\n";
+                        out << "    mov    " << dstAdj << "d, " << srcAdj << "\n";
                     } else {
-                        throw std::runtime_error("Unsupported unsigned cast: " + std::to_string(fromType.bits) + " -> " + std::to_string(toType.bits));
+                        throw std::runtime_error(
+                            "Unsupported unsigned cast: " +
+                            std::to_string(fromType.bits) +
+                            " -> " +
+                            std::to_string(toType.bits)
+                        );
                     }
                 }
+
             } else if (toType.bits < fromType.bits) {
-                if (toType.bits == 8 || toType.bits == 16) {
-                    if (toType.isSigned) {
-                        out << "    movsx " << dstAdj << ", " << adjustReg(val, toType.bits) << "\n";
-                    } else {
-                        out << "    movzx " << dstAdj << ", " << adjustReg(val, toType.bits) << "\n";
-                    }
-                } else if (toType.bits == 32) {
-                    out << "    mov " << adjustReg(dstAdj, 32) << ", " << adjustReg(val, 32) << "\n";
-                } else {
-                    throw std::runtime_error("Unsupported downcast to " + std::to_string(toType.bits));
-                }
+                out << "    mov    " << dstAdj << ", " << adjustReg(val, toType.bits) << "\n";
+
             } else {
-                out << "    mov " << dstAdj << ", " << srcAdj << "\n";
+                // same size — plain mov
+                out << "    mov    " << dstAdj << ", " << srcAdj << "\n";
             }
 
             alloc.free(val);
             noteType(dst, toType);
             return dst;
         }
+
 
         throw std::runtime_error(
             "Unsupported cast from " +
@@ -165,11 +167,10 @@ namespace zlang {
 
     std::string CodeGenWindows::generateIntegerLiteral(std::unique_ptr<ASTNode> node, std::ostringstream &out) {
         TypeInfo ti = node->scope->lookupType("int64_t");
-        auto r = alloc.allocate();
         std::string adj = allocateOrSpill(false, node->scope, out);
         out << "    mov " << adj << ", " << node->value << "\n";
-        noteType(r, ti);
-        return r;
+        noteType(adj, ti);
+        return adj;
     }
 
     std::string CodeGenWindows::generateFloatLiteral(std::unique_ptr<ASTNode> node, std::ostringstream &out) {
@@ -196,20 +197,82 @@ namespace zlang {
         noteType(r_xmm, floatType);
         return r_xmm;
     }
-    std::string CodeGenWindows::generateStringLiteral(std::unique_ptr<ASTNode> node, std::ostringstream &out) {
+    std::string CodeGenWindows::generateStringLiteral(
+        std::unique_ptr<ASTNode> node,
+        std::ostringstream &out
+    ) {
+        // 1) Create a unique label
         std::string lbl = "Lstr" + std::to_string(stringLabelCount++);
-        std::string str = node->value;
-        outGlobalStream
-            << "    ALIGN 1\n"
-            << lbl << " db \"" << str << "\", 0\n";
+
+        // 2) Raw value from the AST (e.g. contains "\n", "\"", etc.)
+        const std::string &raw = node->value;
+
+        // 3) Split into printable chars and numeric bytes
+        std::string printable;
+        std::vector<unsigned char> nums;
+
+        for (size_t i = 0; i < raw.size(); ++i) {
+            if (raw[i] == '\\' && i + 1 < raw.size()) {
+                char esc = raw[++i];
+                switch (esc) {
+                    case 'n':  nums.push_back(0x0A); break;
+                    case 't':  nums.push_back(0x09); break;
+                    case '\\': printable.push_back('\\'); break;
+                    case '"':  printable.push_back('"');  break;
+                    case '0':  nums.push_back(0x00); break;
+                    default:
+                        // Unknown escape: emit literally
+                        printable.push_back('\\');
+                        printable.push_back(esc);
+                }
+            } else {
+                printable.push_back(raw[i]);
+            }
+        }
+        // Always null-terminate
+        nums.push_back(0x00);
+
+        // 4) Emit the data declaration
+        outGlobalStream << "    ALIGN 1\n";
+        outGlobalStream << lbl << " db ";
+
+        // Emit the quoted printable portion if non-empty
+        if (!printable.empty()) {
+            outGlobalStream << "\"";
+            for (unsigned char c : printable) {
+                if (c == '"')       outGlobalStream << "\"\"";   // MASM doubles quotes
+                else if (c == '\\') outGlobalStream << "\\\\"; // literal backslash
+                else                outGlobalStream << c;
+            }
+            outGlobalStream << "\"";
+
+            if (!nums.empty()) {
+                outGlobalStream << ",";
+            }
+        }
+
+        // Emit numeric bytes (e.g. 0Ah for newline, 00h for terminator)
+        for (size_t i = 0; i < nums.size(); ++i) {
+            unsigned int b = nums[i];
+            outGlobalStream
+                << std::uppercase
+                << std::hex
+                << "0" << b << "h"
+                << std::dec;
+            if (i + 1 < nums.size()) {
+                outGlobalStream << ",";
+            }
+        }
+        outGlobalStream << "\n\n";
+
+        // 5) Generate the code to load its address
         TypeInfo strType = node->scope->lookupType("string");
         std::string r = allocateOrSpill(false, node->scope, out);
-        out
-            << "    lea " << r << ", OFFSET " << lbl << "\n";
-
+        out << "    lea " << r << ", OFFSET " << lbl << "\n";
         noteType(r, strType);
         return r;
     }
+
     std::string CodeGenWindows::generateBooleanLiteral(std::unique_ptr<ASTNode> node, std::ostringstream &out) {
         TypeInfo boolType = node->scope->lookupType("boolean");
         std::string r = allocateOrSpill(false, node->scope, out);
@@ -353,25 +416,25 @@ namespace zlang {
 
         if (op == "+" || op == "-" || op == "*" || op == "/") {
             if (op == "+") {
-                out << "    add" << suf << " " << adj_l << ", " << adj_r << "\n";
+                out << "    add" << " " << adj_l << ", " << adj_r << "\n";
             } else if (op == "-") {
-                out << "    sub" << suf << " " << adj_l << ", " << adj_r << "\n";
+                out << "    sub" << " " << adj_l << ", " << adj_r << "\n";
             } else if (op == "*") {
-                out << "    imul" << suf << " " << adj_l << ", " << adj_r << "\n";
+                out << "    imul" << " " << adj_l << ", " << adj_r << "\n";
             } else {
                 // division
                 if (tr.isSigned) {
                     // signed: RDX:RAX ← RAX / src
-                    out << "    mov" << suf << " rax, " << adj_l << "\n"
+                    out << "    mov" << " rax, " << adj_l << "\n"
                         << "    cqo\n"  // sign‑extend RAX→RDX:RAX
-                        << "    idiv" << suf << " " << adj_r << "\n"
-                        << "    mov" << suf << " " << adj_l << ", rax\n";
+                        << "    idiv" << " " << adj_r << "\n"
+                        << "    mov" << " " << adj_l << ", rax\n";
                 } else {
                     // unsigned
-                    out << "    mov" << suf << " rax, " << adj_l << "\n"
+                    out << "    mov" << " rax, " << adj_l << "\n"
                         << "    xor rdx, rdx\n"
-                        << "    div" << suf << " " << adj_r << "\n"
-                        << "    mov" << suf << " " << adj_l << ", rax\n";
+                        << "    div" << " " << adj_r << "\n"
+                        << "    mov" << " " << adj_l << ", rax\n";
                 }
                 alloc.free(rr);
                 noteType(rl, tr);
@@ -385,7 +448,7 @@ namespace zlang {
 
         // 7. Integer comparison?
         if (assembly_comparison_operations.count(op)) {
-            std::string cmpInstr = "cmp" + std::string(1, suf);
+            std::string cmpInstr = "cmp";
             out << "    " << cmpInstr << " " << adj_l << ", " << adj_r << "\n"
                 << "    " << assembly_comparison_operations.at(op) << " al\n";
             TypeInfo boolType = node->scope->lookupType("boolean");
@@ -451,20 +514,16 @@ namespace zlang {
             int64_t off = std::abs(scp.getVariableOffset(varName));
             ptr = "[rbp - " + std::to_string(off) + "]";
         }
-
-        uint64_t sz = ti.bits / 8;
-        char suf = integer_suffixes.at(ti.bits);
-
         // Load variable
         std::string r = allocateOrSpill(false, node->scope, out);
         std::string adj = adjustReg(r, ti.bits);
-        out << "    mov" << suf << " " << adj << ", " << ptr << "\n";
+        out << "    mov" << " " << adj << ", " << ptr << "\n";
 
         // inc/dec
-        out << "    " << (op == "++" ? "inc" : "dec") << suf << " " << adj << "\n";
+        out << "    " << (op == "++" ? "inc" : "dec") << " " << adj << "\n";
 
         // store back
-        out << "    mov" << suf << " " << ptr << ", " << adj << "\n";
+        out << "    mov" << " " << ptr << ", " << adj << "\n";
 
         noteType(adj, ti);
         return adj;
@@ -492,6 +551,20 @@ namespace zlang {
         }
     }
 
+    std::string formatHex32(uint32_t value) {
+        std::ostringstream oss;
+        oss << std::hex << value;
+        std::string s = oss.str();
+        if (!s.empty()) {
+            char first = s[0];
+            if ((first >= 'a' && first <= 'f') || 
+                (first >= 'A' && first <= 'F')) {
+                s = "0" + s;
+            }
+        }
+        return s + "h";
+    }
+
     void CodeGenWindows::emitPrologue(std::shared_ptr<ScopeContext> scope, std::ostringstream &out) {
         if (scope->kind() != "Function")
             return;
@@ -504,47 +577,42 @@ namespace zlang {
         if (!funcScope)
             throw std::runtime_error("Expected FunctionScope for function prologue");
 
-        // compute sizes exactly as in Linux version
-        size_t regsCount = CALLEE_GPR_LINUX.size() + 2 * CALLEE_XMM_MSVC.size();
+        // Compute sizes
         std::uint64_t spillSize = std::abs(funcScope->getSpillSize());
         std::uint64_t localSize = std::abs(funcScope->getStackOffset());
         std::uint64_t rawSize = 8 + localSize + spillSize;
         std::uint64_t stackReserve = (rawSize + 15) & ~15ULL;
 
-        std::string canaryReg = allocateOrSpill(false, scope, out);
+        uint64_t canary = funcScope->getCanary();
+        uint32_t low = static_cast<uint32_t>(canary);
+        uint32_t high = static_cast<uint32_t>(canary >> 32);
 
-        // mov reg, imm64
-        out << std::hex
-            << "    mov     " << canaryReg
-            << ", 0x" << funcScope->getCanary()
-            << "    ; load canary\n"
-            << std::dec;
+        out << "    ; store canary as two 32-bit values\n";
+        out << "    mov     DWORD PTR [rbp-8], " << formatHex32(low) << "\n";
+        out << "    mov     DWORD PTR [rbp-4], " << formatHex32(high) << "\n";
 
-        // mov qword ptr [rbp-8], reg
-        out << "    mov     QWORD PTR [rbp-8], "
-            << canaryReg
-            << "    ; store canary\n";
-
-        alloc.free(canaryReg);
-
-        // --- reserve stack for locals + spills ---
+        // Reserve stack for locals + spills
         if (stackReserve > 0) {
             out << "    sub     rsp, "
                 << stackReserve
                 << "    ; reserve locals + spills\n";
         }
 
-        // --- save callee‐saved GPRs ---
+        // Save callee-saved GPRs
         for (auto &reg : CALLEE_GPR_MSVC) {
             out << "    push    " << reg
                 << "    ; save callee-saved GPR\n";
         }
-        for (auto &reg : CALLEE_XMM_MSVC) {
-            out << "    push    " << reg
-                << "    ; save callee-saved XMM\n";
+
+        // 🔑 Align stack after odd number of GPR pushes
+        if (CALLEE_GPR_MSVC.size() % 2 != 0) {
+            out << "    sub     rsp, 8    ; align stack\n";
         }
-        if (regsCount & 1) {
-            out << "    push   %" << CALLEE_XMM_MSVC.back() << "    # just for alignment\n";
+
+        // Save callee-saved XMMs
+        for (auto &reg : CALLEE_XMM_MSVC) {
+            out << "    sub     rsp, 16\n";
+            out << "    movdqu  [rsp], " << reg << "\n";
         }
     }
     void CodeGenWindows::emitEpilogue(std::shared_ptr<ScopeContext> scope, std::ostringstream &out, bool clearRax) {
@@ -557,65 +625,59 @@ namespace zlang {
         if (!funcScope)
             throw std::runtime_error("Expected FunctionScope for function epilogue");
 
-        size_t regsCount = CALLEE_GPR_LINUX.size() + 2 * CALLEE_XMM_MSVC.size();
+        // Compute sizes
         std::uint64_t spillSize = std::abs(funcScope->getSpillSize());
         std::uint64_t localSize = std::abs(funcScope->getStackOffset());
         std::uint64_t rawSize = 8 + localSize + spillSize;
         std::uint64_t stackReserve = (rawSize + 15) & ~15ULL;
 
-        // --- reload stored canary and compare ---
-        std::string regStored = allocateOrSpill(false, scope, out);
-        std::string regExpected = allocateOrSpill(false, scope, out);
+        // Canary check
+        uint64_t canary = funcScope->getCanary();
+        uint32_t low_expected = static_cast<uint32_t>(canary);
+        uint32_t high_expected = static_cast<uint32_t>(canary >> 32);
 
-        // mov regStored, qword ptr [rbp-8]
-        out << "    mov     " << regStored
-            << ", QWORD PTR [rbp-8]    ; load stored canary\n";
+        std::string reg = adjustReg(allocateOrSpill(false, scope, out), 32);
 
-        // mov regExpected, imm64
-        out << std::hex
-            << "    mov     " << regExpected
-            << ", 0x" << funcScope->getCanary()
-            << "    ; load expected canary\n"
-            << std::dec;
+        out << "    mov     " << reg << ", DWORD PTR [rbp-8]    ; load stored low\n";
+        out << "    cmp     " << reg << ", " << formatHex32(low_expected) << "\n";
+        out << "    jne     __stack_smash_detected\n";
 
-        // cmp regExpected, regStored
-        out << "    cmp     " << regExpected
-            << ", " << regStored
-            << "    ; compare canary\n";
+        out << "    mov     " << reg << ", DWORD PTR [rbp-4]    ; load stored high\n";
+        out << "    cmp     " << reg << ", " << formatHex32(high_expected) << "\n";
+        out << "    jne     __stack_smash_detected\n";
 
-        out << "    jne     __stack_smash_detected    ; abort on mismatch\n";
+        alloc.free(reg);
 
-        alloc.free(regStored);
-        alloc.free(regExpected);
+        // Restore XMM registers
+        for (auto it = CALLEE_XMM_MSVC.rbegin(); it != CALLEE_XMM_MSVC.rend(); ++it) {
+            out << "    movdqu  " << *it << ", [rsp]\n";
+            out << "    add     rsp, 16\n";
+        }
 
-        // --- unwind the stack frame ---
+        // 🔑 Undo stack alignment after GPR pushes
+        if (CALLEE_GPR_MSVC.size() % 2 != 0) {
+            out << "    add     rsp, 8    ; undo alignment\n";
+        }
+
+        // Restore callee-saved GPRs in reverse
+        for (auto it = CALLEE_GPR_MSVC.rbegin(); it != CALLEE_GPR_MSVC.rend(); ++it) {
+            out << "    pop     " << *it
+                << "    ; restore callee-saved GPR\n";
+        }
+
+        // Unwind stack frame
         if (stackReserve > 0) {
             out << "    add     rsp, "
                 << stackReserve
                 << "    ; free locals + spills\n";
         }
 
-        if (regsCount & 1) {
-            out << "    pop    %" << CALLEE_XMM_MSVC.back() << "    # pop alignment\n";
-        }
-
-        for (auto it = CALLEE_XMM_MSVC.rbegin(); it != CALLEE_XMM_MSVC.rend(); ++it) {
-            out << "    pop     " << *it
-                << "    ; restore callee-saved XMM\n";
-        }
-
-        // restore callee‐saved GPRs in reverse
-        for (auto it = CALLEE_GPR_MSVC.rbegin(); it != CALLEE_GPR_MSVC.rend(); ++it) {
-            out << "    pop     " << *it
-                << "    ; restore callee-saved GPR\n";
-        }
-
-        // zero RAX if required
+        // Zero RAX if required
         if (clearRax) {
             out << "    xor     rax, rax\n";
         }
 
-        // leave + ret
+        // Leave + ret
         out << "    leave    ; mov rsp, rbp & pop rbp\n";
         out << "    ret\n";
     }
@@ -687,12 +749,15 @@ namespace zlang {
         TypeInfo ti = scp.lookupType(scp.lookupVariable(name).type);
         uint64_t sz = ti.bits / 8;
 
+        // Evaluate RHS expression
         std::string r = emitExpression(std::move(statement->children.back()), out);
         restoreIfSpilled(r, statement->scope, out);
 
+        // Cast to the variable's type
         r = castValue(r, regType.at(r), ti, statement->scope, out);
         restoreIfSpilled(r, statement->scope, out);
 
+        // Determine memory operand
         std::string mem;
         if (scp.isGlobalVariable(name)) {
             mem = "[" + name + "]";
@@ -701,6 +766,7 @@ namespace zlang {
             mem = "[rbp - " + std::to_string(off) + "]";
         }
 
+        // Emit store based on size and type
         if (ti.isFloat) {
             if (sz == 4) {
                 out << "    movss DWORD PTR " << mem << ", " << r << "\n";
@@ -708,38 +774,61 @@ namespace zlang {
                 out << "    movsd QWORD PTR " << mem << ", " << r << "\n";
             }
         } else {
-            out << "    mov     qword ptr " << mem << ", " << r << "\n";
+            switch (sz) {
+                case 1:
+                    out << "    mov     BYTE PTR " << mem << ", " << r << "\n";
+                    break;
+                case 2:
+                    out << "    mov     WORD PTR " << mem << ", " << r << "\n";
+                    break;
+                case 4:
+                    out << "    mov     DWORD PTR " << mem << ", " << r << "\n";
+                    break;
+                case 8:
+                default:
+                    out << "    mov     QWORD PTR " << mem << ", " << r << "\n";
+                    break;
+            }
         }
 
         alloc.free(r);
     }
+
     void CodeGenWindows::generateVariableDeclaration(std::unique_ptr<ASTNode> statement, std::ostringstream &out) {
         auto &scp = *statement->scope;
         const std::string name = statement->value;
         TypeInfo ti = scp.lookupType(scp.lookupVariable(name).type);
         uint64_t sz = ti.bits / 8;  // bytes
 
-        auto memOperand = [&]() {
-            if (scp.isGlobalVariable(name)) {
-                return "[" + name + "]";
-            } else {
-                int64_t off = std::abs(scp.getVariableOffset(name));
-                return "[rbp - " + std::to_string(off) + "]";
-            }
-        }();
+        // Compute memory operand
+        std::string mem = scp.isGlobalVariable(name)
+            ? ("[" + name + "]")
+            : ("[rbp - " + std::to_string(std::abs(scp.getVariableOffset(name))) + "]");
 
+        // Lambda to emit store
         auto emitStore = [&](const std::string &r) {
             if (ti.isFloat) {
                 if (sz == 4) {
-                    out << "    movss DWORD PTR " << memOperand
-                        << ", " << r << "\n";
+                    out << "    movss DWORD PTR " << mem << ", " << r << "\n";
                 } else {
-                    out << "    movsd QWORD PTR " << memOperand
-                        << ", " << r << "\n";
+                    out << "    movsd QWORD PTR " << mem << ", " << r << "\n";
                 }
             } else {
-                out << "    mov     QWORD PTR " << memOperand
-                    << ", " << r << "\n";
+                switch (sz) {
+                    case 1:
+                        out << "    mov     BYTE PTR " << mem << ", " << adjustReg(r, sz*8) << "\n";
+                        break;
+                    case 2:
+                        out << "    mov     WORD PTR " << mem << ", " << adjustReg(r, sz*8) << "\n";
+                        break;
+                    case 4:
+                        out << "    mov     DWORD PTR " << mem << ", " << adjustReg(r, sz*8) << "\n";
+                        break;
+                    case 8:
+                    default:
+                        out << "    mov     QWORD PTR " << mem << ", " << adjustReg(r, sz*8) << "\n";
+                        break;
+                }
             }
         };
 
@@ -759,9 +848,23 @@ namespace zlang {
                 emitStore(r_xmm);
                 alloc.free(r_xmm);
             } else {
-                out << "    xor     rax, rax\n";
-                out << "    mov     QWORD PTR " << memOperand
-                    << ", rax\n";
+                // Zero-initialize integer of size sz
+                switch (sz) {
+                    case 1:
+                        out << "    mov     BYTE PTR " << mem << ", 0\n";
+                        break;
+                    case 2:
+                        out << "    mov     WORD PTR " << mem << ", 0\n";
+                        break;
+                    case 4:
+                        out << "    mov     DWORD PTR " << mem << ", 0\n";
+                        break;
+                    case 8:
+                    default:
+                        out << "    xor     rax, rax\n";
+                        out << "    mov     QWORD PTR " << mem << ", rax\n";
+                        break;
+                }
             }
         }
     }
@@ -841,7 +944,7 @@ namespace zlang {
         out << endLbl << ":\n\n";
     }
     void CodeGenWindows::generate(std::unique_ptr<ASTNode> program) {
-        std::vector<ASTNode *> globals;
+        std::vector<ASTNode*> globals;
 
         // collect globals
         for (auto &stmt : program->children) {
@@ -850,52 +953,51 @@ namespace zlang {
             }
         }
 
-        // --- .data section ---
-        outGlobalStream << "SECTION .data\n\n";
-        for (auto *g : globals) {
+        // --- .DATA segment (read-write globals) ---
+        outGlobalStream << ".data\n\n";
+        for (auto &g : globals)
+        {
             TypeInfo info = g->scope->lookupType(g->children[0]->value);
-            std::string name = g->value;
-            switch (info.bits / 8) {
+            switch (info.bits / 8)
+            {
             case 8:
-                outGlobalStream << name << " dq 0\n";
+                outGlobalStream << g->value << " QWORD 0\n";
                 break;
             case 4:
-                outGlobalStream << name << " dd 0\n";
+                outGlobalStream << g->value << " DWORD 0\n";
                 break;
             case 2:
-                outGlobalStream << name << " dw 0\n";
+                outGlobalStream << g->value << " WORD 0\n";
                 break;
             case 1:
-                outGlobalStream << name << " db 0\n";
+                outGlobalStream << g->value << " BYTE 0\n";
                 break;
             default:
                 throw std::runtime_error("Unsupported global size");
             }
         }
 
-        // --- .rdata for read‑only literals (if any) ---
-        outGlobalStream << "\nSECTION .rdata\n\n";
+        outGlobalStream << "\n.const\n";
+        
+        // --- .CODE segment ---
+        outStream << ".code\n";
 
-        // --- code section ---
-        outStream << "SECTION .text\n";
-        outStream << "EXTERN __stack_smash_detected:PROC\n";
-        outStream << "PUBLIC main\n\n";
-
-        // emit stack‑smash handler
+        // emit stack-smash handler (define only, no EXTERN)
         outStream << "__stack_smash_detected PROC\n"
-                  << "    mov     rax, 60       ; syscall: exit\n"
-                  << "    mov     rdi, 69       ; exit code\n"
-                  << "    syscall\n"
-                  << "    ret\n"
-                  << "__stack_smash_detected ENDP\n\n";
+                << "    mov     rax, 60       ; syscall: exit\n"
+                << "    mov     rdi, 69       ; exit code\n"
+                << "    syscall\n"
+                << "    ret\n"
+                << "__stack_smash_detected ENDP\n\n";
 
-        // collect main and top‑level init statements
+        // collect main and top-level init statements
         std::unique_ptr<ASTNode> mainFn;
         std::vector<std::unique_ptr<ASTNode>> initStmts;
         for (auto &stmt : program->children) {
             if (stmt->type == NodeType::Function && stmt->value == "main") {
                 mainFn = std::move(stmt);
-            } else if (stmt->type == NodeType::VariableDeclaration || stmt->type == NodeType::VariableReassignment || (stmt->type == NodeType::UnaryOp && (stmt->value == "++" || stmt->value == "--"))) {
+            } else if (stmt->type == NodeType::VariableDeclaration || stmt->type == NodeType::VariableReassignment
+                    || (stmt->type == NodeType::UnaryOp && (stmt->value == "++" || stmt->value == "--"))) {
                 initStmts.push_back(std::move(stmt));
             } else {
                 generateStatement(std::move(stmt), outStream);
@@ -907,15 +1009,17 @@ namespace zlang {
         for (auto &s : initStmts) {
             generateStatement(std::move(s), outStream);
         }
-        // force emit main body (prologue+body+epilogue)
         generateFunctionDeclaration(std::move(mainFn), outStream, /*force=*/true);
+        outStream << "    ret\n";
         outStream << "main ENDP\n\n";
 
-        // finalize
+        // finalize with END directive
         outfinal << outGlobalStream.str()
-                 << "\n; ============== Globals End Here ==============\n\n"
-                 << outStream.str();
+                << "; ============== Globals End Here ==============\n\n"
+                << outStream.str()
+                << "\nEND\n";
     }
+
     std::string CodeGenWindows::generateFunctionCall(std::unique_ptr<ASTNode> node, std::ostringstream &out) {
         // 1) Lookup target and args
         auto fnInfo = node->scope->lookupFunction(node->value);
@@ -952,10 +1056,10 @@ namespace zlang {
         uint64_t gpCount = 0, xmmCount = 0, stackOff = 0;
         for (size_t i = 0; i < args.size(); ++i) {
             bool isFloat = (i < params.size())
-                               ? node->scope->lookupType(params[i].type).isFloat
-                               : (fnInfo.isVariadic ? false
+                            ? node->scope->lookupType(params[i].type).isFloat
+                            : (fnInfo.isVariadic ? false
                                                     : throw std::runtime_error(
-                                                          "Too many args"));
+                                                        "Too many args"));
             if (!isFloat) {
                 if (gpCount < ARG_GPR_MSVC.size())
                     gpCount++;
@@ -974,6 +1078,8 @@ namespace zlang {
                 << "    ; reserve arg stack\n";
         }
 
+        std::vector<std::pair<int, std::string>> shadowDuplicates;
+
         // 5) Materialize arguments
         gpCount = xmmCount = stackOff = 0;
         std::vector<std::string> reservedArgs;
@@ -988,10 +1094,10 @@ namespace zlang {
                 (i < params.size())
                     ? node->scope->lookupType(params[i].type)
                     : (fnInfo.isVariadic
-                           ? (passed.isFloat
-                                  ? node->scope->lookupType("double")
-                                  : node->scope->lookupType("int64_t"))
-                           : throw std::runtime_error("Too many args"));
+                        ? (passed.isFloat
+                                ? node->scope->lookupType("double")
+                                : node->scope->lookupType("int64_t"))
+                        : throw std::runtime_error("Too many args"));
             std::string cvt = castValue(src, passed, expect, node->scope, out);
             restoreIfSpilled(cvt, node->scope, out);
 
@@ -1010,6 +1116,7 @@ namespace zlang {
                         << ", " << dst
                         << "    ; spill arg GPR\n";
                 } else {
+                    dst = alloc.allocateArgument(gpCount);
                     reservedArgs.push_back(dst);
                 }
                 out << "    mov     " << dst
@@ -1031,11 +1138,21 @@ namespace zlang {
                         << ", XMMWORD PTR " << slot
                         << "    ; spill arg XMM\n";
                 } else {
+                    dst = alloc.allocateArgumentXMM(xmmCount);
                     reservedArgs.push_back(dst);
                 }
-                out << "    movsd   " << dst
-                    << ", " << cvt
-                    << "\n";
+
+                out << "    movsd   " << dst << ", " << cvt << "\n";
+
+                // CORRECTED: Use argument index (i) instead of xmmCount
+                if (fnInfo.isVariadic && i < 4) {
+                    static const std::vector<std::string> VARIADIC_FLOAT_GPRS = { "rcx", "rdx", "r8", "r9" };
+                    std::string gprDst = VARIADIC_FLOAT_GPRS[i];
+                    out << "    movq    " << gprDst << ", " << dst << "    ; duplicate variadic float to GPR\n";
+                    // Record for shadow space duplication
+                    shadowDuplicates.push_back({8 * static_cast<int>(i), dst});
+                }
+
                 xmmCount++;
             }
             // stack‐overflow args
@@ -1054,8 +1171,11 @@ namespace zlang {
                 << "    ; variadic float count\n";
         }
 
-        // 7) Call!
+        // CORRECTED: Calculate proper stack alignment (32+8=40)
+        uint64_t shadowAndAlign = 32;
+        out << "    sub     rsp, " << shadowAndAlign << "      ; 🔑 Allocate shadow space + alignment\n";
         out << "    call    " << label << "\n";
+        out << "    add     rsp, " << shadowAndAlign << "      ; 🔑 Cleanup shadow space + alignment\n";
 
         // 8) Restore spilled argument regs
         for (auto &r : spilledArgs) {
@@ -1090,7 +1210,7 @@ namespace zlang {
         if (isFltRet) {
             const char *mov = (fnInfo.returnType == "float" ? "movss" : "movsd");
             out << "    " << mov << " " << holder
-                << ", " << "xmm0\n";
+                << ", xmm0\n";
         } else {
             out << "    mov     " << holder
                 << ", rax\n";
@@ -1098,7 +1218,8 @@ namespace zlang {
 
         return holder;
     }
-    void CodeGenWindows::generateFunctionDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out, bool force) {
+    
+    void CodeGenWindows::generateFunctionDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out, bool force) {        
         if (node->value == "main" && !force)
             return;
 
@@ -1111,8 +1232,8 @@ namespace zlang {
         if (!funcScope)
             throw std::runtime_error("Expected FunctionScope for function declaration");
 
-        // Label as PROC
-        out << fnInfo.label << " PROC\n";
+        if(!force)
+            out << fnInfo.label << " PROC\n";
 
         // Generate parameter moves into locals ([rbp - offset])
         // Windows registers: RCX, RDX, R8, R9; XMM0–XMM3
@@ -1144,7 +1265,7 @@ namespace zlang {
             } else if (isFlt && xmmIdx < ARG_XMM_MS.size()) {
                 // xmm reg → local slot
                 paramInit
-                    << "    " << movInst
+                    << "    " << "movdqu"
                     << " XMMWORD PTR [rbp-" << slotOff << "], "
                     << ARG_XMM_MS[xmmIdx++] << "\n";
             } else {
@@ -1161,6 +1282,11 @@ namespace zlang {
             }
         }
 
+        // Setup canary and stack frame
+        std::ostringstream prologue;
+        std::uint64_t canary = CanaryGenerator::generate();
+        funcScope->setCanary(canary);
+
         // Generate the actual function body
         std::vector<std::unique_ptr<ASTNode>> nestedFns;
         for (auto &stmt : bodyNode->children) {
@@ -1171,10 +1297,7 @@ namespace zlang {
             }
         }
 
-        // Setup canary and stack frame
-        std::ostringstream prologue;
-        std::uint64_t canary = CanaryGenerator::generate();
-        funcScope->setCanary(canary);
+
         emitPrologue(funcScope, prologue);
 
         // If void return, emit epilogue after body
@@ -1197,9 +1320,13 @@ namespace zlang {
         }
 
         // End PROC
+        if(!force)
         out << fnInfo.label << " ENDP\n\n";
     }
     void CodeGenWindows::generateExternFunctionDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out) {
+        auto fnInfo = node->scope->lookupFunction(node->value);
+        const std::string &label = node->value;
+        outGlobalStream << "EXTERN  " << label << ":FAR\n";
     }
     void CodeGenWindows::generateReturnstatement(std::unique_ptr<ASTNode> node, std::ostringstream &out) {
         std::string result = emitExpression(std::move(node->children[0]), out);
@@ -1227,8 +1354,7 @@ namespace zlang {
             const char *mov = (expected.bits == 32 ? "movss" : "movsd");
             out << "    " << mov << " xmm0, " << casted << "\n";
         }
-
         alloc.free(casted);
-        emitEpilogue(funcScope, out, /*clearRax=*/false);
+        emitEpilogue(funcScope, out);
     }
 }  // namespace zlang
