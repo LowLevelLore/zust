@@ -7,8 +7,13 @@ let other: boolean = false;
 let s: string = "hello";
 let a: string;
 
-let x1: int64_t = 10;
-x = 20;
+extern fn printf(fmt: string, ...) -> int32_t;
 
-let f1: float = 1.5f;
-f = 2.5f;
+fn main(){
+    s = "It is what it is";
+    printf(s);
+    let x1: int64_t = 10;
+    x = 20;
+    let f1: float = 1.5f;
+    f = 2.5f;
+}

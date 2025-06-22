@@ -1,4 +1,22 @@
-// Integer + Integer
+// Arithmetic and Comparison test
+extern fn printf(fmt: string, ...) -> int32_t;
+
+fn print_int(x: int64_t) -> none {
+    printf("%d\n", x);
+}
+
+fn print_float(x: float) -> none {
+    printf("%f\n", x);
+}
+
+fn print_bool(x: boolean) -> none {
+    if(x == 1){
+        printf("true\n");
+    }else{
+        printf("false\n");
+    }
+}
+
 let a: int64_t = 10;
 let b: int64_t = 20;
 let sum_i: int64_t = a + b;
@@ -6,14 +24,12 @@ let diff_i: int64_t = a - b;
 let prod_i: int64_t = a * b;
 let div_i: int64_t = b / a;
 
-// Integer + Float (promote to float)
 let c: float = 2.5;
 let sum_if: float = a + c;
 let diff_if: float = c - a;
 let prod_if: float = a * c;
 let div_if: float = a / c;
 
-// Float + Float
 let d: double = 3.1415;
 let e: double = 2.718;
 let sum_f: double = d + e;
@@ -21,12 +37,10 @@ let diff_f: double = d - e;
 let prod_f: double = d * e;
 let div_f: double = d / e;
 
-// Unsigned + Signed
 let ua: uint8_t = 5;
 let sb: int8_t = -2;
 let sum_us: int16_t = ua + sb;
 
-// Comparisons int
 let cmp_lt: boolean = a < b;
 let cmp_le: boolean = a <= b;
 let cmp_gt: boolean = a > b;
@@ -34,15 +48,46 @@ let cmp_ge: boolean = a >= b;
 let cmp_eq: boolean = a == b;
 let cmp_ne: boolean = a != b;
 
-// Comparisons float
 let cmpf_lt: boolean = d < e;
 let cmpf_eq: boolean = d == e;
 
-// Mixed Comparison
 let cmpmix: boolean = a < d;
 
-// Comparison boolean (only ==, != valid)
 let ba: boolean = true;
 let bb: boolean = false;
 let cmpb_eq: boolean = ba == bb;
 let cmpb_ne: boolean = ba != bb;
+
+fn main() {
+    print_int(sum_i);     // 30
+    print_int(diff_i);    // -10
+    print_int(prod_i);    // 200
+    print_int(div_i);     // 2
+
+    print_float(sum_if);   // 12.5
+    print_float(diff_if);  // -7.5
+    print_float(prod_if);  // 25.0
+    print_float(div_if);   // 4.0
+
+    print_float(sum_f);   // 5.8595
+    print_float(diff_f);  // 0.4235
+    print_float(prod_f);  // 8.5392257
+    print_float(div_f);   // 1.1557276
+
+    print_int(sum_us);    // 3
+
+    print_bool(cmp_lt);   // true
+    print_bool(cmp_le);   // true
+    print_bool(cmp_gt);   // false
+    print_bool(cmp_ge);   // false
+    print_bool(cmp_eq);   // false
+    print_bool(cmp_ne);   // true
+
+    print_bool(cmpf_lt);  // false
+    print_bool(cmpf_eq);  // false
+
+    print_bool(cmpmix);   // true
+
+    print_bool(cmpb_eq);  // false
+    print_bool(cmpb_ne);  // true
+}

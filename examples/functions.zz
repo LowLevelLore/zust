@@ -1,0 +1,17 @@
+
+extern fn printf(fmt: string, ...) -> int32_t;
+
+let a: int64_t = 10;
+let f: float = 20.5;
+let u: uint8_t = 10;
+
+fn print_int(x: int64_t) -> none {
+    printf("%d\n", x);
+}
+
+fn main() {
+    if (a > 100) {
+        let res: int64_t = a * 2;
+        print_int(res);
+    }
+}

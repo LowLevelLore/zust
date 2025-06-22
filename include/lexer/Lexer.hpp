@@ -1,14 +1,12 @@
 #pragma once
 #include <string>
 #include <vector>
+
 #include "../common/Errors.hpp"
 
-namespace zlang
-{
-    struct Token
-    {
-        enum class Kind
-        {
+namespace zlang {
+    struct Token {
+        enum class Kind {
             Let,
             Identifier,
             Colon,
@@ -17,15 +15,20 @@ namespace zlang
             StringLiteral,
             BoolLiteral,
             Symbol,
-            Keyword,
+            Comma,
+            Arrow,
             EndOfFile,
             SemiColon,
             Equal,
+            Return,
+            Dot,
+            Ellipsis,
             If,
             ElseIf,
             Else,
             LeftBrace,
             RightBrace,
+            Function,
             LeftParen,
             RightParen,
             Unknown
@@ -35,8 +38,7 @@ namespace zlang
         size_t line;
         size_t column;
 
-        std::string to_string() const
-        {
+        std::string to_string() const {
             return "Token { kind = " + kindToString(kind) +
                    ", text = \"" + text +
                    "\", line = " + std::to_string(line) +
@@ -44,10 +46,8 @@ namespace zlang
         }
 
     private:
-        static std::string kindToString(Kind k)
-        {
-            switch (k)
-            {
+        static std::string kindToString(Kind k) {
+            switch (k) {
             case Kind::Equal:
                 return "Equal";
             case Kind::Colon:
@@ -64,8 +64,6 @@ namespace zlang
                 return "StringLiteral";
             case Kind::Symbol:
                 return "Symbol";
-            case Kind::Keyword:
-                return "Keyword";
             case Kind::EndOfFile:
                 return "EndOfFile";
             case Kind::SemiColon:
@@ -88,18 +86,28 @@ namespace zlang
                 return "RightParen";
             case Kind::LeftParen:
                 return "LeftParen";
+            case Kind::Arrow:
+                return "Arrow";
+            case Kind::Comma:
+                return "Comma";
+            case Kind::Function:
+                return "Function";
+            case Kind::Return:
+                return "Return";
+            case Kind::Dot:
+                return "Dot";
+            case Kind::Ellipsis:
+                return "Ellipsis";
             }
             return "Invalid";
         }
     };
 
-    inline std::ostream &operator<<(std::ostream &os, const Token &token)
-    {
+    inline std::ostream &operator<<(std::ostream &os, const Token &token) {
         return os << token.to_string();
     }
     using Error = zlang::Error;
-    class Lexer
-    {
+    class Lexer {
     public:
         explicit Lexer(const std::string &source);
 
@@ -122,4 +130,4 @@ namespace zlang
         Token scanSymbol();
     };
 
-} // namespace zlang
+}  // namespace zlang

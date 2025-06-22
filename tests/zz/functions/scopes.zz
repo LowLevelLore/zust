@@ -1,0 +1,39 @@
+extern fn printf(fmt: string, ...) -> int32_t;
+
+fn print_int(x: int64_t) -> none {
+    printf("%d\n", x);
+}
+
+fn print_float(x: float) -> none {
+    printf("%f\n", x);
+}
+
+fn print_bool(x: boolean) -> none {
+    if(x == 1){
+        printf("true\n");
+    }else{
+        printf("false\n");
+    }
+}
+
+fn increment(n: int64_t) -> int64_t {
+    let res: int64_t = n + 1;
+    return res;
+}
+
+fn double(n: int64_t) -> int64_t {
+    return n * 2;
+}
+
+fn process(n: int64_t) -> int64_t {
+    let step1: int64_t = increment(n);   // n + 1
+    let step2: int64_t = double(step1);  // (n + 1) * 2
+    return step2;
+}
+
+fn main() {
+    let input: int64_t = 10;
+    let result: int64_t = process(input);  // (10 + 1) * 2 = 22
+
+    print_int(result);
+}

@@ -1,18 +1,42 @@
+extern fn printf(fmt: string, ...) -> int32_t;
+
+fn print_int(x: int64_t) -> none {
+    printf("%d\n", x);
+}
+
+fn print_bool(x: boolean) -> none {
+    if(x == 1){
+        printf("%d\n", 1);
+    }else{
+        printf("%d\n", 0);
+    }
+}
+
 let x: int64_t = 5;
-++x;
---x;
+++x;        // x = 6
+--x;        // x = 5
 
 let y: uint8_t = 255;
-++y;
---y;
+++y;        // y = 0 (wrap-around)
+--y;        // y = 255
 
 let z: size_t = 100;
-++z;
---z;
+++z;        // z = 101
+--z;        // z = 100
 
-// Logical NOT on boolean
 let b1: boolean = true;
 let nb1: boolean = !b1;
 
 let b2: boolean = false;
 let nb2: boolean = !b2;
+
+fn main() {
+    print_int(x);    // 5
+    print_int(y);    // 255
+    print_int(z);    // 100
+
+    print_bool(nb1); // false
+    print_bool(nb2); // true
+}
+
+

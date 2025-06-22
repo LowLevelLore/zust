@@ -22,27 +22,19 @@ TARGETS = {
         "zpiler_flag": "--format x86_64-linux",
         "asm_ext": ".s",
         "assemble": lambda asm, obj: ["as", asm, "-o", obj],
-        "link": lambda obj, exe: ["ld", obj, "-o", exe],
+        "link": lambda obj, exe: ["gcc", obj, "-o", exe],
     },
     "windows": {
         "zpiler_flag": "--format x86_64-mswin",
         "asm_ext": ".asm",
-        # Produce obj in cwd, move manually
         "assemble": lambda asm, obj: ["ml64", "/nologo", "/c", asm],
-        "link": lambda obj, exe: [
-            "link",
-            "/nologo",
-            "/SUBSYSTEM:CONSOLE",
-            "/ENTRY:main",
-            "/OUT:" + exe,
-            obj,
-        ],
+        "link": lambda obj, exe: ["gcc", obj, "-o", exe],
     },
     "llvm": {
         "zpiler_flag": "--format llvm-ir",
         "asm_ext": ".ll",
         "assemble": lambda ir, obj: ["llc", "-filetype=obj", ir, "-o", obj],
-        "link": lambda obj, exe: ["clang", obj, "-o", exe, "-no-pie"],
+        "link": lambda obj, exe: ["gcc", obj, "-o", exe, "-no-pie"],
     },
 }
 

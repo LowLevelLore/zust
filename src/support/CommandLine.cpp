@@ -1,154 +1,118 @@
 #include "support/CommandLine.hpp"
 
-#include <iostream>
 #include <cstring>
+#include <iostream>
 
-namespace zlang
-{
+namespace zlang {
 
-    CommandLine::CommandLine(int argc, char *argv[])
-    {
+    CommandLine::CommandLine(int argc, char *argv[]) {
         parseArgs(argc, argv);
     }
 
-    bool CommandLine::printAST() const noexcept
-    {
+    bool CommandLine::printAST() const noexcept {
         return printAST_;
     }
 
-    void CommandLine::parseArgs(int argc, char *argv[])
-    {
-        for (int i = 1; i < argc; ++i)
-        {
+    void CommandLine::parseArgs(int argc, char *argv[]) {
+        for (int i = 1; i < argc; ++i) {
             const char *arg = argv[i];
 
-            if (std::strcmp(arg, "-h") == 0 || std::strcmp(arg, "--help") == 0)
-            {
+            if (std::strcmp(arg, "-h") == 0 || std::strcmp(arg, "--help") == 0) {
                 helpFlag = true;
-                return; // no need to parse further
+                return;  // no need to parse further
             }
-            if (std::strcmp(arg, "-p") == 0 || std::strcmp(arg, "--printAST") == 0)
-            {
+            if (std::strcmp(arg, "-p") == 0 || std::strcmp(arg, "--printAST") == 0) {
                 printAST_ = true;
-                return; // no need to parse further
-            }
-            else if (std::strcmp(arg, "--formats") == 0)
-            {
+            } else if (std::strcmp(arg, "--formats") == 0) {
                 formatsFlag = true;
                 return;
-            }
-            else if (std::strcmp(arg, "-v") == 0 || std::strcmp(arg, "--verbose") == 0)
-            {
+            } else if (std::strcmp(arg, "-v") == 0 || std::strcmp(arg, "--verbose") == 0) {
                 verbosity = 1;
-            }
-            else if (std::strcmp(arg, "-o") == 0 || std::strcmp(arg, "--output") == 0)
-            {
-                if (++i >= argc)
-                {
+            } else if (std::strcmp(arg, "-o") == 0 || std::strcmp(arg, "--output") == 0) {
+                if (++i >= argc) {
                     errorFlag = true;
-                    error.message = "Expected filepath after output command line argument";
-                    return;
-                }
-                if (argv[i][0] == '-')
-                {
-                    errorFlag = true;
-                    error.message = std::string("Expected filepath after output argument, got: ") + argv[i];
+                    error.message = "Expected filepath after " + std::string(arg);
                     return;
                 }
                 outputFile = argv[i];
-            }
-            else if (std::strcmp(arg, "-f") == 0 || std::strcmp(arg, "--format") == 0)
-            {
-                if (++i >= argc)
-                {
+            } else if (std::strcmp(arg, "-f") == 0 || std::strcmp(arg, "--format") == 0) {
+                if (++i >= argc) {
                     errorFlag = true;
                     error.message = "Expected format after format command line argument";
                     return;
                 }
-                if (argv[i][0] == '-')
-                {
+                if (argv[i][0] == '-') {
                     errorFlag = true;
                     error.message = std::string("Expected format after format argument, got: ") + argv[i];
                     return;
                 }
                 std::string fmt = argv[i];
-                if (fmt == "default")
-                {
+                if (fmt == "default") {
                     format = CodegenOutputFormat::Default;
-                }
-                else if (fmt == "x86_64-mswin")
-                {
+                } else if (fmt == "x86_64-mswin") {
                     format = CodegenOutputFormat::X86_64_MSWIN;
-                }
-                else if (fmt == "x86_64-linux")
-                {
+                } else if (fmt == "x86_64-linux") {
                     format = CodegenOutputFormat::X86_64_LINUX;
-                }
-                else if (fmt == "llvm-ir")
-                {
+                } else if (fmt == "llvm-ir") {
                     format = CodegenOutputFormat::LLVM_IR;
-                }
-                else
-                {
+                } else {
                     errorFlag = true;
                     error.message = "Unrecognized format: " + fmt;
                     return;
                 }
-            }
-            else
-            {
+            } else {
                 // treat as input file
-                if (!inputFile.empty())
-                {
+                if (!inputFile.empty()) {
                     std::cerr << "Warning: Multiple input files detected; using the last one: " << arg << "\n";
                 }
                 inputFile = arg;
             }
         }
+        if (helpFlag && !formatsFlag) {
+            return;
+        }
+        if (formatsFlag) {
+            return;
+        }
+        if (inputFile.empty() && !helpFlag && !formatsFlag) {
+            errorFlag = true;
+            error.message = "No input file specified";
+        }
     }
 
-    bool CommandLine::hasError() const noexcept
-    {
+    bool CommandLine::hasError() const noexcept {
         return errorFlag;
     }
 
-    const CliError &CommandLine::getError() const noexcept
-    {
+    const CliError &CommandLine::getError() const noexcept {
         return error;
     }
 
-    bool CommandLine::showHelp() const noexcept
-    {
+    bool CommandLine::showHelp() const noexcept {
         return helpFlag;
     }
 
-    bool CommandLine::showFormats() const noexcept
-    {
+    bool CommandLine::showFormats() const noexcept {
         return formatsFlag;
     }
 
-    std::string CommandLine::getInputFile() const noexcept
-    {
+    std::string CommandLine::getInputFile() const noexcept {
         return inputFile;
     }
 
-    std::string CommandLine::getOutputFile() const noexcept
-    {
+    std::string CommandLine::getOutputFile() const noexcept {
         return outputFile;
     }
 
-    CodegenOutputFormat CommandLine::getFormat() const noexcept
-    {
+    CodegenOutputFormat CommandLine::getFormat() const noexcept {
         return format;
     }
 
-    int CommandLine::getVerbosity() const noexcept
-    {
+    int CommandLine::getVerbosity() const noexcept {
         return verbosity;
     }
 
-    void CommandLine::printUsage(const std::string &programName)
-    {
+    void CommandLine::printUsage(const std::string &programName) {
         std::cout << "\nUSAGE: " << programName << " [FLAGS] [OPTIONS] <path to file to compile>\n"
                   << "Flags:\n"
                   << "   `-h`, `--help`    :: Show this help and usage information.\n"
@@ -160,12 +124,11 @@ namespace zlang
                   << "Anything else is treated as the input file path.\n";
     }
 
-    void CommandLine::printFormats()
-    {
+    void CommandLine::printFormats() {
         std::cout << "Acceptable formats include:\n"
                   << " -> default\n"
                   << " -> x86_64-mswin\n"
                   << " -> x86_64-linux\n";
     }
 
-} // namespace zlang
+}  // namespace zlang

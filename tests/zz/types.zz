@@ -1,0 +1,24 @@
+// Arithmetic and Comparison test
+extern fn printf(fmt: string, ...) -> int32_t;
+
+fn print_int(x: int64_t) -> none {
+    printf("%d\n", x);
+}
+
+fn print_float(x: float) -> none {
+    printf("%f\n", x);
+}
+
+fn print_bool(x: boolean) -> none {
+    if(x == 1){
+        printf("true\n");
+    }else{
+        printf("false\n");
+    }
+}
+
+fn main() {
+    let x: uint8_t = 255;
+    x++;
+    print_int(x);
+}
