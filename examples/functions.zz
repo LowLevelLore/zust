@@ -7,7 +7,7 @@ fn factorial(x: uint64_t) -> uint64_t{
     if(x <= 1){
         return 1;
     }else{
-        return multiply(x, factorial(x - 1));
+        return multiply(x, factorial(x-1));
     }
 }
 

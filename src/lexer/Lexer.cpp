@@ -63,7 +63,7 @@ namespace zust {
         if (std::isalpha(static_cast<unsigned char>(c)) || c == '_')
             return scanIdentifierOrKeywordOrConditional();
 
-        if (std::isdigit(static_cast<unsigned char>(c)) || (c == '-' && std::isdigit((unsigned char)peekChar(1))))
+        if (std::isdigit(static_cast<unsigned char>(c)))
             return scanNumber();
 
         if (c == '"')
@@ -119,9 +119,6 @@ namespace zust {
         size_t startCol = column_;
         std::string text;
         bool seenDot = false;
-        if (peekChar() == '-' and isdigit(peekChar(1))) {
-            text.push_back(advance());
-        }
         while (std::isdigit(static_cast<unsigned char>(peekChar())) || (!seenDot && peekChar() == '.')) {
             if (peekChar() == '.')
                 seenDot = true;
