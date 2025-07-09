@@ -23,24 +23,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-build-
 
-      # Cache pip download cache
-      - name: Cache pip
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
       - name: Install System Dependencies
         run: |
           sudo apt-get update -y
           sudo apt-get install -y build-essential llvm clang cmake python3-pip
-
-      - name: Install Python Dependencies
-        run: |
-          python3 -m pip install --upgrade pip
-          pip install -r requirements.txt
 
       - name: Build zpiler
         run: |
@@ -81,11 +67,6 @@ jobs:
 
       - name: Install CMake
         run: choco install --no-progress -y cmake
-
-      - name: Install Python Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
 
       - name: Build zpiler
         shell: cmd
