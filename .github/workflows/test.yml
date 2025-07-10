@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
     branches: [main]
 
@@ -14,14 +14,16 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      # Cache the CMake build outputs
       - name: Cache build directory
         uses: actions/cache@v4
         with:
-          path: |
-            build
-          key: linux-build-${{ hashFiles('CMakeLists.txt', 'src/**') }}
+          path: build
+          key: ${{ runner.os }}-build-${{ hashFiles('CMakeLists.txt', 'src/**') }}
+          restore-keys: |
+            ${{ runner.os }}-build-
 
-      - name: Install Dependencies
+      - name: Install System Dependencies
         run: |
           sudo apt-get update -y
           sudo apt-get install -y build-essential llvm clang cmake python3-pip
@@ -42,12 +44,23 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      # Cache the CMake build outputs
       - name: Cache build directory
         uses: actions/cache@v4
         with:
-          path: |
-            build
-          key: windows-build-${{ hashFiles('CMakeLists.txt', 'src/**') }}
+          path: build
+          key: ${{ runner.os }}-build-${{ hashFiles('CMakeLists.txt', 'src/**') }}
+          restore-keys: |
+            ${{ runner.os }}-build-
+
+      # Cache pip download cache on Windows
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: C:\Users\runneradmin\AppData\Local\pip\Cache
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
 
       - name: Setup MSVC Developer Command Prompt
         uses: ilammy/msvc-dev-cmd@v1

@@ -180,7 +180,7 @@ namespace zust {
 
     void Parser::advance() { currentToken = lexer.nextToken(); }
 
-    bool Parser::match(Token::Token::Kind kind) {
+    bool Parser::match(Token::Kind kind) {
         if (currentToken.kind == kind) {
             advance();
             return true;
@@ -188,7 +188,7 @@ namespace zust {
         return false;
     }
 
-    void Parser::expect(Token::Token::Kind kind, const std::string& errMsg) {
+    void Parser::expect(Token::Kind kind, const std::string& errMsg) {
         if (!match(kind)) {
             logError({ErrorType::Syntax,
                       errMsg + " at line " + std::to_string(currentToken.line) +
@@ -201,7 +201,7 @@ namespace zust {
 
     std::unique_ptr<ASTNode> Parser::parse() {
         auto program = ASTNode::makeProgramNode(currentScope);
-        while (currentToken.kind != Token::Token::Kind::EndOfFile) {
+        while (currentToken.kind != Token::Kind::EndOfFile) {
             auto stmt = parseStatement();
             if (stmt)
                 program->addChild(std::move(stmt));
@@ -238,9 +238,9 @@ namespace zust {
              currentToken.text == "extern") ||
             currentToken.kind == Token::Kind::Function)
             return parseFunctionDeclaration();
-        if (match(Token::Token::Kind::Let))
+        if (match(Token::Kind::Let))
             return parseVariableDeclaration();
-        if (currentToken.kind == Token::Token::Kind::Identifier and lexer.peek().kind == Token::Kind::Equal)
+        if (currentToken.kind == Token::Kind::Identifier and lexer.peek().kind == Token::Kind::Equal)
             return parseVariableReassignment();
         if (currentToken.kind == Token::Kind::If ||
             currentToken.kind == Token::Kind::ElseIf ||
@@ -458,8 +458,8 @@ namespace zust {
     }
 
     std::unique_ptr<ASTNode> Parser::parseVariableDeclaration() {
-        if (currentToken.kind != Token::Token::Kind::Identifier)
-            expect(Token::Token::Kind::Identifier,
+        if (currentToken.kind != Token::Kind::Identifier)
+            expect(Token::Kind::Identifier,
                    "Expected variable name after 'let'");
 
         std::string name = currentToken.text;
@@ -521,9 +521,9 @@ namespace zust {
         std::string name = currentToken.text;
         advance();
 
-        expect(Token::Token::Kind::Equal, "Expected '=' for variable reassignment");
+        expect(Token::Kind::Equal, "Expected '=' for variable reassignment");
         auto expr = parseExpression();
-        expect(Token::Token::Kind::SemiColon, "Expected ';' after reassignment");
+        expect(Token::Kind::SemiColon, "Expected ';' after reassignment");
         return ASTNode::makeVariableReassignmentNode(name, std::move(expr),
                                                      currentScope);
     }
@@ -538,27 +538,40 @@ namespace zust {
     }
 
     std::unique_ptr<ASTNode> Parser::parsePrimary() {
+        if (currentToken.kind == Token::Kind::Symbol && currentToken.text == "-") {
+            advance();
+            if (currentToken.kind == Token::Kind::FloatLiteral) {
+                std::string f = currentToken.text;
+                advance();
+                return ASTNode::makeFloatLiteralNode("-" + f, currentScope);
+            }
+            if (currentToken.kind == Token::Kind::IntegerLiteral) {
+                std::string val = currentToken.text;
+                advance();
+                return ASTNode::makeIntegerLiteralNode("-" + val, currentScope);
+            }
+        }
         if (currentToken.kind == Token::Kind::BoolLiteral) {
             bool val = (currentToken.text == "true");
             advance();
             return ASTNode::makeBooleanLiteralNode(val, currentScope);
         }
-        if (currentToken.kind == Token::Token::Kind::StringLiteral) {
+        if (currentToken.kind == Token::Kind::StringLiteral) {
             std::string s = currentToken.text;
             advance();
             return ASTNode::makeStringLiteralNode(s, currentScope);
         }
-        if (currentToken.kind == Token::Token::Kind::FloatLiteral) {
+        if (currentToken.kind == Token::Kind::FloatLiteral) {
             std::string f = currentToken.text;
             advance();
             return ASTNode::makeFloatLiteralNode(f, currentScope);
         }
-        if (currentToken.kind == Token::Token::Kind::IntegerLiteral) {
+        if (currentToken.kind == Token::Kind::IntegerLiteral) {
             std::string val = currentToken.text;
             advance();
             return ASTNode::makeIntegerLiteralNode(val, currentScope);
         }
-        if (currentToken.kind == Token::Token::Kind::Identifier) {
+        if (currentToken.kind == Token::Kind::Identifier) {
             std::string name = currentToken.text;
             advance();
 
