@@ -1,14 +1,18 @@
 #include "all.hpp"
 
-namespace zust {
+namespace zust
+{
     std::string CodeGenWindows::castValue(const std::string &val,
                                           const TypeInfo &fromType,
-                                          const TypeInfo &toType, const std::shared_ptr<ScopeContext> currentScope, std::ostringstream &out) {
+                                          const TypeInfo &toType, const std::shared_ptr<ScopeContext> currentScope, std::ostringstream &out)
+    {
         restoreIfSpilled(val, currentScope, out);
 
-        if (fromType.bits == toType.bits && fromType.isFloat == toType.isFloat) {
+        if (fromType.bits == toType.bits && fromType.isFloat == toType.isFloat)
+        {
             if (!fromType.isFloat && fromType.bits == toType.bits &&
-                fromType.isSigned != toType.isSigned) {
+                fromType.isSigned != toType.isSigned)
+            {
                 std::string dst = allocateOrSpill(false, currentScope, out);
                 out << "    mov " << adjustReg(dst, fromType.bits)
                     << ", " << adjustReg(val, fromType.bits) << "\n";
@@ -19,7 +23,8 @@ namespace zust {
             return RegisterAllocator::getBaseReg(val);
         }
 
-        if (fromType.isFloat && toType.isFloat) {
+        if (fromType.isFloat && toType.isFloat)
+        {
             std::string dst = allocateOrSpill(true, currentScope, out);
             auto instr = (fromType.bits < toType.bits)
                              ? "cvtss2sd"
@@ -30,7 +35,8 @@ namespace zust {
             return dst;
         }
 
-        if (!fromType.isFloat && toType.isFloat) {
+        if (!fromType.isFloat && toType.isFloat)
+        {
             std::string dst = allocateOrSpill(true, currentScope, out);
             auto instr = (toType.bits == 32)
                              ? "cvtsi2ss"
@@ -42,7 +48,8 @@ namespace zust {
             return dst;
         }
 
-        if (fromType.isFloat && !toType.isFloat) {
+        if (fromType.isFloat && !toType.isFloat)
+        {
             std::string dst = allocateOrSpill(false, currentScope, out);
             auto instr = (fromType.bits == 32)
                              ? "cvttss2si"
@@ -53,27 +60,40 @@ namespace zust {
             return dst;
         }
 
-        if (!fromType.isFloat && !toType.isFloat) {
+        if (!fromType.isFloat && !toType.isFloat)
+        {
             std::string dst = allocateOrSpill(false, currentScope, out);
             std::string srcAdj = adjustReg(val, fromType.bits);
             std::string dstAdj = adjustReg(dst, toType.bits);
 
-            if (toType.bits > fromType.bits) {
+            if (toType.bits > fromType.bits)
+            {
                 // widening
-                if (fromType.isSigned) {
+                if (fromType.isSigned)
+                {
                     // signed → use movsxd for 32→64, movsx otherwise
-                    if (fromType.bits == 32 && toType.bits == 64) {
+                    if (fromType.bits == 32 && toType.bits == 64)
+                    {
                         out << "    movsxd " << dstAdj << ", " << srcAdj << "\n";
-                    } else {
+                    }
+                    else
+                    {
                         out << "    movsx  " << dstAdj << ", " << srcAdj << "\n";
                     }
-                } else {
+                }
+                else
+                {
                     // unsigned → use movzx for width ≤ 16, plain mov for 32→64
-                    if (fromType.bits == 8 || fromType.bits == 16) {
+                    if (fromType.bits == 8 || fromType.bits == 16)
+                    {
                         out << "    movzx  " << dstAdj << ", " << srcAdj << "\n";
-                    } else if (fromType.bits == 32 && toType.bits == 64) {
+                    }
+                    else if (fromType.bits == 32 && toType.bits == 64)
+                    {
                         out << "    mov    " << dstAdj << "d, " << srcAdj << "\n";
-                    } else {
+                    }
+                    else
+                    {
                         throw std::runtime_error(
                             "Unsupported unsigned cast: " +
                             std::to_string(fromType.bits) +
@@ -81,11 +101,13 @@ namespace zust {
                             std::to_string(toType.bits));
                     }
                 }
-
-            } else if (toType.bits < fromType.bits) {
+            }
+            else if (toType.bits < fromType.bits)
+            {
                 out << "    mov    " << dstAdj << ", " << adjustReg(val, toType.bits) << "\n";
-
-            } else {
+            }
+            else
+            {
                 // same size — plain mov
                 out << "    mov    " << dstAdj << ", " << srcAdj << "\n";
             }
@@ -102,12 +124,16 @@ namespace zust {
             toType.to_string());
     }
 
-    std::string CodeGenWindows::allocateOrSpill(bool isXMM, std::shared_ptr<ScopeContext> scope, std::ostringstream &out) {
-        try {
+    std::string CodeGenWindows::allocateOrSpill(bool isXMM, std::shared_ptr<ScopeContext> scope, std::ostringstream &out)
+    {
+        try
+        {
             std::string reg = isXMM ? alloc.allocateXMM() : alloc.allocate();
             if (!reg.empty())
                 return reg;
-        } catch (...) {
+        }
+        catch (...)
+        {
         }
 
         std::shared_ptr<FunctionScope> result_scope = scope->findEnclosingFunctionScope();
@@ -123,12 +149,15 @@ namespace zust {
             funcScope->allocateSpillSlot(isXMM ? 16 : 8,
                                          CodegenOutputFormat::X86_64_MSWIN);
 
-        if (isXMM) {
+        if (isXMM)
+        {
             alloc.markSpilledXMM(victim, spillSlot);
             out << "    movdqu " << victim
                 << ", XMMWORD PTR " << spillSlot
                 << "    ; Spill XMM\n";
-        } else {
+        }
+        else
+        {
             alloc.markSpilled(victim, spillSlot);
             out << "    mov " << victim
                 << ", QWORD PTR " << spillSlot
@@ -137,24 +166,29 @@ namespace zust {
 
         return victim;
     }
-    void CodeGenWindows::restoreIfSpilled(const std::string &reg, std::shared_ptr<ScopeContext> scope, std::ostringstream &out) {
+    void CodeGenWindows::restoreIfSpilled(const std::string &reg, std::shared_ptr<ScopeContext> scope, std::ostringstream &out)
+    {
         if (!alloc.isSpilled(reg))
             return;
 
         std::string slot = alloc.spillSlotFor(reg);
 
-        if (reg.rfind("xm", 0) == 0) {
+        if (reg.rfind("xm", 0) == 0)
+        {
             alloc.unSpillXMM(reg,
                              CodegenOutputFormat::X86_64_MSWIN,
                              out);
-        } else {
+        }
+        else
+        {
             alloc.unSpill(reg,
                           CodegenOutputFormat::X86_64_MSWIN,
                           out);
         }
 
         auto result_scope = scope->findEnclosingFunctionScope();
-        if (result_scope) {
+        if (result_scope)
+        {
             auto funcScope =
                 std::static_pointer_cast<FunctionScope>(result_scope);
             funcScope->freeSpillSlot(
@@ -163,7 +197,8 @@ namespace zust {
         }
     }
 
-    std::string CodeGenWindows::generateIntegerLiteral(std::unique_ptr<ASTNode> node, std::ostringstream &out) {
+    std::string CodeGenWindows::generateIntegerLiteral(std::unique_ptr<ASTNode> node, std::ostringstream &out)
+    {
         TypeInfo ti = node->scope->lookupType("int64_t");
         std::string adj = allocateOrSpill(false, node->scope, out);
         out << "    mov " << adj << ", " << node->value << "\n";
@@ -171,7 +206,8 @@ namespace zust {
         return adj;
     }
 
-    std::string CodeGenWindows::generateFloatLiteral(std::unique_ptr<ASTNode> node, std::ostringstream &out) {
+    std::string CodeGenWindows::generateFloatLiteral(std::unique_ptr<ASTNode> node, std::ostringstream &out)
+    {
         std::string lbl = "Lfloat" + std::to_string(floatLabelCount++);
         std::string val = node->value;
         bool isF32 = (!val.empty() && (val.back() == 'f' || val.back() == 'F'));
@@ -197,7 +233,8 @@ namespace zust {
     }
     std::string CodeGenWindows::generateStringLiteral(
         std::unique_ptr<ASTNode> node,
-        std::ostringstream &out) {
+        std::ostringstream &out)
+    {
         // 1) Create a unique label
         std::string lbl = "Lstr" + std::to_string(stringLabelCount++);
 
@@ -208,10 +245,13 @@ namespace zust {
         std::string printable;
         std::vector<unsigned char> nums;
 
-        for (size_t i = 0; i < raw.size(); ++i) {
-            if (raw[i] == '\\' && i + 1 < raw.size()) {
+        for (size_t i = 0; i < raw.size(); ++i)
+        {
+            if (raw[i] == '\\' && i + 1 < raw.size())
+            {
                 char esc = raw[++i];
-                switch (esc) {
+                switch (esc)
+                {
                 case 'n':
                     nums.push_back(0x0A);
                     break;
@@ -232,7 +272,9 @@ namespace zust {
                     printable.push_back('\\');
                     printable.push_back(esc);
                 }
-            } else {
+            }
+            else
+            {
                 printable.push_back(raw[i]);
             }
         }
@@ -244,32 +286,37 @@ namespace zust {
         outGlobalStream << lbl << " db ";
 
         // Emit the quoted printable portion if non-empty
-        if (!printable.empty()) {
+        if (!printable.empty())
+        {
             outGlobalStream << "\"";
-            for (unsigned char c : printable) {
+            for (unsigned char c : printable)
+            {
                 if (c == '"')
-                    outGlobalStream << "\"\"";  // MASM doubles quotes
+                    outGlobalStream << "\"\""; // MASM doubles quotes
                 else if (c == '\\')
-                    outGlobalStream << "\\\\";  // literal backslash
+                    outGlobalStream << "\\\\"; // literal backslash
                 else
                     outGlobalStream << c;
             }
             outGlobalStream << "\"";
 
-            if (!nums.empty()) {
+            if (!nums.empty())
+            {
                 outGlobalStream << ",";
             }
         }
 
         // Emit numeric bytes (e.g. 0Ah for newline, 00h for terminator)
-        for (size_t i = 0; i < nums.size(); ++i) {
+        for (size_t i = 0; i < nums.size(); ++i)
+        {
             unsigned int b = nums[i];
             outGlobalStream
                 << std::uppercase
                 << std::hex
                 << "0" << b << "h"
                 << std::dec;
-            if (i + 1 < nums.size()) {
+            if (i + 1 < nums.size())
+            {
                 outGlobalStream << ",";
             }
         }
@@ -283,7 +330,8 @@ namespace zust {
         return r;
     }
 
-    std::string CodeGenWindows::generateBooleanLiteral(std::unique_ptr<ASTNode> node, std::ostringstream &out) {
+    std::string CodeGenWindows::generateBooleanLiteral(std::unique_ptr<ASTNode> node, std::ostringstream &out)
+    {
         TypeInfo boolType = node->scope->lookupType("boolean");
         std::string r = allocateOrSpill(false, node->scope, out);
         out
@@ -293,15 +341,18 @@ namespace zust {
         noteType(r, boolType);
         return r;
     }
-    std::string CodeGenWindows::generateVariableAccess(std::unique_ptr<ASTNode> node, std::ostringstream &out) {
+    std::string CodeGenWindows::generateVariableAccess(std::unique_ptr<ASTNode> node, std::ostringstream &out)
+    {
         auto &scope = *node->scope;
         std::string name = node->value;
         TypeInfo ti = scope.lookupType(scope.lookupVariable(name).type);
         uint64_t sz = ti.bits / 8;
         bool isGlobal = scope.isGlobalVariable(name);
 
-        auto ptrQualifier = [&](uint64_t bytes) {
-            switch (bytes) {
+        auto ptrQualifier = [&](uint64_t bytes)
+        {
+            switch (bytes)
+            {
             case 8:
                 return "QWORD PTR ";
             case 4:
@@ -315,18 +366,22 @@ namespace zust {
             }
         };
 
-        if (ti.isFloat) {
+        if (ti.isFloat)
+        {
             std::string r_xmm = allocateOrSpill(true, node->scope, out);
             std::string instr = (sz == 4 ? "movss" : "movsd");
             std::string qualifier = ptrQualifier(sz);
 
-            if (isGlobal) {
+            if (isGlobal)
+            {
                 out << "    "
                     << instr << " "
                     << r_xmm << ", "
                     << qualifier << "[" << name << "]"
                     << "\n";
-            } else {
+            }
+            else
+            {
                 int64_t off = std::abs(scope.getVariableOffset(name));
                 out << "    "
                     << instr << " "
@@ -337,18 +392,23 @@ namespace zust {
 
             noteType(r_xmm, ti);
             return r_xmm;
-        } else {
+        }
+        else
+        {
             std::string r = allocateOrSpill(false, node->scope, out);
             std::string adj = adjustReg(r, ti.bits);
             std::string qualifier = ptrQualifier(sz);
 
-            if (isGlobal) {
+            if (isGlobal)
+            {
                 out << "    "
                     << "mov "
                     << adj << ", "
                     << qualifier << "[" << name << "]"
                     << "\n";
-            } else {
+            }
+            else
+            {
                 int64_t off = std::abs(scope.getVariableOffset(name));
                 out << "    "
                     << "mov "
@@ -361,7 +421,8 @@ namespace zust {
             return r;
         }
     }
-    std::string CodeGenWindows::generateBinaryOperation(std::unique_ptr<ASTNode> node, std::ostringstream &out) {
+    std::string CodeGenWindows::generateBinaryOperation(std::unique_ptr<ASTNode> node, std::ostringstream &out)
+    {
         // 1. Evaluate left operand
         std::string rl = emitExpression(std::move(node->children[0]), out);
         restoreIfSpilled(rl, node->scope, out);
@@ -383,9 +444,10 @@ namespace zust {
         restoreIfSpilled(rr, node->scope, out);
 
         // 5. Floating‑point operations?
-        if (tr.isFloat) {
+        if (tr.isFloat)
+        {
             bool isF32 = (tr.bits == 32);
-            std::string vsuf = isF32 ? "ss" : "sd";  // movss/movsd, addss/addsd...
+            std::string vsuf = isF32 ? "ss" : "sd"; // movss/movsd, addss/addsd...
             std::string instr;
             if (op == "+")
                 instr = "add" + vsuf;
@@ -395,9 +457,10 @@ namespace zust {
                 instr = "mul" + vsuf;
             else if (op == "/")
                 instr = "div" + vsuf;
-            else if (assembly_comparison_operations.count(op)) {
+            else if (assembly_comparison_operations.count(op))
+            {
                 // unordered compare + setcc
-                std::string ucom = "ucomi" + vsuf;  // ucomiss / ucomisd
+                std::string ucom = "ucomi" + vsuf; // ucomiss / ucomisd
                 out << "    " << ucom << " " << rl << ", " << rr << "\n"
                     << "    " << assembly_comparison_operations.at(op) << " al\n";
                 // alloc bool
@@ -408,7 +471,9 @@ namespace zust {
                 alloc.free(rr);
                 alloc.free(rl);
                 return r_bool;
-            } else {
+            }
+            else
+            {
                 throw std::runtime_error("Unsupported FP op " + op);
             }
 
@@ -420,26 +485,37 @@ namespace zust {
         }
 
         // 6. Integer operations
-        char suf = integer_suffixes.at(tr.bits);  // e.g. 'q' for 64, 'l' for 32
+        char suf = integer_suffixes.at(tr.bits); // e.g. 'q' for 64, 'l' for 32
         std::string adj_l = adjustReg(rl, tr.bits);
         std::string adj_r = adjustReg(rr, tr.bits);
 
-        if (op == "+" || op == "-" || op == "*" || op == "/") {
-            if (op == "+") {
+        if (op == "+" || op == "-" || op == "*" || op == "/")
+        {
+            if (op == "+")
+            {
                 out << "    add" << " " << adj_l << ", " << adj_r << "\n";
-            } else if (op == "-") {
+            }
+            else if (op == "-")
+            {
                 out << "    sub" << " " << adj_l << ", " << adj_r << "\n";
-            } else if (op == "*") {
+            }
+            else if (op == "*")
+            {
                 out << "    imul" << " " << adj_l << ", " << adj_r << "\n";
-            } else {
+            }
+            else
+            {
                 // division
-                if (tr.isSigned) {
+                if (tr.isSigned)
+                {
                     // signed: RDX:RAX ← RAX / src
                     out << "    mov" << " rax, " << adj_l << "\n"
-                        << "    cqo\n"  // sign‑extend RAX→RDX:RAX
+                        << "    cqo\n" // sign‑extend RAX→RDX:RAX
                         << "    idiv" << " " << adj_r << "\n"
                         << "    mov" << " " << adj_l << ", rax\n";
-                } else {
+                }
+                else
+                {
                     // unsigned
                     out << "    mov" << " rax, " << adj_l << "\n"
                         << "    xor rdx, rdx\n"
@@ -457,7 +533,8 @@ namespace zust {
         }
 
         // 7. Integer comparison?
-        if (assembly_comparison_operations.count(op)) {
+        if (assembly_comparison_operations.count(op))
+        {
             std::string cmpInstr = "cmp";
             out << "    " << cmpInstr << " " << adj_l << ", " << adj_r << "\n"
                 << "    " << assembly_comparison_operations.at(op) << " al\n";
@@ -470,7 +547,8 @@ namespace zust {
         }
 
         // 8. Bitwise/logical ops: &&, ||, &, |
-        if (op == "&&" || op == "||" || op == "&" || op == "|") {
+        if (op == "&&" || op == "||" || op == "&" || op == "|")
+        {
             std::string instr = (op == "&&" ? "and" : op == "||" ? "or"
                                                                  : op);
             out << "    " << instr << suf << " " << adj_l << ", " << adj_r << "\n";
@@ -481,12 +559,14 @@ namespace zust {
 
         throw std::runtime_error("Unsupported int op " + op);
     }
-    std::string CodeGenWindows::generateUnaryOperation(std::unique_ptr<ASTNode> node, std::ostringstream &out) {
+    std::string CodeGenWindows::generateUnaryOperation(std::unique_ptr<ASTNode> node, std::ostringstream &out)
+    {
         const std::string &op = node->value;
         if (op != "!" && op != "++" && op != "--")
             throw std::runtime_error("Unsupported unary operator: " + op);
 
-        if (op == "!") {
+        if (op == "!")
+        {
             // logical not
             std::string r = emitExpression(std::move(node->children[0]), out);
             restoreIfSpilled(r, node->scope, out);
@@ -518,9 +598,12 @@ namespace zust {
 
         // Compute address
         std::string ptr;
-        if (scp.isGlobalVariable(varName)) {
+        if (scp.isGlobalVariable(varName))
+        {
             ptr = "[" + varName + "]";
-        } else {
+        }
+        else
+        {
             int64_t off = std::abs(scp.getVariableOffset(varName));
             ptr = "[rbp - " + std::to_string(off) + "]";
         }
@@ -538,8 +621,10 @@ namespace zust {
         noteType(adj, ti);
         return adj;
     }
-    std::string CodeGenWindows::emitExpression(std::unique_ptr<ASTNode> node, std::ostringstream &out) {
-        switch (node->type) {
+    std::string CodeGenWindows::emitExpression(std::unique_ptr<ASTNode> node, std::ostringstream &out)
+    {
+        switch (node->type)
+        {
         case NodeType::IntegerLiteral:
             return generateIntegerLiteral(std::move(node), out);
         case NodeType::FloatLiteral:
@@ -561,21 +646,25 @@ namespace zust {
         }
     }
 
-    std::string formatHex32(uint32_t value) {
+    std::string formatHex32(uint32_t value)
+    {
         std::ostringstream oss;
         oss << std::hex << value;
         std::string s = oss.str();
-        if (!s.empty()) {
+        if (!s.empty())
+        {
             char first = s[0];
             if ((first >= 'a' && first <= 'f') ||
-                (first >= 'A' && first <= 'F')) {
+                (first >= 'A' && first <= 'F'))
+            {
                 s = "0" + s;
             }
         }
         return s + "h";
     }
 
-    void CodeGenWindows::emitPrologue(std::shared_ptr<ScopeContext> scope, std::ostringstream &out) {
+    void CodeGenWindows::emitPrologue(std::shared_ptr<ScopeContext> scope, std::ostringstream &out)
+    {
         if (scope->kind() != "Function")
             return;
 
@@ -602,30 +691,35 @@ namespace zust {
         out << "    mov     DWORD PTR [rbp-4], " << formatHex32(high) << "\n";
 
         // Reserve stack for locals + spills
-        if (stackReserve > 0) {
+        if (stackReserve > 0)
+        {
             out << "    sub     rsp, "
                 << stackReserve
                 << "    ; reserve locals + spills\n";
         }
 
         // Save callee-saved GPRs
-        for (auto &reg : CALLEE_GPR_MSVC) {
+        for (auto &reg : CALLEE_GPR_MSVC)
+        {
             out << "    push    " << reg
                 << "    ; save callee-saved GPR\n";
         }
 
         // 🔑 Align stack after odd number of GPR pushes
-        if (CALLEE_GPR_MSVC.size() % 2 != 0) {
+        if (CALLEE_GPR_MSVC.size() % 2 != 0)
+        {
             out << "    sub     rsp, 8    ; align stack\n";
         }
 
         // Save callee-saved XMMs
-        for (auto &reg : CALLEE_XMM_MSVC) {
+        for (auto &reg : CALLEE_XMM_MSVC)
+        {
             out << "    sub     rsp, 16\n";
             out << "    movdqu  [rsp], " << reg << "\n";
         }
     }
-    void CodeGenWindows::emitEpilogue(std::shared_ptr<ScopeContext> scope, std::ostringstream &out, bool clearRax) {
+    void CodeGenWindows::emitEpilogue(std::shared_ptr<ScopeContext> scope, std::ostringstream &out, bool clearRax)
+    {
         if (scope->kind() != "Function")
             return;
 
@@ -659,31 +753,36 @@ namespace zust {
         alloc.free(reg);
 
         // Restore XMM registers
-        for (auto it = CALLEE_XMM_MSVC.rbegin(); it != CALLEE_XMM_MSVC.rend(); ++it) {
+        for (auto it = CALLEE_XMM_MSVC.rbegin(); it != CALLEE_XMM_MSVC.rend(); ++it)
+        {
             out << "    movdqu  " << *it << ", [rsp]\n";
             out << "    add     rsp, 16\n";
         }
 
         // 🔑 Undo stack alignment after GPR pushes
-        if (CALLEE_GPR_MSVC.size() % 2 != 0) {
+        if (CALLEE_GPR_MSVC.size() % 2 != 0)
+        {
             out << "    add     rsp, 8    ; undo alignment\n";
         }
 
         // Restore callee-saved GPRs in reverse
-        for (auto it = CALLEE_GPR_MSVC.rbegin(); it != CALLEE_GPR_MSVC.rend(); ++it) {
+        for (auto it = CALLEE_GPR_MSVC.rbegin(); it != CALLEE_GPR_MSVC.rend(); ++it)
+        {
             out << "    pop     " << *it
                 << "    ; restore callee-saved GPR\n";
         }
 
         // Unwind stack frame
-        if (stackReserve > 0) {
+        if (stackReserve > 0)
+        {
             out << "    add     rsp, "
                 << stackReserve
                 << "    ; free locals + spills\n";
         }
 
         // Zero RAX if required
-        if (clearRax) {
+        if (clearRax)
+        {
             out << "    xor     rax, rax\n";
         }
 
@@ -692,59 +791,71 @@ namespace zust {
         out << "    ret\n";
     }
 
-    void CodeGenWindows::generateStatement(std::unique_ptr<ASTNode> statement, std::ostringstream &out) {
-        switch (statement->type) {
-        case NodeType::VariableReassignment: {
+    void CodeGenWindows::generateStatement(std::unique_ptr<ASTNode> statement, std::ostringstream &out)
+    {
+        switch (statement->type)
+        {
+        case NodeType::VariableReassignment:
+        {
             generateVariableReassignment(std::move(statement), out);
             out << "\n";
             break;
         }
-        case NodeType::VariableDeclaration: {
+        case NodeType::VariableDeclaration:
+        {
             generateVariableDeclaration(std::move(statement), out);
             out << "\n";
             break;
         }
-        case NodeType::IfStatement: {
+        case NodeType::IfStatement:
+        {
             generateIfStatement(std::move(statement), out);
             out << "\n";
             break;
         }
-        case NodeType::UnaryOp: {
+        case NodeType::UnaryOp:
+        {
             std::string op = statement->value;
             auto scope = statement->scope;
             std::string reg = emitExpression(std::move(statement), out);
             restoreIfSpilled(reg, scope, out);
-            if (op == "--" or op == "++") {
+            if (op == "--" or op == "++")
+            {
                 alloc.free(reg);
             }
             out << "\n";
             break;
         }
-        case NodeType::BinaryOp: {
+        case NodeType::BinaryOp:
+        {
             auto scope = statement->scope;
-            std::string reg = emitExpression(std::move(statement), out);  // I am doing this just so the increments/decrements work in x + y-- -> this itself must not have any result, but y-- should still be effective.
+            std::string reg = emitExpression(std::move(statement), out); // I am doing this just so the increments/decrements work in x + y-- -> this itself must not have any result, but y-- should still be effective.
             restoreIfSpilled(reg, scope, out);
             alloc.free(reg);
             out << "\n";
             break;
         }
-        case NodeType::FunctionCall: {
+        case NodeType::FunctionCall:
+        {
             std::string reg = generateFunctionCall(std::move(statement), out);
             alloc.free(reg);
             out << "\n";
             break;
         }
-        case NodeType::Function: {
+        case NodeType::Function:
+        {
             generateFunctionDeclaration(std::move(statement), out);
             out << "\n";
             break;
         }
-        case NodeType::ExternFunction: {
+        case NodeType::ExternFunction:
+        {
             generateExternFunctionDeclaration(std::move(statement), out);
             out << "\n";
             break;
         }
-        case NodeType::ReturnStatement: {
+        case NodeType::ReturnStatement:
+        {
             generateReturnstatement(std::move(statement), out);
             out << "\n";
             break;
@@ -753,7 +864,8 @@ namespace zust {
             throw std::runtime_error("Unknown statement encountered.");
         }
     }
-    void CodeGenWindows::generateVariableReassignment(std::unique_ptr<ASTNode> statement, std::ostringstream &out) {
+    void CodeGenWindows::generateVariableReassignment(std::unique_ptr<ASTNode> statement, std::ostringstream &out)
+    {
         auto &scp = *statement->scope;
         const std::string name = statement->value;
         TypeInfo ti = scp.lookupType(scp.lookupVariable(name).type);
@@ -769,22 +881,32 @@ namespace zust {
 
         // Determine memory operand
         std::string mem;
-        if (scp.isGlobalVariable(name)) {
+        if (scp.isGlobalVariable(name))
+        {
             mem = "[" + name + "]";
-        } else {
+        }
+        else
+        {
             int64_t off = std::abs(scp.getVariableOffset(name));
             mem = "[rbp - " + std::to_string(off) + "]";
         }
 
         // Emit store based on size and type
-        if (ti.isFloat) {
-            if (sz == 4) {
+        if (ti.isFloat)
+        {
+            if (sz == 4)
+            {
                 out << "    movss DWORD PTR " << mem << ", " << r << "\n";
-            } else {
+            }
+            else
+            {
                 out << "    movsd QWORD PTR " << mem << ", " << r << "\n";
             }
-        } else {
-            switch (sz) {
+        }
+        else
+        {
+            switch (sz)
+            {
             case 1:
                 out << "    mov     BYTE PTR " << mem << ", " << r << "\n";
                 break;
@@ -804,11 +926,12 @@ namespace zust {
         alloc.free(r);
     }
 
-    void CodeGenWindows::generateVariableDeclaration(std::unique_ptr<ASTNode> statement, std::ostringstream &out) {
+    void CodeGenWindows::generateVariableDeclaration(std::unique_ptr<ASTNode> statement, std::ostringstream &out)
+    {
         auto &scp = *statement->scope;
         const std::string name = statement->value;
         TypeInfo ti = scp.lookupType(scp.lookupVariable(name).type);
-        uint64_t sz = ti.bits / 8;  // bytes
+        uint64_t sz = ti.bits / 8; // bytes
 
         // Compute memory operand
         std::string mem = scp.isGlobalVariable(name)
@@ -816,15 +939,23 @@ namespace zust {
                               : ("[rbp - " + std::to_string(std::abs(scp.getVariableOffset(name))) + "]");
 
         // Lambda to emit store
-        auto emitStore = [&](const std::string &r) {
-            if (ti.isFloat) {
-                if (sz == 4) {
+        auto emitStore = [&](const std::string &r)
+        {
+            if (ti.isFloat)
+            {
+                if (sz == 4)
+                {
                     out << "    movss DWORD PTR " << mem << ", " << r << "\n";
-                } else {
+                }
+                else
+                {
                     out << "    movsd QWORD PTR " << mem << ", " << r << "\n";
                 }
-            } else {
-                switch (sz) {
+            }
+            else
+            {
+                switch (sz)
+                {
                 case 1:
                     out << "    mov     BYTE PTR " << mem << ", " << adjustReg(r, sz * 8) << "\n";
                     break;
@@ -842,7 +973,8 @@ namespace zust {
             }
         };
 
-        if (statement->children.size() >= 2) {
+        if (statement->children.size() >= 2)
+        {
             std::string r = emitExpression(std::move(statement->children.back()), out);
             restoreIfSpilled(r, statement->scope, out);
 
@@ -851,15 +983,21 @@ namespace zust {
 
             emitStore(r);
             alloc.free(r);
-        } else {
-            if (ti.isFloat) {
+        }
+        else
+        {
+            if (ti.isFloat)
+            {
                 std::string r_xmm = allocateOrSpill(true, statement->scope, out);
                 out << "    pxor    " << r_xmm << ", " << r_xmm << "\n";
                 emitStore(r_xmm);
                 alloc.free(r_xmm);
-            } else {
+            }
+            else
+            {
                 // Zero-initialize integer of size sz
-                switch (sz) {
+                switch (sz)
+                {
                 case 1:
                     out << "    mov     BYTE PTR " << mem << ", 0\n";
                     break;
@@ -878,14 +1016,16 @@ namespace zust {
             }
         }
     }
-    void CodeGenWindows::generateIfStatement(std::unique_ptr<ASTNode> statement, std::ostringstream &out) {
+    void CodeGenWindows::generateIfStatement(std::unique_ptr<ASTNode> statement, std::ostringstream &out)
+    {
         int id = blockLabelCount++;
         std::string endLbl = "Lend" + std::to_string(id);
         std::vector<std::string> elseLbls;
 
         // Precompute labels for all else‑if / else branches
         ASTNode *branch = statement->getElseBranch();
-        while (branch) {
+        while (branch)
+        {
             elseLbls.push_back("Lelse" + std::to_string(blockLabelCount++));
             branch = branch->getElseBranch();
         }
@@ -905,7 +1045,8 @@ namespace zust {
         // then‑block
         auto ifBlk = std::move(statement->children[1]);
         emitPrologue(ifBlk->scope, out);
-        for (auto &stmt : ifBlk->children) {
+        for (auto &stmt : ifBlk->children)
+        {
             generateStatement(std::move(stmt), out);
         }
         emitEpilogue(ifBlk->scope, out);
@@ -914,10 +1055,12 @@ namespace zust {
 
         // --- ELSE‑IF / ELSE branches ---
         branch = statement->getElseBranch();
-        while (branch) {
+        while (branch)
+        {
             out << elseLbls[elseIdx++] << ":\n";
 
-            if (branch->type == NodeType::ElseIfStatement) {
+            if (branch->type == NodeType::ElseIfStatement)
+            {
                 // test elseif condition
                 std::string r2 = emitExpression(std::move(branch->children[0]), out);
                 restoreIfSpilled(r2, branch->scope, out);
@@ -932,16 +1075,20 @@ namespace zust {
                 // elseif‑block
                 auto elifBlk = std::move(branch->children[1]);
                 emitPrologue(elifBlk->scope, out);
-                for (auto &stmt : elifBlk->children) {
+                for (auto &stmt : elifBlk->children)
+                {
                     generateStatement(std::move(stmt), out);
                 }
                 emitEpilogue(elifBlk->scope, out);
                 out << "    jmp     " << endLbl << "\n";
-            } else if (branch->type == NodeType::ElseStatement) {
+            }
+            else if (branch->type == NodeType::ElseStatement)
+            {
                 // else‑block
                 auto elseBlk = std::move(branch->children[0]);
                 emitPrologue(elseBlk->scope, out);
-                for (auto &stmt : elseBlk->children) {
+                for (auto &stmt : elseBlk->children)
+                {
                     generateStatement(std::move(stmt), out);
                 }
                 emitEpilogue(elseBlk->scope, out);
@@ -953,21 +1100,32 @@ namespace zust {
         // end label
         out << endLbl << ":\n\n";
     }
-    void CodeGenWindows::generate(std::unique_ptr<ASTNode> program) {
+    void CodeGenWindows::generateForLoop(std::unique_ptr<ASTNode> node, std::ostringstream &out)
+    {
+    }
+    void CodeGenWindows::generateWhileLoop(std::unique_ptr<ASTNode> node, std::ostringstream &out)
+    {
+    }
+    void CodeGenWindows::generate(std::unique_ptr<ASTNode> program)
+    {
         std::vector<ASTNode *> globals;
 
         // collect globals
-        for (auto &stmt : program->children) {
-            if (stmt->type == NodeType::VariableDeclaration) {
+        for (auto &stmt : program->children)
+        {
+            if (stmt->type == NodeType::VariableDeclaration)
+            {
                 globals.push_back(stmt.get());
             }
         }
 
         // --- .DATA segment (read-write globals) ---
         outGlobalStream << ".data\n\n";
-        for (auto &g : globals) {
+        for (auto &g : globals)
+        {
             TypeInfo info = g->scope->lookupType(g->children[0]->value);
-            switch (info.bits / 8) {
+            switch (info.bits / 8)
+            {
             case 8:
                 outGlobalStream << g->value << " QWORD 0\n";
                 break;
@@ -1001,19 +1159,26 @@ namespace zust {
         // collect main and top-level init statements
         std::unique_ptr<ASTNode> mainFn;
         std::vector<std::unique_ptr<ASTNode>> initStmts;
-        for (auto &stmt : program->children) {
-            if (stmt->type == NodeType::Function && stmt->value == "main") {
+        for (auto &stmt : program->children)
+        {
+            if (stmt->type == NodeType::Function && stmt->value == "main")
+            {
                 mainFn = std::move(stmt);
-            } else if (stmt->type == NodeType::VariableDeclaration || stmt->type == NodeType::VariableReassignment || (stmt->type == NodeType::UnaryOp && (stmt->value == "++" || stmt->value == "--"))) {
+            }
+            else if (stmt->type == NodeType::VariableDeclaration || stmt->type == NodeType::VariableReassignment || (stmt->type == NodeType::UnaryOp && (stmt->value == "++" || stmt->value == "--")))
+            {
                 initStmts.push_back(std::move(stmt));
-            } else {
+            }
+            else
+            {
                 generateStatement(std::move(stmt), outStream);
             }
         }
 
         // emit main
         outStream << "main PROC\n";
-        for (auto &s : initStmts) {
+        for (auto &s : initStmts)
+        {
             generateStatement(std::move(s), outStream);
         }
         generateFunctionDeclaration(std::move(mainFn), outStream, /*force=*/true);
@@ -1027,7 +1192,8 @@ namespace zust {
                  << "\nEND\n";
     }
 
-    std::string CodeGenWindows::generateFunctionCall(std::unique_ptr<ASTNode> node, std::ostringstream &out) {
+    std::string CodeGenWindows::generateFunctionCall(std::unique_ptr<ASTNode> node, std::ostringstream &out)
+    {
         // 1) Lookup target and args
         auto fnInfo = node->scope->lookupFunction(node->value);
         const std::string label = fnInfo.isExtern ? node->value : fnInfo.label;
@@ -1036,8 +1202,10 @@ namespace zust {
 
         // 2) Save caller‑saved GPRs
         std::vector<std::string> savedGPR;
-        for (auto &reg : CALLER_GPR_MSVC) {
-            if (alloc.isInUse(reg)) {
+        for (auto &reg : CALLER_GPR_MSVC)
+        {
+            if (alloc.isInUse(reg))
+            {
                 out << "    push    " << reg << "    ; save caller GPR\n";
                 savedGPR.push_back(reg);
             }
@@ -1045,8 +1213,10 @@ namespace zust {
 
         // 3) Save caller‑saved XMMs
         std::vector<std::pair<std::string, std::string>> savedXMM;
-        for (auto &reg : CALLER_XMM_MSVC) {
-            if (alloc.isInUseXMM(reg)) {
+        for (auto &reg : CALLER_XMM_MSVC)
+        {
+            if (alloc.isInUseXMM(reg))
+            {
                 auto funcScope = std::static_pointer_cast<FunctionScope>(
                     node->scope->findEnclosingFunctionScope());
                 std::string slot = funcScope->allocateSpillSlot(16,
@@ -1061,18 +1231,22 @@ namespace zust {
 
         // 4) Compute stack‐space needed for overflow args
         uint64_t gpCount = 0, xmmCount = 0, stackOff = 0;
-        for (size_t i = 0; i < args.size(); ++i) {
+        for (size_t i = 0; i < args.size(); ++i)
+        {
             bool isFloat = (i < params.size())
                                ? node->scope->lookupType(params[i].type).isFloat
                                : (fnInfo.isVariadic ? false
                                                     : throw std::runtime_error(
                                                           "Too many args"));
-            if (!isFloat) {
+            if (!isFloat)
+            {
                 if (gpCount < ARG_GPR_MSVC.size())
                     gpCount++;
                 else
                     stackOff += 8;
-            } else {
+            }
+            else
+            {
                 if (xmmCount < ARG_XMM_MSVC.size())
                     xmmCount++;
                 else
@@ -1080,7 +1254,8 @@ namespace zust {
             }
         }
         uint64_t stackReserve = (stackOff + 15) & ~15ULL;
-        if (stackReserve) {
+        if (stackReserve)
+        {
             out << "    sub     rsp, " << stackReserve
                 << "    ; reserve arg stack\n";
         }
@@ -1092,7 +1267,8 @@ namespace zust {
         std::vector<std::string> reservedArgs;
         std::vector<std::string> spilledArgs;
 
-        for (size_t i = 0; i < args.size(); ++i) {
+        for (size_t i = 0; i < args.size(); ++i)
+        {
             // evaluate and cast
             std::string src = emitExpression(std::move(args[i]), out);
             restoreIfSpilled(src, node->scope, out);
@@ -1110,9 +1286,11 @@ namespace zust {
 
             bool isF = expect.isFloat;
             // GPR args
-            if (!isF && gpCount < ARG_GPR_MSVC.size()) {
+            if (!isF && gpCount < ARG_GPR_MSVC.size())
+            {
                 std::string dst = ARG_GPR_MSVC[gpCount];
-                if (alloc.isInUseArgument(dst)) {
+                if (alloc.isInUseArgument(dst))
+                {
                     auto funcScope = std::static_pointer_cast<FunctionScope>(
                         node->scope->findEnclosingFunctionScope());
                     std::string slot = funcScope->allocateSpillSlot(8,
@@ -1122,7 +1300,9 @@ namespace zust {
                     out << "    mov     QWORD PTR " << slot
                         << ", " << dst
                         << "    ; spill arg GPR\n";
-                } else {
+                }
+                else
+                {
                     dst = alloc.allocateArgument(gpCount);
                     reservedArgs.push_back(dst);
                 }
@@ -1132,9 +1312,11 @@ namespace zust {
                 gpCount++;
             }
             // XMM args
-            else if (isF && xmmCount < ARG_XMM_MSVC.size()) {
+            else if (isF && xmmCount < ARG_XMM_MSVC.size())
+            {
                 std::string dst = ARG_XMM_MSVC[xmmCount];
-                if (alloc.isInUseArgumentXMM(dst)) {
+                if (alloc.isInUseArgumentXMM(dst))
+                {
                     auto funcScope = std::static_pointer_cast<FunctionScope>(
                         node->scope->findEnclosingFunctionScope());
                     std::string slot = funcScope->allocateSpillSlot(16,
@@ -1144,7 +1326,9 @@ namespace zust {
                     out << "    movdqu  " << dst
                         << ", XMMWORD PTR " << slot
                         << "    ; spill arg XMM\n";
-                } else {
+                }
+                else
+                {
                     dst = alloc.allocateArgumentXMM(xmmCount);
                     reservedArgs.push_back(dst);
                 }
@@ -1152,7 +1336,8 @@ namespace zust {
                 out << "    movsd   " << dst << ", " << cvt << "\n";
 
                 // CORRECTED: Use argument index (i) instead of xmmCount
-                if (fnInfo.isVariadic && i < 4) {
+                if (fnInfo.isVariadic && i < 4)
+                {
                     static const std::vector<std::string> VARIADIC_FLOAT_GPRS = {"rcx", "rdx", "r8", "r9"};
                     std::string gprDst = VARIADIC_FLOAT_GPRS[i];
                     out << "    movq    " << gprDst << ", " << dst << "    ; duplicate variadic float to GPR\n";
@@ -1163,7 +1348,8 @@ namespace zust {
                 xmmCount++;
             }
             // stack‐overflow args
-            else {
+            else
+            {
                 out << "    mov     QWORD PTR [rsp+" << stackOff << "], "
                     << cvt << "\n";
                 stackOff += 8;
@@ -1173,7 +1359,8 @@ namespace zust {
         }
 
         // 6) Variadic‐ABI: number of float args in XMM
-        if (fnInfo.isVariadic) {
+        if (fnInfo.isVariadic)
+        {
             out << "    mov     rax, " << xmmCount
                 << "    ; variadic float count\n";
         }
@@ -1185,26 +1372,31 @@ namespace zust {
         out << "    add     rsp, " << shadowAndAlign << "      ; 🔑 Cleanup shadow space + alignment\n";
 
         // 8) Restore spilled argument regs
-        for (auto &r : spilledArgs) {
+        for (auto &r : spilledArgs)
+        {
             restoreIfSpilled(r, node->scope, out);
         }
-        for (auto &r : reservedArgs) {
+        for (auto &r : reservedArgs)
+        {
             alloc.freeArgument(r);
         }
 
         // 9) Restore caller‑saved XMMs & GPRs
-        for (auto it = savedXMM.rbegin(); it != savedXMM.rend(); ++it) {
+        for (auto it = savedXMM.rbegin(); it != savedXMM.rend(); ++it)
+        {
             out << "    movdqu  XMMWORD PTR " << it->second
                 << ", " << it->first
                 << "    ; restore XMM\n";
         }
-        for (auto it = savedGPR.rbegin(); it != savedGPR.rend(); ++it) {
+        for (auto it = savedGPR.rbegin(); it != savedGPR.rend(); ++it)
+        {
             out << "    pop     " << *it
                 << "    ; restore GPR\n";
         }
 
         // 10) Tear down arg stack
-        if (stackReserve) {
+        if (stackReserve)
+        {
             out << "    add     rsp, " << stackReserve
                 << "    ; pop arg stack\n";
         }
@@ -1214,11 +1406,14 @@ namespace zust {
         std::string holder = allocateOrSpill(isFltRet, node->scope, out);
         noteType(holder, node->scope->lookupType(fnInfo.returnType));
 
-        if (isFltRet) {
+        if (isFltRet)
+        {
             const char *mov = (fnInfo.returnType == "float" ? "movss" : "movsd");
             out << "    " << mov << " " << holder
                 << ", xmm0\n";
-        } else {
+        }
+        else
+        {
             out << "    mov     " << holder
                 << ", rax\n";
         }
@@ -1226,7 +1421,8 @@ namespace zust {
         return holder;
     }
 
-    void CodeGenWindows::generateFunctionDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out, bool force) {
+    void CodeGenWindows::generateFunctionDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out, bool force)
+    {
         if (node->value == "main" && !force)
             return;
 
@@ -1251,7 +1447,8 @@ namespace zust {
         std::ostringstream paramInit, body;
 
         size_t gpIdx = 0, xmmIdx = 0, stackArgOffset = 0;
-        for (auto &p : fnInfo.paramTypes) {
+        for (auto &p : fnInfo.paramTypes)
+        {
             TypeInfo ti = node->scope->lookupType(p.type);
             bool isFlt = ti.isFloat;
             int64_t slotOff = std::abs(bodyNode->scope->getVariableOffset(p.name));
@@ -1261,21 +1458,26 @@ namespace zust {
             if (isFlt)
                 movInst = (ti.bits == 64 ? "movsd" : "movss");
             else
-                movInst = "mov     ";  // QWORD PTR implied by reg
+                movInst = "mov     "; // QWORD PTR implied by reg
 
-            if (!isFlt && gpIdx < ARG_GPR_MS.size()) {
+            if (!isFlt && gpIdx < ARG_GPR_MS.size())
+            {
                 // integer reg → local slot
                 paramInit
                     << "    " << movInst
                     << " QWORD PTR [rbp-" << slotOff << "], "
                     << ARG_GPR_MS[gpIdx++] << "\n";
-            } else if (isFlt && xmmIdx < ARG_XMM_MS.size()) {
+            }
+            else if (isFlt && xmmIdx < ARG_XMM_MS.size())
+            {
                 // xmm reg → local slot
                 paramInit
                     << "    " << "movdqu"
                     << " XMMWORD PTR [rbp-" << slotOff << "], "
                     << ARG_XMM_MS[xmmIdx++] << "\n";
-            } else {
+            }
+            else
+            {
                 // spilled on caller’s stack at [rbp+16 + stackArgOffset]
                 int64_t callerDisp = 16 + stackArgOffset;
                 paramInit
@@ -1296,10 +1498,14 @@ namespace zust {
 
         // Generate the actual function body
         std::vector<std::unique_ptr<ASTNode>> nestedFns;
-        for (auto &stmt : bodyNode->children) {
-            if (stmt->type == NodeType::Function) {
+        for (auto &stmt : bodyNode->children)
+        {
+            if (stmt->type == NodeType::Function)
+            {
                 nestedFns.push_back(std::move(stmt));
-            } else {
+            }
+            else
+            {
                 generateStatement(std::move(stmt), body);
             }
         }
@@ -1308,7 +1514,8 @@ namespace zust {
 
         // If void return, emit epilogue after body
         std::ostringstream epilogue;
-        if (bodyNode->scope->returnType == "none") {
+        if (bodyNode->scope->returnType == "none")
+        {
             // Note: clearRax must be true for void
             emitEpilogue(funcScope, epilogue, /*clearRax=*/true);
         }
@@ -1321,7 +1528,8 @@ namespace zust {
             << epilogue.str();
 
         // Nested functions follow
-        for (auto &nf : nestedFns) {
+        for (auto &nf : nestedFns)
+        {
             generateFunctionDeclaration(std::move(nf), out, /*force=*/false);
         }
 
@@ -1329,12 +1537,14 @@ namespace zust {
         if (!force)
             out << fnInfo.label << " ENDP\n\n";
     }
-    void CodeGenWindows::generateExternFunctionDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out) {
+    void CodeGenWindows::generateExternFunctionDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out)
+    {
         auto fnInfo = node->scope->lookupFunction(node->value);
         const std::string &label = node->value;
         outGlobalStream << "EXTERN  " << label << ":FAR\n";
     }
-    void CodeGenWindows::generateReturnstatement(std::unique_ptr<ASTNode> node, std::ostringstream &out) {
+    void CodeGenWindows::generateReturnstatement(std::unique_ptr<ASTNode> node, std::ostringstream &out)
+    {
         std::string result = emitExpression(std::move(node->children[0]), out);
 
         // Restore if spilled
@@ -1349,13 +1559,18 @@ namespace zust {
         restoreIfSpilled(casted, funcScope, out);
 
         // Move into the ABI return register
-        if (expected.name == "none") {
+        if (expected.name == "none")
+        {
             // void return: zero RAX
             out << "    xor     rax, rax\n";
-        } else if (!expected.isFloat) {
+        }
+        else if (!expected.isFloat)
+        {
             // integer return
             out << "    mov     rax, " << casted << "\n";
-        } else {
+        }
+        else
+        {
             // floating‑point return
             const char *mov = (expected.bits == 32 ? "movss" : "movsd");
             out << "    " << mov << " xmm0, " << casted << "\n";
@@ -1363,4 +1578,4 @@ namespace zust {
         alloc.free(casted);
         emitEpilogue(funcScope, out);
     }
-}  // namespace zust
+} // namespace zust

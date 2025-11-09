@@ -11,14 +11,17 @@
 #include "codegen/RegisterAllocator.hpp"
 #include "typechecker/TypeChecker.hpp"
 
-namespace zust {
-    enum class TargetTriple {
+namespace zust
+{
+    enum class TargetTriple
+    {
         X86_64_LINUX,
         X86_64_WINDOWS,
         LLVM_IR
     };
 
-    class CodeGen {
+    class CodeGen
+    {
     protected:
         std::map<std::string, std::string> assembly_comparison_operations = {
             {">=", "setge"},
@@ -39,7 +42,8 @@ namespace zust {
         std::ostringstream outGlobalStream;
         std::ostringstream outStream;
 
-        std::string adjustReg(const std::string &r64, uint64_t bits) {
+        std::string adjustReg(const std::string &r64, uint64_t bits)
+        {
             std::string baseRegister = RegisterAllocator::getBaseReg(r64);
             static const std::unordered_map<std::string, std::array<std::string, 4>> registers_based_on_bytes = {
                 {"rax", {"rax", "eax", "ax", "al"}},
@@ -64,7 +68,8 @@ namespace zust {
                 throw std::runtime_error("Unknown register '" + baseRegister + "'\n\n");
             const auto &ents = it->second;
 
-            switch (bits) {
+            switch (bits)
+            {
             case 64:
                 return ents[0];
             case 32:
@@ -78,16 +83,21 @@ namespace zust {
             }
         }
 
-        static std::string getCorrectMove(uint64_t size_bytes, bool isfloat) {
-            if (isfloat) {
+        static std::string getCorrectMove(uint64_t size_bytes, bool isfloat)
+        {
+            if (isfloat)
+            {
                 if (size_bytes == 4)
                     return "movss";
                 else if (size_bytes == 8)
                     return "movsd";
                 else
                     throw std::runtime_error("Bad float move size");
-            } else {
-                switch (size_bytes) {
+            }
+            else
+            {
+                switch (size_bytes)
+                {
                 case 8:
                     return "movq";
                 case 4:
@@ -119,13 +129,15 @@ namespace zust {
         virtual void generateVariableReassignment(std::unique_ptr<ASTNode> node, std::ostringstream &out) = 0;
         virtual void generateVariableDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out) = 0;
         virtual void generateIfStatement(std::unique_ptr<ASTNode> node, std::ostringstream &out) = 0;
+        virtual void generateForLoop(std::unique_ptr<ASTNode> node, std::ostringstream &out) = 0;
+        virtual void generateWhileLoop(std::unique_ptr<ASTNode> node, std::ostringstream &out) = 0;
 
         virtual std::string generateBinaryOperation(std::unique_ptr<ASTNode> node, std::ostringstream &out) = 0;
         virtual std::string generateUnaryOperation(std::unique_ptr<ASTNode> node, std::ostringstream &out) = 0;
 
-        virtual std::string generateFunctionCall(std::unique_ptr<ASTNode> node, std::ostringstream &out) = 0;                      // Expression
-        virtual void generateFunctionDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out, bool force = false) = 0;  // Statement
-        virtual void generateExternFunctionDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out) = 0;                // Statement
+        virtual std::string generateFunctionCall(std::unique_ptr<ASTNode> node, std::ostringstream &out) = 0;                     // Expression
+        virtual void generateFunctionDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out, bool force = false) = 0; // Statement
+        virtual void generateExternFunctionDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out) = 0;               // Statement
 
     public:
         CodeGen(RegisterAllocator alloc, std::ostream &outstream) : stringLabelCount(0), blockLabelCount(0), doubleLabelCount(0), floatLabelCount(0), alloc(alloc), outfinal(outstream) {}
@@ -134,7 +146,8 @@ namespace zust {
         static std::unique_ptr<CodeGen> create(TargetTriple target, std::ostream &outstream);
     };
 
-    class CodeGenLinux : public CodeGen {
+    class CodeGenLinux : public CodeGen
+    {
     private:
         std::unordered_map<std::uint32_t, char> integer_suffixes = {{8, 'b'}, {16, 'w'}, {32, 'l'}, {64, 'q'}};
 
@@ -157,16 +170,18 @@ namespace zust {
         void generateVariableReassignment(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
         void generateVariableDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
         void generateIfStatement(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
+        void generateForLoop(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
+        void generateWhileLoop(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
 
         std::string generateBinaryOperation(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
         std::string generateUnaryOperation(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
 
         std::string castValue(const std::string &val, const TypeInfo &fromType, const TypeInfo &toType, const std::shared_ptr<ScopeContext> currentScope, std::ostringstream &out);
 
-        std::string generateFunctionCall(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;                      // Expression
-        void generateFunctionDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out, bool force = false) override;  // Statement
-        void generateExternFunctionDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;                // Statement
-        void generateReturnstatement(std::unique_ptr<ASTNode> node, std::ostringstream &out);                                   // Statement
+        std::string generateFunctionCall(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;                     // Expression
+        void generateFunctionDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out, bool force = false) override; // Statement
+        void generateExternFunctionDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;               // Statement
+        void generateReturnstatement(std::unique_ptr<ASTNode> node, std::ostringstream &out);                                  // Statement
 
     public:
         ~CodeGenLinux() override = default;
@@ -174,7 +189,8 @@ namespace zust {
         void generate(std::unique_ptr<ASTNode> program) override;
     };
 
-    class CodeGenWindows : public CodeGen {
+    class CodeGenWindows : public CodeGen
+    {
     private:
         std::unordered_map<std::uint32_t, char> integer_suffixes = {{8, 'b'}, {16, 'w'}, {32, 'l'}, {64, 'q'}};
 
@@ -196,16 +212,18 @@ namespace zust {
         void generateVariableReassignment(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
         void generateVariableDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
         void generateIfStatement(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
+        void generateForLoop(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
+        void generateWhileLoop(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
 
         std::string generateBinaryOperation(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
         std::string generateUnaryOperation(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
 
         std::string castValue(const std::string &val, const TypeInfo &fromType, const TypeInfo &toType, const std::shared_ptr<ScopeContext> currentScope, std::ostringstream &out);
 
-        std::string generateFunctionCall(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;                      // Expression
-        void generateFunctionDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out, bool force = false) override;  // Statement
-        void generateExternFunctionDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;                // Statement
-        void generateReturnstatement(std::unique_ptr<ASTNode> node, std::ostringstream &out);                                   // Statement
+        std::string generateFunctionCall(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;                     // Expression
+        void generateFunctionDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out, bool force = false) override; // Statement
+        void generateExternFunctionDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;               // Statement
+        void generateReturnstatement(std::unique_ptr<ASTNode> node, std::ostringstream &out);                                  // Statement
 
     public:
         ~CodeGenWindows() override = default;
@@ -213,7 +231,8 @@ namespace zust {
         void generate(std::unique_ptr<ASTNode> program) override;
     };
 
-    class CodeGenLLVM : public CodeGen {
+    class CodeGenLLVM : public CodeGen
+    {
     private:
         std::unordered_map<std::string, std::string> stringLiterals;
 
@@ -232,19 +251,21 @@ namespace zust {
         void generateVariableReassignment(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
         void generateVariableDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
         void generateIfStatement(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
+        void generateForLoop(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
+        void generateWhileLoop(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
 
         std::string generateBinaryOperation(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
         std::string generateUnaryOperation(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
         std::string castValue(const std::string &val, const TypeInfo &fromType, const TypeInfo &toType, std::ostringstream &out);
 
-        std::string generateFunctionCall(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;                      // Expression
-        void generateFunctionDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out, bool force = false) override;  // Statement
-        void generateExternFunctionDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;                // Statement
-        void generateReturnstatement(std::unique_ptr<ASTNode> node, std::ostringstream &out);                                   // Statement
+        std::string generateFunctionCall(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;                     // Expression
+        void generateFunctionDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out, bool force = false) override; // Statement
+        void generateExternFunctionDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;               // Statement
+        void generateReturnstatement(std::unique_ptr<ASTNode> node, std::ostringstream &out);                                  // Statement
 
     public:
         ~CodeGenLLVM() override = default;
         CodeGenLLVM(std::ostream &outstream) : CodeGen(RegisterAllocator(), outstream) {};
         void generate(std::unique_ptr<ASTNode> program) override;
     };
-}  // namespace zust
+} // namespace zust

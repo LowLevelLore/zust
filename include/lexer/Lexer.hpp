@@ -4,9 +4,12 @@
 
 #include "../common/Errors.hpp"
 
-namespace zust {
-    struct Token {
-        enum class Kind {
+namespace zust
+{
+    struct Token
+    {
+        enum class Kind
+        {
             Let,
             Identifier,
             Colon,
@@ -31,6 +34,8 @@ namespace zust {
             Function,
             LeftParen,
             RightParen,
+            For,
+            While,
             Unknown
         } kind;
 
@@ -38,7 +43,8 @@ namespace zust {
         size_t line;
         size_t column;
 
-        std::string to_string() const {
+        std::string to_string() const
+        {
             return "Token { kind = " + kindToString(kind) +
                    ", text = \"" + text +
                    "\", line = " + std::to_string(line) +
@@ -46,8 +52,10 @@ namespace zust {
         }
 
     private:
-        static std::string kindToString(Kind k) {
-            switch (k) {
+        static std::string kindToString(Kind k)
+        {
+            switch (k)
+            {
             case Kind::Equal:
                 return "Equal";
             case Kind::Colon:
@@ -98,16 +106,23 @@ namespace zust {
                 return "Dot";
             case Kind::Ellipsis:
                 return "Ellipsis";
+            case Kind::For:
+                return "For";
+            case Kind::While:
+                return "While";
+            default:
+                return "Invalid";
             }
-            return "Invalid";
         }
     };
 
-    inline std::ostream &operator<<(std::ostream &os, const Token &token) {
+    inline std::ostream &operator<<(std::ostream &os, const Token &token)
+    {
         return os << token.to_string();
     }
     using Error = zust::Error;
-    class Lexer {
+    class Lexer
+    {
     public:
         explicit Lexer(const std::string &source);
 
@@ -130,4 +145,4 @@ namespace zust {
         Token scanSymbol();
     };
 
-}  // namespace zust
+} // namespace zust

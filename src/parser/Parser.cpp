@@ -6,8 +6,10 @@
 // Structures
 // Stdlib
 
-namespace zust {
-    Parser::Parser(Lexer& lex) : lexer(lex) {
+namespace zust
+{
+    Parser::Parser(Lexer &lex) : lexer(lex)
+    {
         currentScope = std::make_shared<NamespaceScope>("GLOBAL__SCOPE", nullptr);
         // TODO: This is controversial, lets make something in the near future that
         // gets these (size_t, integer, float, double, etc) sizes dynamically
@@ -180,16 +182,20 @@ namespace zust {
 
     void Parser::advance() { currentToken = lexer.nextToken(); }
 
-    bool Parser::match(Token::Kind kind) {
-        if (currentToken.kind == kind) {
+    bool Parser::match(Token::Kind kind)
+    {
+        if (currentToken.kind == kind)
+        {
             advance();
             return true;
         }
         return false;
     }
 
-    void Parser::expect(Token::Kind kind, const std::string& errMsg) {
-        if (!match(kind)) {
+    void Parser::expect(Token::Kind kind, const std::string &errMsg)
+    {
+        if (!match(kind))
+        {
             logError({ErrorType::Syntax,
                       errMsg + " at line " + std::to_string(currentToken.line) +
                           ", column " + std::to_string(currentToken.column)});
@@ -199,9 +205,11 @@ namespace zust {
         }
     }
 
-    std::unique_ptr<ASTNode> Parser::parse() {
+    std::unique_ptr<ASTNode> Parser::parse()
+    {
         auto program = ASTNode::makeProgramNode(currentScope);
-        while (currentToken.kind != Token::Kind::EndOfFile) {
+        while (currentToken.kind != Token::Kind::EndOfFile)
+        {
             auto stmt = parseStatement();
             if (stmt)
                 program->addChild(std::move(stmt));
@@ -209,9 +217,12 @@ namespace zust {
         return program;
     }
 
-    std::unique_ptr<ASTNode> Parser::parseStatement() {
-        if (currentToken.kind == Token::Kind::Return) {
-            if (currentScope->isGlobalScope()) {
+    std::unique_ptr<ASTNode> Parser::parseStatement()
+    {
+        if (currentToken.kind == Token::Kind::Return)
+        {
+            if (currentScope->isGlobalScope())
+            {
                 logError({ErrorType::Syntax,
                           "Unexpected keyword '" + currentToken.text +
                               "' outside any function at line " +
@@ -220,15 +231,20 @@ namespace zust {
                 shouldTypecheck = false;
                 advance();
                 return nullptr;
-            } else {
+            }
+            else
+            {
                 advance();
                 auto node = std::make_unique<ASTNode>(NodeType::ReturnStatement, "",
                                                       currentScope);
-                if (currentToken.kind == Token::Kind::SemiColon) {
+                if (currentToken.kind == Token::Kind::SemiColon)
+                {
                     auto ret = std::make_unique<ASTNode>(NodeType::Symbol, "none",
                                                          currentScope);
                     node->addChild(std::move(ret));
-                } else {
+                }
+                else
+                {
                     node->addChild(parseExpression(true));
                 }
                 return node;
@@ -246,6 +262,10 @@ namespace zust {
             currentToken.kind == Token::Kind::ElseIf ||
             currentToken.kind == Token::Kind::Else)
             return parseConditionals();
+        if (currentToken.kind == Token::Kind::For)
+            return parseForLoop();
+        if (currentToken.kind == Token::Kind::While)
+            return parseWhileLoop();
         if (currentToken.kind == Token::Kind::Symbol ||
             currentToken.kind == Token::Kind::Identifier)
             return parseExpression(true);
@@ -257,11 +277,13 @@ namespace zust {
         return nullptr;
     }
 
-    std::unique_ptr<ASTNode> Parser::parseFunctionDeclaration() {
+    std::unique_ptr<ASTNode> Parser::parseFunctionDeclaration()
+    {
         bool isExtern = false;
         bool isVariadic = false;
         if (currentToken.kind == Token::Kind::Symbol &&
-            currentToken.text == "extern") {
+            currentToken.text == "extern")
+        {
             isExtern = true;
             advance();
         }
@@ -278,14 +300,16 @@ namespace zust {
         expect(Token::Kind::LeftParen, "Expected '(' after function name");
 
         std::vector<ParamInfo> params;
-        if (currentToken.kind != Token::Kind::RightParen) {
+        if (currentToken.kind != Token::Kind::RightParen)
+        {
             // Parse first parameter
             std::string paramName = currentToken.text;
             expect(Token::Kind::Identifier, "Expected parameter name");
 
             expect(Token::Kind::Colon, "Expected ':' after parameter name");
 
-            if (currentToken.kind != Token::Kind::Identifier) {
+            if (currentToken.kind != Token::Kind::Identifier)
+            {
                 logError(Error{ErrorType::Syntax,
                                "Expected data type after ':' at line " +
                                    std::to_string(currentToken.line) + ", column " +
@@ -298,9 +322,12 @@ namespace zust {
 
             params.push_back(ParamInfo{.name = paramName, .type = typeName});
 
-            while (match(Token::Kind::Comma)) {
-                if (currentToken.kind == Token::Kind::Ellipsis) {
-                    if (!isExtern) {
+            while (match(Token::Kind::Comma))
+            {
+                if (currentToken.kind == Token::Kind::Ellipsis)
+                {
+                    if (!isExtern)
+                    {
                         logError(Error{ErrorType::Generic, "We only support variadic arguments with extern functions"});
                         shouldTypecheck = false;
                         return nullptr;
@@ -309,7 +336,8 @@ namespace zust {
                     advance();
 
                     // Ellipsis must be the last thing before ')'
-                    if (currentToken.kind != Token::Kind::RightParen) {
+                    if (currentToken.kind != Token::Kind::RightParen)
+                    {
                         logError(Error{ErrorType::Syntax,
                                        "Variadic parameter '...' must be the last in the parameter list at line " +
                                            std::to_string(currentToken.line) + ", column " +
@@ -326,7 +354,8 @@ namespace zust {
 
                 expect(Token::Kind::Colon, "Expected ':' after parameter name");
 
-                if (currentToken.kind != Token::Kind::Identifier) {
+                if (currentToken.kind != Token::Kind::Identifier)
+                {
                     logError(Error{ErrorType::Syntax,
                                    "Expected data type after ':' at line " +
                                        std::to_string(currentToken.line) +
@@ -345,8 +374,10 @@ namespace zust {
 
         // Return type (optional)
         std::string returnTypeName = "none";
-        if (match(Token::Kind::Arrow)) {
-            if (currentToken.kind != Token::Kind::Identifier) {
+        if (match(Token::Kind::Arrow))
+        {
+            if (currentToken.kind != Token::Kind::Identifier)
+            {
                 logError(
                     Error{ErrorType::Syntax,
                           "Expected return type identifier after '->' at line " +
@@ -359,7 +390,8 @@ namespace zust {
             advance();
         }
 
-        if (isExtern) {
+        if (isExtern)
+        {
             expect(Token::Kind::SemiColon,
                    "Expected ';' after extern function declaration");
             return ASTNode::makeExternFunctionDeclaration(name, currentScope,
@@ -368,10 +400,14 @@ namespace zust {
         enterScope(currentScope->name() + "___" + name, true);
         auto body = parseBlock();
         exitScope();
-        if (name == "main") {
-            if (currentScope->parent() == nullptr) {
+        if (name == "main")
+        {
+            if (currentScope->parent() == nullptr)
+            {
                 // Ok go ahead
-            } else {
+            }
+            else
+            {
                 throw std::runtime_error("Main should be in global scope");
             }
         }
@@ -379,7 +415,8 @@ namespace zust {
                                                 returnTypeName, std::move(body), isVariadic);
     }
 
-    std::unique_ptr<ASTNode> Parser::parseBlock() {
+    std::unique_ptr<ASTNode> Parser::parseBlock()
+    {
         expect(Token::Kind::LeftBrace,
                "Expected a '{' to open a scope, at line " +
                    std::to_string(currentToken.line) + ", column " +
@@ -387,8 +424,10 @@ namespace zust {
         auto blockNode =
             std::make_unique<ASTNode>(NodeType::Program, "", currentScope);
         while (!match(Token::Kind::RightBrace) &&
-               currentToken.kind != Token::Kind::EndOfFile) {
-            if (currentToken.kind == Token::Kind::EndOfFile) {
+               currentToken.kind != Token::Kind::EndOfFile)
+        {
+            if (currentToken.kind == Token::Kind::EndOfFile)
+            {
                 logError({ErrorType::Syntax,
                           "Expected token '}' found 'End Of File' at line " +
                               std::to_string(currentToken.line) + ", column " +
@@ -401,8 +440,10 @@ namespace zust {
         return blockNode;
     }
 
-    std::unique_ptr<ASTNode> Parser::parseConditionals() {
-        if (!match(Token::Kind::If)) {
+    std::unique_ptr<ASTNode> Parser::parseConditionals()
+    {
+        if (!match(Token::Kind::If))
+        {
             logError({ErrorType::Syntax, "Expected 'if'"});
             shouldTypecheck = false;
             exit(1);
@@ -423,9 +464,10 @@ namespace zust {
         exitScope();
         auto root = ASTNode::makeIfStatement(std::move(condition),
                                              std::move(ifBlock), currentScope);
-        ASTNode* current = root.get();
+        ASTNode *current = root.get();
 
-        while (match(Token::Kind::ElseIf)) {
+        while (match(Token::Kind::ElseIf))
+        {
             expect(Token::Kind::LeftParen,
                    "Expected a '(' after if block at line " +
                        std::to_string(currentToken.line) + ", column " +
@@ -445,7 +487,8 @@ namespace zust {
         }
 
         // optional 'else'
-        if (match(Token::Kind::Else)) {
+        if (match(Token::Kind::Else))
+        {
             enterScope("Block__" + std::to_string(++blockNumber), false);
             auto elseBlock = parseBlock();
             exitScope();
@@ -457,7 +500,66 @@ namespace zust {
         return root;
     }
 
-    std::unique_ptr<ASTNode> Parser::parseVariableDeclaration() {
+    std::unique_ptr<ASTNode> Parser::parseForLoop()
+    {
+        expect(Token::Kind::For,
+               "Expected 'for' keyword at line " +
+                   std::to_string(currentToken.line) + ", column " +
+                   std::to_string(currentToken.column) + ".");
+
+        expect(Token::Kind::LeftParen,
+               "Expected '(' after 'for' at line " +
+                   std::to_string(currentToken.line) + ", column " +
+                   std::to_string(currentToken.column) + ".");
+
+        enterScope("Block__" + std::to_string(++blockNumber), false);
+        auto init = parseStatement();
+        auto condition = parseExpression(true);
+        auto postLoop = parseStatement();
+
+        std::cout << "Post Loop Token: " << currentToken.to_string() << "\n";
+
+        expect(Token::Kind::RightParen,
+               "Expected ')' after for loop clauses at line " +
+                   std::to_string(currentToken.line) + ", column " +
+                   std::to_string(currentToken.column) + ".");
+
+        auto body = parseBlock();
+        exitScope();
+
+        auto forNode = ASTNode::makeForLoopNode(std::move(init), std::move(condition), std::move(postLoop), std::move(body), currentScope);
+        return forNode;
+    }
+
+    std::unique_ptr<ASTNode> Parser::parseWhileLoop()
+    {
+        expect(Token::Kind::While,
+               "Expected 'while' keyword at line " +
+                   std::to_string(currentToken.line) + ", column " +
+                   std::to_string(currentToken.column) + ".");
+
+        expect(Token::Kind::LeftParen,
+               "Expected '(' after 'while' at line " +
+                   std::to_string(currentToken.line) + ", column " +
+                   std::to_string(currentToken.column) + ".");
+
+        auto condition = parseExpression();
+
+        expect(Token::Kind::RightParen,
+               "Expected ')' after while loop condition at line " +
+                   std::to_string(currentToken.line) + ", column " +
+                   std::to_string(currentToken.column) + ".");
+
+        enterScope("Block__" + std::to_string(++blockNumber), false);
+        auto body = parseBlock();
+        exitScope();
+
+        auto whileNode = ASTNode::makeWhileLoopNode(std::move(condition), std::move(body), currentScope);
+        return whileNode;
+    }
+
+    std::unique_ptr<ASTNode> Parser::parseVariableDeclaration()
+    {
         if (currentToken.kind != Token::Kind::Identifier)
             expect(Token::Kind::Identifier,
                    "Expected variable name after 'let'");
@@ -466,10 +568,13 @@ namespace zust {
         advance();
         std::unique_ptr<ASTNode> typeNode, initNode;
 
-        if (match(Token::Kind::Colon)) {
+        if (match(Token::Kind::Colon))
+        {
             typeNode = ASTNode::makeSymbolNode(currentToken.text, currentScope);
             advance();
-        } else {
+        }
+        else
+        {
             // TODO: Handle type deduction but its a far far task.
             logError(
                 Error(
@@ -478,23 +583,30 @@ namespace zust {
             advance();
             return nullptr;
         }
-        if (match(Token::Kind::Equal)) {
+        if (match(Token::Kind::Equal))
+        {
             initNode = parseExpression();
         }
-        if (initNode == nullptr) {
+        if (initNode == nullptr)
+        {
             TypeInfo ty = currentScope->lookupType(typeNode->value);
             if (zust::numeric_types.find(typeNode->value) !=
-                zust::numeric_types.end()) {
-                if (ty.isFloat) {
+                zust::numeric_types.end())
+            {
+                if (ty.isFloat)
+                {
                     if (ty.bits == 32)
                         initNode =
                             ASTNode::makeFloatLiteralNode("0.0F", currentScope);
                     else
                         initNode =
                             ASTNode::makeFloatLiteralNode("0.0", currentScope);
-                } else
+                }
+                else
                     initNode = ASTNode::makeIntegerLiteralNode("0", currentScope);
-            } else {
+            }
+            else
+            {
                 if (typeNode->value == "boolean")
                     initNode = ASTNode::makeBooleanLiteralNode(true, currentScope);
 
@@ -506,18 +618,22 @@ namespace zust {
         std::optional<std::unique_ptr<ASTNode>> result =
             ASTNode::makeVariableDeclarationNode(name, std::move(typeNode),
                                                  std::move(initNode), currentScope);
-        if (!result.has_value()) {
+        if (!result.has_value())
+        {
             logError(
                 Error(ErrorType::Generic,
                       "Variable '" + name + "' already defined in current scope."));
             shouldTypecheck = false;
             return nullptr;
-        } else {
+        }
+        else
+        {
             return std::move(result.value());
         }
     }
 
-    std::unique_ptr<ASTNode> Parser::parseVariableReassignment() {
+    std::unique_ptr<ASTNode> Parser::parseVariableReassignment()
+    {
         std::string name = currentToken.text;
         advance();
 
@@ -528,63 +644,80 @@ namespace zust {
                                                      currentScope);
     }
 
-    std::unique_ptr<ASTNode> Parser::parseExpression(bool expect_exclaim) {
+    std::unique_ptr<ASTNode> Parser::parseExpression(bool expect_exclaim)
+    {
         auto lhs = parseUnary();
         auto ans = parseBinaryRHS(0, std::move(lhs));
-        if (expect_exclaim) {
+        if (expect_exclaim)
+        {
             expect(Token::Kind::SemiColon, "';' Expected at the end of statement.");
         }
         return ans;
     }
 
-    std::unique_ptr<ASTNode> Parser::parsePrimary() {
-        if (currentToken.kind == Token::Kind::Symbol && currentToken.text == "-") {
+    std::unique_ptr<ASTNode> Parser::parsePrimary()
+    {
+        if (currentToken.kind == Token::Kind::Symbol && currentToken.text == "-")
+        {
             advance();
-            if (currentToken.kind == Token::Kind::FloatLiteral) {
+            if (currentToken.kind == Token::Kind::FloatLiteral)
+            {
                 std::string f = currentToken.text;
                 advance();
                 return ASTNode::makeFloatLiteralNode("-" + f, currentScope);
             }
-            if (currentToken.kind == Token::Kind::IntegerLiteral) {
+            if (currentToken.kind == Token::Kind::IntegerLiteral)
+            {
                 std::string val = currentToken.text;
                 advance();
                 return ASTNode::makeIntegerLiteralNode("-" + val, currentScope);
             }
         }
-        if (currentToken.kind == Token::Kind::BoolLiteral) {
+        if (currentToken.kind == Token::Kind::BoolLiteral)
+        {
             bool val = (currentToken.text == "true");
             advance();
             return ASTNode::makeBooleanLiteralNode(val, currentScope);
         }
-        if (currentToken.kind == Token::Kind::StringLiteral) {
+        if (currentToken.kind == Token::Kind::StringLiteral)
+        {
             std::string s = currentToken.text;
             advance();
             return ASTNode::makeStringLiteralNode(s, currentScope);
         }
-        if (currentToken.kind == Token::Kind::FloatLiteral) {
+        if (currentToken.kind == Token::Kind::FloatLiteral)
+        {
             std::string f = currentToken.text;
             advance();
             return ASTNode::makeFloatLiteralNode(f, currentScope);
         }
-        if (currentToken.kind == Token::Kind::IntegerLiteral) {
+        if (currentToken.kind == Token::Kind::IntegerLiteral)
+        {
             std::string val = currentToken.text;
             advance();
             return ASTNode::makeIntegerLiteralNode(val, currentScope);
         }
-        if (currentToken.kind == Token::Kind::Identifier) {
+        if (currentToken.kind == Token::Kind::Identifier)
+        {
             std::string name = currentToken.text;
             advance();
 
-            if (currentToken.kind == Token::Kind::LeftParen) {
+            if (currentToken.kind == Token::Kind::LeftParen)
+            {
                 advance();
                 std::vector<std::unique_ptr<ASTNode>> arguments;
 
-                if (currentToken.kind != Token::Kind::RightParen) {
-                    while (true) {
+                if (currentToken.kind != Token::Kind::RightParen)
+                {
+                    while (true)
+                    {
                         arguments.push_back(parseExpression(false));
-                        if (currentToken.kind == Token::Kind::Comma) {
+                        if (currentToken.kind == Token::Kind::Comma)
+                        {
                             advance();
-                        } else {
+                        }
+                        else
+                        {
                             break;
                         }
                     }
@@ -595,7 +728,8 @@ namespace zust {
 
             auto node = ASTNode::makeVariableAccessNode(name, currentScope);
             if (currentToken.kind == Token::Kind::Symbol &&
-                (currentToken.text == "++" || currentToken.text == "--")) {
+                (currentToken.text == "++" || currentToken.text == "--"))
+            {
                 std::string op = currentToken.text;
                 advance();
                 node = ASTNode::makeUnaryOp(op, std::move(node), currentScope);
@@ -611,10 +745,12 @@ namespace zust {
         return nullptr;
     }
 
-    std::unique_ptr<ASTNode> Parser::parseUnary() {
+    std::unique_ptr<ASTNode> Parser::parseUnary()
+    {
         if (currentToken.kind == Token::Kind::Symbol &&
             (currentToken.text == "++" || currentToken.text == "--" ||
-             currentToken.text == "!")) {
+             currentToken.text == "!"))
+        {
             std::string op = currentToken.text;
             advance();
             auto operand = parseUnary();
@@ -624,8 +760,10 @@ namespace zust {
     }
 
     std::unique_ptr<ASTNode> Parser::parseBinaryRHS(int exprPrec,
-                                                    std::unique_ptr<ASTNode> lhs) {
-        while (true) {
+                                                    std::unique_ptr<ASTNode> lhs)
+    {
+        while (true)
+        {
             // Only consider tokens that can represent binary operators
             if (!(currentToken.kind == Token::Kind::Symbol ||
                   (currentToken.kind == Token::Kind::Equal and
@@ -653,7 +791,8 @@ namespace zust {
         return lhs;
     }
 
-    int Parser::getPrecedence(const std::string& op) const {
+    int Parser::getPrecedence(const std::string &op) const
+    {
         static std::map<std::string, int> prec = {
             {"||", 1}, {"&&", 2}, {"==", 3}, {"!=", 3}, {"<", 4}, {">", 4}, {"<=", 4}, {">=", 4}, {"+", 5}, {"-", 5}, {"*", 6}, {"/", 6}};
 
@@ -661,20 +800,26 @@ namespace zust {
         return it == prec.end() ? -1 : it->second;
     }
 
-    void Parser::enterScope(const std::string& name, bool isFunction) {
-        if (isFunction) {
+    void Parser::enterScope(const std::string &name, bool isFunction)
+    {
+        if (isFunction)
+        {
             currentScope = std::make_shared<FunctionScope>(name, currentScope);
-        } else {
+        }
+        else
+        {
             auto funcScope = currentScope->findEnclosingFunctionScope();
-            if (!funcScope) {
+            if (!funcScope)
+            {
                 throw std::runtime_error("Block scope must be inside a function scope");
             }
             currentScope = std::make_shared<BlockScope>(name, funcScope, currentScope);
         }
     }
-    void Parser::exitScope() {
+    void Parser::exitScope()
+    {
         if (!currentScope->parent())
             throw std::runtime_error("Scope underflow");
         currentScope = currentScope->parent();
     }
-}  // namespace zust
+} // namespace zust

@@ -7,12 +7,15 @@
 #include "common/Logging.hpp"
 #include "parser/ScopeContext.hpp"
 
-namespace zust {
-    class Parser {
+namespace zust
+{
+    class Parser
+    {
     public:
         explicit Parser(Lexer &lexer);
         std::unique_ptr<ASTNode> parse();
-        bool isCorrect() {
+        bool isCorrect()
+        {
             return shouldTypecheck;
         }
 
@@ -31,6 +34,8 @@ namespace zust {
         std::unique_ptr<ASTNode> parseVariableDeclaration();
         std::unique_ptr<ASTNode> parseVariableReassignment();
         std::unique_ptr<ASTNode> parseConditionals();
+        std::unique_ptr<ASTNode> parseForLoop();
+        std::unique_ptr<ASTNode> parseWhileLoop();
         std::unique_ptr<ASTNode> parseExpression(bool expect_exclaim = false);
         std::unique_ptr<ASTNode> parsePrimary();
         std::unique_ptr<ASTNode> parseFunctionDeclaration();

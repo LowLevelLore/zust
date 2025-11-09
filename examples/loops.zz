@@ -1,0 +1,17 @@
+extern fn printf(fmt: string, ...) -> int32_t;
+
+fn main() {
+    let sum: int32_t = 0;
+    for(let i: int32_t = 1; i <= 10; i = i + 1;){
+        sum = sum + i;
+    }
+    printf("Sum of first 10 natural numbers: %d\n", sum);
+
+    let count: int32_t = 0;
+    let n: int32_t = 20;
+    while(n > 0){
+        count = count + 1;
+        n = n - 2;
+    }
+    printf("Count of iterations until n <= 0: %d\n", count);
+}

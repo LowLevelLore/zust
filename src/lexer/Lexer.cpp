@@ -1,44 +1,56 @@
 #include "all.hpp"
 
-namespace zust {
+namespace zust
+{
 
     Lexer::Lexer(const std::string &source)
-        : source_(source), pos_(0), line_(1), column_(1) {
+        : source_(source), pos_(0), line_(1), column_(1)
+    {
     }
 
-    void Lexer::reset() {
+    void Lexer::reset()
+    {
         pos_ = 0;
         line_ = 1;
         column_ = 1;
     }
 
-    char Lexer::advance() {
+    char Lexer::advance()
+    {
         if (pos_ >= source_.size())
             return '\0';
         char c = source_[pos_++];
-        if (c == '\n') {
+        if (c == '\n')
+        {
             ++line_;
             column_ = 1;
-        } else {
+        }
+        else
+        {
             ++column_;
         }
         return c;
     }
 
-    char Lexer::peekChar(size_t offset) const {
+    char Lexer::peekChar(size_t offset) const
+    {
         if (pos_ + offset >= source_.size())
             return '\0';
         return source_[pos_ + offset];
     }
 
-    void Lexer::skipWhitespaceAndComments() {
-        while (true) {
+    void Lexer::skipWhitespaceAndComments()
+    {
+        while (true)
+        {
             char c = peekChar();
-            if (std::isspace(static_cast<unsigned char>(c))) {
+            if (std::isspace(static_cast<unsigned char>(c)))
+            {
                 advance();
                 continue;
             }
-            if (c == '/' && peekChar(1) == '/') {
+            if (c == '/' && peekChar(1) == '/')
+            {
                 // line comment
                 advance();
                 advance();
@@ -50,13 +62,15 @@ namespace zust {
         }
     }
 
-    Token Lexer::nextToken() {
+    Token Lexer::nextToken()
+    {
         skipWhitespaceAndComments();
         size_t tokLine = line_;
         size_t tokCol = column_;
 
         char c = peekChar();
-        if (c == '\0') {
+        if (c == '\0')
+        {
             return Token{Token::Kind::EndOfFile, "", tokLine, tokCol};
         }
 
@@ -72,7 +86,8 @@ namespace zust {
         return scanSymbol();
     }
 
-    Token Lexer::peek(size_t offset) const {
+    Token Lexer::peek(size_t offset) const
+    {
         Lexer copy = *this;
         Token tok;
         for (size_t i = 0; i <= offset; ++i)
@@ -80,7 +95,8 @@ namespace zust {
         return tok;
     }
 
-    Token Lexer::scanIdentifierOrKeywordOrConditional() {
+    Token Lexer::scanIdentifierOrKeywordOrConditional()
+    {
         size_t startLine = line_;
         size_t startCol = column_;
         std::string text;
@@ -102,6 +118,12 @@ namespace zust {
         if (text == "else")
             return {Token::Kind::Else, text, startLine, startCol};
 
+        if (text == "for")
+            return {Token::Kind::For, text, startLine, startCol};
+
+        if (text == "while")
+            return {Token::Kind::While, text, startLine, startCol};
+
         if (text == "fn")
             return {Token::Kind::Function, text, startLine, startCol};
 
@@ -114,17 +136,20 @@ namespace zust {
         return Token{Token::Kind::Identifier, text, startLine, startCol};
     }
 
-    Token Lexer::scanNumber() {
+    Token Lexer::scanNumber()
+    {
         size_t startLine = line_;
         size_t startCol = column_;
         std::string text;
         bool seenDot = false;
-        while (std::isdigit(static_cast<unsigned char>(peekChar())) || (!seenDot && peekChar() == '.')) {
+        while (std::isdigit(static_cast<unsigned char>(peekChar())) || (!seenDot && peekChar() == '.'))
+        {
             if (peekChar() == '.')
                 seenDot = true;
             text.push_back(advance());
         }
-        if ((peekChar() == 'f' || peekChar() == 'F') && seenDot) {
+        if ((peekChar() == 'f' || peekChar() == 'F') && seenDot)
+        {
             text.push_back(advance());
         }
         return Token{
@@ -132,38 +157,45 @@ namespace zust {
             text, startLine, startCol};
     }
 
-    Token Lexer::scanString() {
+    Token Lexer::scanString()
+    {
         size_t startLine = line_;
         size_t startCol = column_;
-        advance();  // consume '"'
+        advance(); // consume '"'
         std::string text;
         while (peekChar() != '"' && peekChar() != '\0')
             text.push_back(advance());
         if (peekChar() == '"')
-            advance();  // consume closing '"'
+            advance(); // consume closing '"'
         else
             logError(Error(ErrorType::Syntax, "Unterminated string literal."));
         return Token{Token::Kind::StringLiteral, text, startLine, startCol};
     }
 
-    Token Lexer::scanSymbol() {
+    Token Lexer::scanSymbol()
+    {
         size_t startLine = line_;
         size_t startCol = column_;
         char c = advance();
         std::string text(1, c);
         char next = peekChar();
 
-        if (c == '.' && next == '.') {
-            if (peekChar(1) == '.') {
+        if (c == '.' && next == '.')
+        {
+            if (peekChar(1) == '.')
+            {
                 advance();
                 advance();
                 return Token{Token::Kind::Ellipsis, "...", startLine, startCol};
-            } else {
+            }
+            else
+            {
                 throw std::runtime_error("'..' is not a operator");
             }
         }
 
-        if (c == '-' && next == '>') {
+        if (c == '-' && next == '>')
+        {
             text.push_back(advance());
             return Token{Token::Kind::Arrow, text, startLine, startCol};
         }
@@ -178,11 +210,13 @@ namespace zust {
             (c == '!' && next == '=') ||
             (c == '=' && next == '=') ||
             (c == '+' && next == '+') ||
-            (c == '-' && next == '-')) {
+            (c == '-' && next == '-'))
+        {
             text.push_back(advance());
         }
 
-        switch (c) {
+        switch (c)
+        {
         case ':':
             return Token{Token::Kind::Colon, text, startLine, startCol};
         case '.':
@@ -215,4 +249,4 @@ namespace zust {
             return Token{Token::Kind::Symbol, text, startLine, startCol};
         }
     }
-}  // namespace zust
+} // namespace zust

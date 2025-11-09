@@ -7,13 +7,15 @@
 
 #include "parser/ScopeContext.hpp"
 
-namespace zust {
-    enum class NodeType {
+namespace zust
+{
+    enum class NodeType
+    {
         Program,
-        VariableDeclaration,   // let x: int; or let x = 10;
-        VariableReassignment,  // x = 42;
-        VariableAccess,        // just x
-        IntegerLiteral,        // 10, 42
+        VariableDeclaration,  // let x: int; or let x = 10;
+        VariableReassignment, // x = 42;
+        VariableAccess,       // just x
+        IntegerLiteral,       // 10, 42
         FloatLiteral,
         StringLiteral,
         BooleanLiteral,
@@ -30,10 +32,13 @@ namespace zust {
         FunctionReturnType,
         ReturnStatement,
         FunctionCall,
-        FunctionCallArgumentList
+        FunctionCallArgumentList,
+        ForLoop,
+        WhileLoop
     };
 
-    class ASTNode {
+    class ASTNode
+    {
     public:
         NodeType type;
         std::string value;
@@ -65,12 +70,20 @@ namespace zust {
         static std::unique_ptr<ASTNode> makeFunctionDeclaration(std::string name, const std::shared_ptr<ScopeContext> scope, std::vector<ParamInfo> params, std::string returnType, std::unique_ptr<ASTNode> body, bool isVariadic);
         static std::unique_ptr<ASTNode> makeFunctionCall(std::string name, std::vector<std::unique_ptr<ASTNode>> arguments, const std::shared_ptr<ScopeContext> scope);
         static std::unique_ptr<ASTNode> makeFunctionParameterList(const std::vector<ParamInfo> params, const std::shared_ptr<ScopeContext> scope);
+        static std::unique_ptr<ASTNode> makeForLoopNode(std::unique_ptr<ASTNode> initializer, std::unique_ptr<ASTNode> condition, std::unique_ptr<ASTNode> postLoop, std::unique_ptr<ASTNode> body, const std::shared_ptr<ScopeContext> scope);
+        static std::unique_ptr<ASTNode> makeWhileLoopNode(std::unique_ptr<ASTNode> condition, std::unique_ptr<ASTNode> body, const std::shared_ptr<ScopeContext> scope);
         void addChild(std::unique_ptr<ASTNode> child);
         void setElseBranch(std::unique_ptr<ASTNode> elseNode);
         ASTNode *getElseBranch() const;
         ASTNode *getFunctionParamList() const;
         ASTNode *getFunctionParamReturnType() const;
         ASTNode *getFunctionBody() const;
+        ASTNode* getInitializationForLoop() const;
+        ASTNode* getConditionForLoop() const;
+        ASTNode* getPostLoopForLoop() const;
+        ASTNode* getBodyForLoop() const;
+        ASTNode* getConditionWhileLoop() const;
+        ASTNode* getBodyWhileLoop() const;
         void print(std::ostream &out, int indent = 0) const;
     };
-}  // namespace zust
+} // namespace zust
