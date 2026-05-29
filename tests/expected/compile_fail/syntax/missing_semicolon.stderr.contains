@@ -1,0 +1,3 @@
+# Required syntax-failure markers
+[Syntax Error]
+Expected ';' after declaration

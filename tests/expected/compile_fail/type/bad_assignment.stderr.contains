@@ -1,0 +1,3 @@
+# Required semantic/type-failure markers
+[Type Error]
+Undefined type 'not_a_type'
