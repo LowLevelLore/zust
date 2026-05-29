@@ -241,9 +241,9 @@ namespace zust
         // 2) Raw value from the AST (e.g. contains "\n", "\"", etc.)
         const std::string &raw = node->value;
 
-        // 3) Split into printable chars and numeric bytes
-        std::string printable;
-        std::vector<unsigned char> nums;
+        // 3) Decode escapes into the exact byte order. MASM string literals do
+        // not use C-style backslash escapes, so emit numeric bytes directly.
+        std::vector<unsigned char> bytes;
 
         for (size_t i = 0; i < raw.size(); ++i)
         {
@@ -253,69 +253,51 @@ namespace zust
                 switch (esc)
                 {
                 case 'n':
-                    nums.push_back(0x0A);
+                    bytes.push_back(0x0A);
                     break;
                 case 't':
-                    nums.push_back(0x09);
+                    bytes.push_back(0x09);
+                    break;
+                case 'r':
+                    bytes.push_back(0x0D);
                     break;
                 case '\\':
-                    printable.push_back('\\');
+                    bytes.push_back('\\');
                     break;
                 case '"':
-                    printable.push_back('"');
+                    bytes.push_back('"');
                     break;
                 case '0':
-                    nums.push_back(0x00);
+                    bytes.push_back(0x00);
                     break;
                 default:
                     // Unknown escape: emit literally
-                    printable.push_back('\\');
-                    printable.push_back(esc);
+                    bytes.push_back('\\');
+                    bytes.push_back(esc);
                 }
             }
             else
             {
-                printable.push_back(raw[i]);
+                bytes.push_back(static_cast<unsigned char>(raw[i]));
             }
         }
         // Always null-terminate
-        nums.push_back(0x00);
+        bytes.push_back(0x00);
 
         // 4) Emit the data declaration
         outGlobalStream << "    ALIGN 1\n";
         outGlobalStream << lbl << " db ";
 
-        // Emit the quoted printable portion if non-empty
-        if (!printable.empty())
-        {
-            outGlobalStream << "\"";
-            for (unsigned char c : printable)
-            {
-                if (c == '"')
-                    outGlobalStream << "\"\""; // MASM doubles quotes
-                else if (c == '\\')
-                    outGlobalStream << "\\\\"; // literal backslash
-                else
-                    outGlobalStream << c;
-            }
-            outGlobalStream << "\"";
-
-            if (!nums.empty())
-            {
-                outGlobalStream << ",";
-            }
-        }
-
         // Emit numeric bytes (e.g. 0Ah for newline, 00h for terminator)
-        for (size_t i = 0; i < nums.size(); ++i)
+        for (size_t i = 0; i < bytes.size(); ++i)
         {
-            unsigned int b = nums[i];
+            unsigned int b = bytes[i];
             outGlobalStream
                 << std::uppercase
                 << std::hex
                 << "0" << b << "h"
                 << std::dec;
-            if (i + 1 < nums.size())
+            if (i + 1 < bytes.size())
             {
                 outGlobalStream << ",";
             }
