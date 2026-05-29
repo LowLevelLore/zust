@@ -200,7 +200,7 @@ namespace zust
                       errMsg + " at line " + std::to_string(currentToken.line) +
                           ", column " + std::to_string(currentToken.column)});
             shouldTypecheck = false;
-            exit(0);
+            exit(1);
             return;
         }
     }

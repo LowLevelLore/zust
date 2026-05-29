@@ -1,0 +1,4 @@
+extern fn foo(x: not_a_type) -> none;
+
+fn main() {
+}

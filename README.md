@@ -145,18 +145,24 @@ Generates: `program` (executable)
 
 ### Automated Testing
 
-Run all test cases for a specific target:
+Install test dependencies:
 ```bash
-# Test native platform (auto-detected)
-python test_runner.py
+python3 -m pip install -r requirements-dev.txt
+```
 
-# Test specific targets
-TARGET=linux python test_runner.py      # Linux
-TARGET=windows python test_runner.py    # Windows (if ml64 available)
-TARGET=llvm python test_runner.py       # LLVM
+Run strict golden-output tests with `pytest`:
+```bash
+# Auto-detect native target when TARGET is not set
+pytest -q
 
-# Test multiple targets
-TARGET=linux,llvm python test_runner.py
+# Linux + LLVM
+TARGET=linux,llvm pytest -q
+
+# Windows
+TARGET=windows pytest -q
+
+# Update/create runtime goldens explicitly
+TARGET=linux pytest -q --bless
 ```
 
 ---
@@ -195,7 +201,13 @@ fn main() {
 
 ## 🧪 Testing
 
-You can add `.zz` programs inside a `tests/` folder and run them individually through the pipeline. Type errors, parsing errors, and codegen output are printed to the terminal.
+Test suites are directory-based:
+
+- `tests/runtime`: program must compile, run, and match exact `stdout`/`stderr`/exit code
+- `tests/runtime_fail`: program must compile, run, and match exact failing output + nonzero exit code
+- `tests/compile_fail`: program must fail compilation with expected exit code and required stderr substrings
+
+Expected files live under `tests/expected/<mode>/...` with mirrored paths.
 
 ---
 

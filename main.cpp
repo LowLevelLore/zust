@@ -130,6 +130,7 @@ int main(int argc, char *argv[]) {
         cg->generate(std::move(program));
     } catch (std::exception const &exc) {
         std::cerr << "ERROR: " << exc.what() << "\n";
+        return 1;
     }
 
     return 0;
