@@ -6,6 +6,7 @@
 #include <memory>
 #include <ostream>
 #include <sstream>
+#include <vector>
 
 #include "ast/ASTNode.hpp"
 #include "codegen/RegisterAllocator.hpp"
@@ -30,6 +31,13 @@ namespace zust
             {"<", "setl"},
             {"==", "sete"},
             {"!=", "setne"}};
+        std::map<std::string, std::string> unsigned_assembly_comparison_operations = {
+            {">=", "setae"},
+            {"<=", "setbe"},
+            {">", "seta"},
+            {"<", "setb"},
+            {"==", "sete"},
+            {"!=", "setne"}};
 
         std::unordered_map<std::string, TypeInfo> regType;
         std::uint64_t stringLabelCount = 0;
@@ -38,6 +46,7 @@ namespace zust
         std::uint64_t floatLabelCount = 0;
         RegisterAllocator alloc;
         std::ostream &outfinal;
+        std::vector<std::pair<std::string, std::string>> loopLabelStack;
 
         std::ostringstream outGlobalStream;
         std::ostringstream outStream;

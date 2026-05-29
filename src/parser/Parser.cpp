@@ -266,6 +266,21 @@ namespace zust
             return parseForLoop();
         if (currentToken.kind == Token::Kind::While)
             return parseWhileLoop();
+        if (currentToken.kind == Token::Kind::Break ||
+            currentToken.kind == Token::Kind::Continue)
+        {
+            bool isBreak = currentToken.kind == Token::Kind::Break;
+            if (loopDepth == 0)
+            {
+                logError({ErrorType::Syntax,
+                          "'" + currentToken.text + "' can only be used inside a loop."});
+                shouldTypecheck = false;
+            }
+            advance();
+            expect(Token::Kind::SemiColon, "Expected ';' after loop control statement.");
+            return isBreak ? ASTNode::makeBreakStatementNode(currentScope)
+                           : ASTNode::makeContinueStatementNode(currentScope);
+        }
         if (currentToken.kind == Token::Kind::Symbol ||
             currentToken.kind == Token::Kind::Identifier)
             return parseExpression(true);
@@ -517,14 +532,14 @@ namespace zust
         auto condition = parseExpression(true);
         auto postLoop = parseStatement();
 
-        std::cout << "Post Loop Token: " << currentToken.to_string() << "\n";
-
         expect(Token::Kind::RightParen,
                "Expected ')' after for loop clauses at line " +
                    std::to_string(currentToken.line) + ", column " +
                    std::to_string(currentToken.column) + ".");
 
+        ++loopDepth;
         auto body = parseBlock();
+        --loopDepth;
         exitScope();
 
         auto forNode = ASTNode::makeForLoopNode(std::move(init), std::move(condition), std::move(postLoop), std::move(body), currentScope);
@@ -551,7 +566,9 @@ namespace zust
                    std::to_string(currentToken.column) + ".");
 
         enterScope("Block__" + std::to_string(++blockNumber), false);
+        ++loopDepth;
         auto body = parseBlock();
+        --loopDepth;
         exitScope();
 
         auto whileNode = ASTNode::makeWhileLoopNode(std::move(condition), std::move(body), currentScope);

@@ -1,0 +1,10 @@
+extern fn exit(code: int32_t) -> none;
+extern fn strlen(s: string) -> size_t;
+
+fn main() {
+    let escaped: string = "a\n\t\\\"";
+    let len: size_t = strlen(escaped);
+    if(len != 5){
+        exit(1);
+    }
+}

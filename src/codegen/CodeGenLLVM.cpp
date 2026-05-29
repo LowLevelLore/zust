@@ -470,6 +470,32 @@ namespace zust
             out << "\n";
             break;
         }
+        case NodeType::WhileLoop:
+        {
+            generateWhileLoop(std::move(statement), out);
+            out << "\n";
+            break;
+        }
+        case NodeType::ForLoop:
+        {
+            generateForLoop(std::move(statement), out);
+            out << "\n";
+            break;
+        }
+        case NodeType::BreakStatement:
+        {
+            if (loopLabelStack.empty())
+                throw std::runtime_error("'break' emitted outside a loop");
+            out << "    br label %" << loopLabelStack.back().second << "\n\n";
+            break;
+        }
+        case NodeType::ContinueStatement:
+        {
+            if (loopLabelStack.empty())
+                throw std::runtime_error("'continue' emitted outside a loop");
+            out << "    br label %" << loopLabelStack.back().first << "\n\n";
+            break;
+        }
         case NodeType::UnaryOp:
         {
             std::string op = statement->value;
@@ -666,12 +692,98 @@ namespace zust
     }
     void CodeGenLLVM::generateForLoop(std::unique_ptr<ASTNode> node, std::ostringstream &out)
     {
-        // TODO: implement loop codegen
+        int id = blockLabelCount++;
+        std::string initLbl = "for.init" + std::to_string(id);
+        std::string condLbl = "for.cond" + std::to_string(id);
+        std::string bodyLbl = "for.body" + std::to_string(id);
+        std::string postLbl = "for.post" + std::to_string(id);
+        std::string endLbl = "for.end" + std::to_string(id);
+        loopLabelStack.push_back({postLbl, endLbl});
+
+        out << "    br label %" << initLbl << "\n\n";
+
+        // Init block
+        out << initLbl << ":\n";
+        if (node->children.size() > 0 && node->children[0]) {
+            generateStatement(std::move(node->children[0]), out);
+        }
+        out << "    br label %" << condLbl << "\n\n";
+
+        // Condition block
+        out << condLbl << ":\n";
+        if (node->children.size() > 1 && node->children[1]) {
+            auto condVal = emitExpression(std::move(node->children[1]), out);
+            TypeInfo condTi = regType[condVal];
+            std::string condBool = fresh();
+            out << "    " << condBool << " = trunc i" << condTi.bits << " " << condVal << " to i1\n";
+            out << "    br i1 " << condBool << ", label %" << bodyLbl << ", label %" << endLbl << "\n\n";
+        } else {
+            out << "    br label %" << bodyLbl << "\n\n";
+        }
+
+        // Body block
+        out << bodyLbl << ":\n";
+        if (node->children.size() > 3 && node->children[3]) {
+            ASTNode *body = node->children[3].get();
+            auto children = std::move(body->children);
+            emitPrologue(body->scope, out);
+            for (auto &stmt : children) {
+                generateStatement(std::move(stmt), out);
+            }
+            emitEpilogue(body->scope, out);
+        }
+        out << "    br label %" << postLbl << "\n\n";
+
+        // Post-loop block
+        out << postLbl << ":\n";
+        if (node->children.size() > 2 && node->children[2]) {
+            generateStatement(std::move(node->children[2]), out);
+        }
+        out << "    br label %" << condLbl << "\n\n";
+
+        // End block
+        out << endLbl << ":\n";
+        loopLabelStack.pop_back();
     }
 
     void CodeGenLLVM::generateWhileLoop(std::unique_ptr<ASTNode> node, std::ostringstream &out)
     {
-        // TODO: implement loop codegen
+        int id = blockLabelCount++;
+        std::string condLbl = "while.cond" + std::to_string(id);
+        std::string bodyLbl = "while.body" + std::to_string(id);
+        std::string endLbl = "while.end" + std::to_string(id);
+        loopLabelStack.push_back({condLbl, endLbl});
+
+        out << "    br label %" << condLbl << "\n\n";
+
+        // Condition block
+        out << condLbl << ":\n";
+        if (node->children.size() > 0 && node->children[0]) {
+            auto condVal = emitExpression(std::move(node->children[0]), out);
+            TypeInfo condTi = regType[condVal];
+            std::string condBool = fresh();
+            out << "    " << condBool << " = trunc i" << condTi.bits << " " << condVal << " to i1\n";
+            out << "    br i1 " << condBool << ", label %" << bodyLbl << ", label %" << endLbl << "\n\n";
+        } else {
+            out << "    br label %" << bodyLbl << "\n\n";
+        }
+
+        // Body block
+        out << bodyLbl << ":\n";
+        if (node->children.size() > 1 && node->children[1]) {
+            ASTNode *body = node->children[1].get();
+            auto children = std::move(body->children);
+            emitPrologue(body->scope, out);
+            for (auto &stmt : children) {
+                generateStatement(std::move(stmt), out);
+            }
+            emitEpilogue(body->scope, out);
+        }
+        out << "    br label %" << condLbl << "\n\n";
+
+        // End block
+        out << endLbl << ":\n";
+        loopLabelStack.pop_back();
     }
     void CodeGenLLVM::generate(std::unique_ptr<ASTNode> program)
     {

@@ -301,7 +301,7 @@ namespace zust
         rl = castValue(rl, t1, tr, node->scope, out);
         restoreIfSpilled(rl, node->scope, out);
         rr = castValue(rr, t2, tr, node->scope, out);
-        restoreIfSpilled(rl, node->scope, out);
+        restoreIfSpilled(rr, node->scope, out);
 
         if (tr.isFloat)
         {
@@ -355,6 +355,8 @@ namespace zust
                 out << "    imul" << suf << " %" << adj_r << ", %" << adj_l << "\n";
             else /* div */
             {
+                out << "    cmp" << suf << " $0, %" << adj_r << "\n"
+                    << "    je __division_by_zero\n";
                 // division requires special setup
                 if (tr.isSigned)
                 {
@@ -402,7 +404,7 @@ namespace zust
         // Integer comparison
         if (assembly_comparison_operations.count(op))
         {
-            auto &map = tr.isSigned ? assembly_comparison_operations : /* unsigned map here */ assembly_comparison_operations;
+            auto &map = tr.isSigned ? assembly_comparison_operations : unsigned_assembly_comparison_operations;
             out << "    cmp" << suf << " %" << adj_r << ", %" << adj_l << "\n"
                 << "    " << map.at(op) << " %al\n";
             TypeInfo boolType = node->scope->lookupType("boolean");
@@ -630,6 +632,20 @@ namespace zust
             out << "\n";
             break;
         }
+        case NodeType::BreakStatement:
+        {
+            if (loopLabelStack.empty())
+                throw std::runtime_error("'break' emitted outside a loop");
+            out << "    jmp " << loopLabelStack.back().second << "\n\n";
+            break;
+        }
+        case NodeType::ContinueStatement:
+        {
+            if (loopLabelStack.empty())
+                throw std::runtime_error("'continue' emitted outside a loop");
+            out << "    jmp " << loopLabelStack.back().first << "\n\n";
+            break;
+        }
         case NodeType::UnaryOp:
         {
             std::string op = statement->value;
@@ -835,16 +851,78 @@ namespace zust
     void CodeGenLinux::generateForLoop(std::unique_ptr<ASTNode> node, std::ostringstream &out)
     {
         int id = blockLabelCount++;
-        ASTNode *init = node->getInitializationForLoop();
-        std::string startLbl = ".Lfor_init_start" + std::to_string(id);
-        std::string endLbl = ".Lfor_init_end" + std::to_string(id);
-        out << startLbl << ":\n";
-        if (init){
-            generateStatement(std::move(init), out);
+        std::string conditionLbl = ".Lfor_cond_" + std::to_string(id);
+        std::string postLbl = ".Lfor_post_" + std::to_string(id);
+        std::string endLbl = ".Lfor_end_" + std::to_string(id);
+        loopLabelStack.push_back({postLbl, endLbl});
+
+        // Execute initialization
+        if (node->children.size() > 0 && node->children[0]) {
+            generateStatement(std::move(node->children[0]), out);
         }
+
+        // Condition check
+        out << conditionLbl << ":\n";
+        if (node->children.size() > 1 && node->children[1]) {
+            auto condR = emitExpression(std::move(node->children[1]), out);
+            restoreIfSpilled(condR, node->scope, out);
+            out << "    cmpq $0, %" << condR << "\n";
+            out << "    je " << endLbl << "\n";
+            alloc.free(condR);
+        }
+
+        // Loop body
+        if (node->children.size() > 3 && node->children[3]) {
+            ASTNode *body = node->children[3].get();
+            emitPrologue(body->scope, out);
+            for (auto &stmt : body->children) {
+                generateStatement(std::move(stmt), out);
+            }
+            emitEpilogue(body->scope, out);
+        }
+
+        // Post-loop statement
+        out << postLbl << ":\n";
+        if (node->children.size() > 2 && node->children[2]) {
+            generateStatement(std::move(node->children[2]), out);
+        }
+
+        // Jump back to condition
+        out << "    jmp " << conditionLbl << "\n";
+        out << endLbl << ":\n\n";
+        loopLabelStack.pop_back();
     }
     void CodeGenLinux::generateWhileLoop(std::unique_ptr<ASTNode> node, std::ostringstream &out)
     {
+        int id = blockLabelCount++;
+        std::string conditionLbl = ".Lwhile_cond_" + std::to_string(id);
+        std::string endLbl = ".Lwhile_end_" + std::to_string(id);
+        loopLabelStack.push_back({conditionLbl, endLbl});
+
+        // Condition check
+        out << conditionLbl << ":\n";
+        if (node->children.size() > 0 && node->children[0]) {
+            auto condR = emitExpression(std::move(node->children[0]), out);
+            restoreIfSpilled(condR, node->scope, out);
+            out << "    cmpq $0, %" << condR << "\n";
+            out << "    je " << endLbl << "\n";
+            alloc.free(condR);
+        }
+
+        // Loop body
+        if (node->children.size() > 1 && node->children[1]) {
+            ASTNode *body = node->children[1].get();
+            emitPrologue(body->scope, out);
+            for (auto &stmt : body->children) {
+                generateStatement(std::move(stmt), out);
+            }
+            emitEpilogue(body->scope, out);
+        }
+
+        // Jump back to condition
+        out << "    jmp " << conditionLbl << "\n";
+        out << endLbl << ":\n\n";
+        loopLabelStack.pop_back();
     }
     void CodeGenLinux::generate(std::unique_ptr<ASTNode> program)
     {
@@ -891,6 +969,11 @@ namespace zust
         outStream << "__stack_smash_detected:\n";
         outStream << "    mov $60, %rax # syscall: exit\n";
         outStream << "    mov $69, %rdi # exit code\n";
+        outStream << "    syscall\n";
+        outStream << ".globl __division_by_zero\n";
+        outStream << "__division_by_zero:\n";
+        outStream << "    mov $60, %rax # syscall: exit\n";
+        outStream << "    mov $70, %rdi # exit code\n";
         outStream << "    syscall\n";
 
         // Entry point

@@ -25,6 +25,7 @@ namespace zust
         Token currentToken;
         std::shared_ptr<ScopeContext> currentScope;
         bool shouldTypecheck = true;
+        int loopDepth = 0;
 
         void advance();
         bool match(Token::Kind kind);

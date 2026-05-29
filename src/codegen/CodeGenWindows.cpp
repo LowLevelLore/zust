@@ -535,9 +535,10 @@ namespace zust
         // 7. Integer comparison?
         if (assembly_comparison_operations.count(op))
         {
+            auto &map = tr.isSigned ? assembly_comparison_operations : unsigned_assembly_comparison_operations;
             std::string cmpInstr = "cmp";
             out << "    " << cmpInstr << " " << adj_l << ", " << adj_r << "\n"
-                << "    " << assembly_comparison_operations.at(op) << " al\n";
+                << "    " << map.at(op) << " al\n";
             TypeInfo boolType = node->scope->lookupType("boolean");
             std::string r_bool = allocateOrSpill(false, node->scope, out);
             out << "    movzx " << r_bool << ", al\n";
@@ -811,6 +812,32 @@ namespace zust
         {
             generateIfStatement(std::move(statement), out);
             out << "\n";
+            break;
+        }
+        case NodeType::WhileLoop:
+        {
+            generateWhileLoop(std::move(statement), out);
+            out << "\n";
+            break;
+        }
+        case NodeType::ForLoop:
+        {
+            generateForLoop(std::move(statement), out);
+            out << "\n";
+            break;
+        }
+        case NodeType::BreakStatement:
+        {
+            if (loopLabelStack.empty())
+                throw std::runtime_error("'break' emitted outside a loop");
+            out << "    jmp     " << loopLabelStack.back().second << "\n\n";
+            break;
+        }
+        case NodeType::ContinueStatement:
+        {
+            if (loopLabelStack.empty())
+                throw std::runtime_error("'continue' emitted outside a loop");
+            out << "    jmp     " << loopLabelStack.back().first << "\n\n";
             break;
         }
         case NodeType::UnaryOp:
@@ -1102,9 +1129,79 @@ namespace zust
     }
     void CodeGenWindows::generateForLoop(std::unique_ptr<ASTNode> node, std::ostringstream &out)
     {
+        int id = blockLabelCount++;
+        std::string conditionLbl = "Lfor_cond_" + std::to_string(id);
+        std::string postLbl = "Lfor_post_" + std::to_string(id);
+        std::string endLbl = "Lfor_end_" + std::to_string(id);
+        loopLabelStack.push_back({postLbl, endLbl});
+
+        // Execute initialization
+        if (node->children.size() > 0 && node->children[0]) {
+            generateStatement(std::move(node->children[0]), out);
+        }
+
+        // Condition check
+        out << conditionLbl << ":\n";
+        if (node->children.size() > 1 && node->children[1]) {
+            std::string condR = emitExpression(std::move(node->children[1]), out);
+            restoreIfSpilled(condR, node->scope, out);
+            out << "    cmp     " << condR << ", 0\n";
+            out << "    je      " << endLbl << "\n";
+            alloc.free(condR);
+        }
+
+        // Loop body
+        if (node->children.size() > 3 && node->children[3]) {
+            ASTNode *body = node->children[3].get();
+            emitPrologue(body->scope, out);
+            for (auto &stmt : body->children) {
+                generateStatement(std::move(stmt), out);
+            }
+            emitEpilogue(body->scope, out);
+        }
+
+        // Post-loop statement
+        out << postLbl << ":\n";
+        if (node->children.size() > 2 && node->children[2]) {
+            generateStatement(std::move(node->children[2]), out);
+        }
+
+        // Jump back to condition
+        out << "    jmp     " << conditionLbl << "\n";
+        out << endLbl << ":\n\n";
+        loopLabelStack.pop_back();
     }
     void CodeGenWindows::generateWhileLoop(std::unique_ptr<ASTNode> node, std::ostringstream &out)
     {
+        int id = blockLabelCount++;
+        std::string conditionLbl = "Lwhile_cond_" + std::to_string(id);
+        std::string endLbl = "Lwhile_end_" + std::to_string(id);
+        loopLabelStack.push_back({conditionLbl, endLbl});
+
+        // Condition check
+        out << conditionLbl << ":\n";
+        if (node->children.size() > 0 && node->children[0]) {
+            std::string condR = emitExpression(std::move(node->children[0]), out);
+            restoreIfSpilled(condR, node->scope, out);
+            out << "    cmp     " << condR << ", 0\n";
+            out << "    je      " << endLbl << "\n";
+            alloc.free(condR);
+        }
+
+        // Loop body
+        if (node->children.size() > 1 && node->children[1]) {
+            ASTNode *body = node->children[1].get();
+            emitPrologue(body->scope, out);
+            for (auto &stmt : body->children) {
+                generateStatement(std::move(stmt), out);
+            }
+            emitEpilogue(body->scope, out);
+        }
+
+        // Jump back to condition
+        out << "    jmp     " << conditionLbl << "\n";
+        out << endLbl << ":\n\n";
+        loopLabelStack.pop_back();
     }
     void CodeGenWindows::generate(std::unique_ptr<ASTNode> program)
     {

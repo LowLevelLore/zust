@@ -300,9 +300,6 @@ namespace zust
     std::unique_ptr<ASTNode> ASTNode::makeForLoopNode(std::unique_ptr<ASTNode> initializer, std::unique_ptr<ASTNode> condition, std::unique_ptr<ASTNode> postLoop, std::unique_ptr<ASTNode> body, const std::shared_ptr<ScopeContext> scope)
     {
         auto node = std::make_unique<ASTNode>(NodeType::ForLoop, "", scope);
-        initializer.get()->value = "for_init";
-        condition.get()->value = "for_cond";
-        postLoop.get()->value = "for_post";
         node->addChild(std::move(initializer));
         node->addChild(std::move(condition));
         node->addChild(std::move(postLoop));
@@ -313,10 +310,19 @@ namespace zust
     std::unique_ptr<ASTNode> ASTNode::makeWhileLoopNode(std::unique_ptr<ASTNode> condition, std::unique_ptr<ASTNode> body, const std::shared_ptr<ScopeContext> scope)
     {
         auto node = std::make_unique<ASTNode>(NodeType::WhileLoop, "", scope);
-        condition.get()->value = "while_cond";
         node->addChild(std::move(condition));
         node->addChild(std::move(body));
         return node;
+    }
+
+    std::unique_ptr<ASTNode> ASTNode::makeBreakStatementNode(const std::shared_ptr<ScopeContext> scope)
+    {
+        return std::make_unique<ASTNode>(NodeType::BreakStatement, "break", scope);
+    }
+
+    std::unique_ptr<ASTNode> ASTNode::makeContinueStatementNode(const std::shared_ptr<ScopeContext> scope)
+    {
+        return std::make_unique<ASTNode>(NodeType::ContinueStatement, "continue", scope);
     }
 
     void ASTNode::addChild(std::unique_ptr<ASTNode> child)
@@ -402,6 +408,12 @@ namespace zust
             break;
         case NodeType::WhileLoop:
             out << "WhileLoop";
+            break;
+        case NodeType::BreakStatement:
+            out << "Break";
+            break;
+        case NodeType::ContinueStatement:
+            out << "Continue";
             break;
         default:
             out << "Unknown";

@@ -26,7 +26,11 @@ int main(int argc, char *argv[]) {
 
     const std::string inputFile = cli.getInputFile();
 
-    assert(inputFile.ends_with(".zz"));
+    if (!inputFile.ends_with(".zz")) {
+        logError(zust::Error(zust::ErrorType::Generic, "Input file must have .zz extension."));
+        CommandLine::printUsage(argv[0]);
+        return 1;
+    }
 
     if (inputFile.empty()) {
         logError(zust::Error(zust::ErrorType::Generic, "No input files."));

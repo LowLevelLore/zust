@@ -36,6 +36,8 @@ namespace zust
             RightParen,
             For,
             While,
+            Break,
+            Continue,
             Unknown
         } kind;
 
@@ -110,6 +112,10 @@ namespace zust
                 return "For";
             case Kind::While:
                 return "While";
+            case Kind::Break:
+                return "Break";
+            case Kind::Continue:
+                return "Continue";
             default:
                 return "Invalid";
             }

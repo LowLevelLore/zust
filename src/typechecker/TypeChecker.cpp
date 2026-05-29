@@ -31,6 +31,11 @@ namespace zust {
             ASTNode *params = node->getFunctionParamList();
             for (const auto &childPtr : params->children) {
                 ASTNode *param = childPtr.get();
+                if (param->children.size() < 2) {
+                    logError(Error{ErrorType::Type, "Invalid parameter definition in extern function '" + node->value + "'."});
+                    shouldCodegen_ = false;
+                    return "";
+                }
                 try {
                     node->scope->lookupType(param->children[1]->value);
                 } catch (...) {
@@ -98,6 +103,11 @@ namespace zust {
             ASTNode *params = node->getFunctionParamList();
             for (const auto &childPtr : params->children) {
                 ASTNode *param = childPtr.get();
+                if (param->children.size() < 2) {
+                    logError(Error{ErrorType::Type, "Invalid parameter definition in function '" + node->value + "'."});
+                    shouldCodegen_ = false;
+                    return "";
+                }
                 try {
                     node->scope->lookupType(param->children[1]->value);
                 } catch (...) {
@@ -312,6 +322,15 @@ namespace zust {
         case NodeType::ElseStatement: {
             if (!node->children.empty())
                 checkNode(node->children[0].get());
+            return "";
+        }
+        case NodeType::ForLoop:
+        case NodeType::WhileLoop:
+        case NodeType::BreakStatement:
+        case NodeType::ContinueStatement: {
+            for (const auto &child : node->children) {
+                checkNode(child.get());
+            }
             return "";
         }
 

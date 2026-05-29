@@ -18,68 +18,6 @@ A lightweight statically typed programming language that compiles to **x86_64 Li
 
 ---
 
-## 📦 Project Structure
-
-```
-zust/
-├── include/
-│   ├── common/
-│   │   ├── Colors.hpp
-│   │   ├── Errors.hpp
-│   │   ├── Logging.hpp
-│   │   └── StringUtils.hpp
-│   ├── support/
-│   │   ├── CommandLine.hpp
-│   │   └── File.hpp
-│   ├── ast/
-│   │   └── ASTNode.hpp
-│   ├── lexer/
-│   │   └── Lexer.hpp
-│   ├── parser/
-│   │   ├── Parser.hpp
-│   │   └── ScopeContext.hpp
-│   ├── typechecker/
-│   │   └── TypeChecker.hpp
-│   └── codegen/
-│       ├── CodeGen.hpp  
-│       ├── Canaries.hpp
-│       └── RegisterAllocator.hpp
-├── src/
-│   ├── common/
-│   │   ├── Logging.cpp
-│   │   └── StringUtils.cpp
-│   ├── support/
-│   │   ├── CommandLine.cpp
-│   │   └── File.cpp
-│   ├── ast/
-│   │   └── ASTNode.cpp
-│   ├── lexer/
-│   │   └── Lexer.cpp
-│   ├── parser/
-│   │   ├── ScopeContext.cpp
-│   │   └── Parser.cpp
-│   ├── typechecker/
-│   │   └── TypeChecker.cpp
-│   └── codegen/
-│       ├── CodeGenWindows.cpp
-│       ├── CodeGenLinux.cpp
-│       ├── CodeGenLLVM.cpp
-│       └── RegisterAllocator.cpp
-├── tests/
-│   ├── zz/
-│   |   ├── [Various test categorized in folders]
-├── examples/
-│   ├── [current example we are working on]
-├── main.cpp
-├── CMakeLists.txt
-├── test_runner.py
-├── LICENSE
-└── README.md
-
-```
-
----
-
 ## 🚀 Getting Started
 
 ### Prerequisites
@@ -97,10 +35,8 @@ zust/
 # Clone the repository
 git clone https://github.com/your-username/zust.git
 cd zust
-
 # Create build directory
 mkdir build && cd build
-
 # Generate and build
 make
 ```
@@ -109,70 +45,118 @@ make
 
 ## 🔧 Usage
 
-### On Linux when --format is x86_64-linux
+### Complete Build Pipeline
 
-- **Compile**
+The compilation process follows this pipeline:
 
+1. **Compile** (zpiler): `.zz` source → assembly/IR
+2. **Assemble**: assembly/IR → object file
+3. **Link**: object file → executable
+4. **Execute**: run the executable
+
+### Linux (x86_64-linux)
+
+**Step 1: Compile to Assembly**
 ```bash
-./zpiler --format x86_64-linux -o out.asm <source_file.zz> 
+./zpiler --format x86_64-linux -o out.asm program.zz
 ```
+Generates: `out.asm` (x86_64 assembly)
 
-    This will:
-
-    1. Parse the input`.zz` file.
-      2. Typecheck the AST.
-      3. Generate `out.asm` containing x86_64 assembly.
-
-- **Assemble, Link and Run**
-
+**Step 2: Assemble**
 ```bash
 as out.asm -o out.o
-gcc out.o -o out
-./out
+```
+Generates: `out.o` (object file)
+
+**Step 3: Link**
+```bash
+gcc out.o -o program
+```
+Generates: `program` (executable)
+
+**Step 4: Execute**
+```bash
+./program
 ```
 
-### On Linux when --format is llvm-ir
-
-- **Compile**
-
+**Combined (one-liner):**
 ```bash
-./zpiler --format llvm-ir -o out.ll <source_file.zz> 
+./zpiler --format x86_64-linux -o out.asm program.zz && as out.asm -o out.o && gcc out.o -o program && ./program
 ```
 
-    This will:
+### Windows (x86_64-mswin)
 
-    1. Parse the input`.zz` file.
-      2. Typecheck the AST.
-      3. Generate `out.ll` containing LLVM IR.
-
-- **Assemble, Link and Run**
-
+**Step 1: Compile to Assembly**
 ```bash
-llc -filetype=obj -o out.ll <llvm_out_path>
-gcc out.o -o out -no-pie
-./out
+./zpiler --format x86_64-mswin -o out.asm program.zz
+```
+Generates: `out.asm` (x86_64 assembly for Windows)
+
+**Step 2: Assemble**
+```bash
+ml64 /nologo /c out.asm
+```
+Generates: `out.obj` (object file)
+
+**Step 3: Link**
+```bash
+gcc out.obj -o program.exe
+```
+Generates: `program.exe` (executable)
+
+**Step 4: Execute**
+```bash
+./program.exe
 ```
 
-### On Windows when --format is x86_64-windows
+**Note:** Requires Microsoft Macro Assembler (ml64) installed. Available in Visual Studio or Windows SDK.
 
-- **Compile**
+### LLVM IR Backend (llvm-ir)
 
+**Step 1: Compile to LLVM IR**
 ```bash
-./zpiler --format x86_64-windows -o out.asm <source_file.zz> 
+./zpiler --format llvm-ir -o out.ll program.zz
+```
+Generates: `out.ll` (LLVM intermediate representation)
+
+**Step 2: Compile to Object File**
+```bash
+llc -filetype=obj out.ll -o out.o
+```
+Generates: `out.o` (object file)
+
+**Step 3: Link**
+```bash
+gcc out.o -o program -no-pie
+```
+Generates: `program` (executable)
+
+**Step 4: Execute**
+```bash
+./program
 ```
 
-    This will:
-
-    1. Parse the input`.zz` file.
-      2. Typecheck the AST.
-      3. Generate `out.asm` containing x86_64 assembly.
-
-- **Assemble, Link and Run**
-
+**Combined (one-liner):**
 ```bash
-ml64 /nologo /c .\out.asm
-gcc out.o -o out
-./out
+./zpiler --format llvm-ir -o out.ll program.zz && llc -filetype=obj out.ll -o out.o && gcc out.o -o program -no-pie && ./program
+```
+
+**Note:** Requires LLVM toolchain (llc) installed.
+
+### Automated Testing
+
+Run all test cases for a specific target:
+```bash
+# Test native platform (auto-detected)
+python test_runner.py
+
+# Test specific targets
+TARGET=linux python test_runner.py      # Linux
+TARGET=windows python test_runner.py    # Windows (if ml64 available)
+TARGET=llvm python test_runner.py       # LLVM
+
+# Test multiple targets
+TARGET=linux,llvm python test_runner.py
 ```
 
 ---

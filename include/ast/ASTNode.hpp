@@ -34,7 +34,9 @@ namespace zust
         FunctionCall,
         FunctionCallArgumentList,
         ForLoop,
-        WhileLoop
+        WhileLoop,
+        BreakStatement,
+        ContinueStatement
     };
 
     class ASTNode
@@ -72,6 +74,8 @@ namespace zust
         static std::unique_ptr<ASTNode> makeFunctionParameterList(const std::vector<ParamInfo> params, const std::shared_ptr<ScopeContext> scope);
         static std::unique_ptr<ASTNode> makeForLoopNode(std::unique_ptr<ASTNode> initializer, std::unique_ptr<ASTNode> condition, std::unique_ptr<ASTNode> postLoop, std::unique_ptr<ASTNode> body, const std::shared_ptr<ScopeContext> scope);
         static std::unique_ptr<ASTNode> makeWhileLoopNode(std::unique_ptr<ASTNode> condition, std::unique_ptr<ASTNode> body, const std::shared_ptr<ScopeContext> scope);
+        static std::unique_ptr<ASTNode> makeBreakStatementNode(const std::shared_ptr<ScopeContext> scope);
+        static std::unique_ptr<ASTNode> makeContinueStatementNode(const std::shared_ptr<ScopeContext> scope);
         void addChild(std::unique_ptr<ASTNode> child);
         void setElseBranch(std::unique_ptr<ASTNode> elseNode);
         ASTNode *getElseBranch() const;

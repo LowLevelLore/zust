@@ -124,6 +124,12 @@ namespace zust
         if (text == "while")
             return {Token::Kind::While, text, startLine, startCol};
 
+        if (text == "break")
+            return {Token::Kind::Break, text, startLine, startCol};
+
+        if (text == "continue")
+            return {Token::Kind::Continue, text, startLine, startCol};
+
         if (text == "fn")
             return {Token::Kind::Function, text, startLine, startCol};
 
@@ -164,7 +170,16 @@ namespace zust
         advance(); // consume '"'
         std::string text;
         while (peekChar() != '"' && peekChar() != '\0')
+        {
+            if (peekChar() == '\\')
+            {
+                text.push_back(advance());
+                if (peekChar() != '\0')
+                    text.push_back(advance());
+                continue;
+            }
             text.push_back(advance());
+        }
         if (peekChar() == '"')
             advance(); // consume closing '"'
         else

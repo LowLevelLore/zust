@@ -1,0 +1,29 @@
+extern fn exit(code: int32_t) -> none;
+
+fn main() {
+    let sum: int32_t = 0;
+    for(let i: int32_t = 0; i < 10; i = i + 1;){
+        if(i == 3){
+            continue;
+        }
+        if(i == 7){
+            break;
+        }
+        sum = sum + i;
+    }
+
+    if(sum != 18){
+        exit(1);
+    }
+
+    let n: int32_t = 5;
+    let count: int32_t = 0;
+    while(n > 0){
+        count = count + 1;
+        n = n - 1;
+    }
+
+    if(count != 5){
+        exit(2);
+    }
+}
