@@ -932,20 +932,21 @@ namespace zust
         }
         else
         {
+            std::string adjusted = adjustReg(r, sz * 8);
             switch (sz)
             {
             case 1:
-                out << "    mov     BYTE PTR " << mem << ", " << r << "\n";
+                out << "    mov     BYTE PTR " << mem << ", " << adjusted << "\n";
                 break;
             case 2:
-                out << "    mov     WORD PTR " << mem << ", " << r << "\n";
+                out << "    mov     WORD PTR " << mem << ", " << adjusted << "\n";
                 break;
             case 4:
-                out << "    mov     DWORD PTR " << mem << ", " << r << "\n";
+                out << "    mov     DWORD PTR " << mem << ", " << adjusted << "\n";
                 break;
             case 8:
             default:
-                out << "    mov     QWORD PTR " << mem << ", " << r << "\n";
+                out << "    mov     QWORD PTR " << mem << ", " << adjusted << "\n";
                 break;
             }
         }
