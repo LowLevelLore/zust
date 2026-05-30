@@ -1,0 +1,16 @@
+// Test string operations and types
+extern fn printf(fmt: string, ...) -> int32_t;
+
+fn print_string_type(s: string) -> none {
+    printf(s);
+}
+
+fn main() {
+    let s1: string = "Hello";
+    let s2: string = "World";
+    
+    printf(s1);
+    printf("\n");
+    printf(s2);
+    printf("\n");
+}

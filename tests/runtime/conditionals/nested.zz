@@ -1,0 +1,48 @@
+// Test nested if-else statements
+extern fn printf(fmt: string, ...) -> int32_t;
+
+fn print_int(x: int64_t) -> none {
+    printf("%d\n", x);
+}
+
+fn main() {
+    let x: int64_t = 50;
+    let y: int64_t = 100;
+    let z: int64_t = 75;
+    
+    // Nested conditions for comparison logic
+    let cmp1: boolean = x < y;
+    if (cmp1) {
+        let cmp2: boolean = z < y;
+        if (cmp2) {
+            let cmp3: boolean = z > x;
+            if (cmp3) {
+                print_int(1);  // All conditions met
+            } else {
+                print_int(2);
+            }
+        } else {
+            print_int(3);
+        }
+    } else {
+        let cmp4: boolean = y > z;
+        if (cmp4) {
+            print_int(4);
+        } else {
+            print_int(5);
+        }
+    }
+    
+    // Nested with multiple levels
+    let a: int64_t = 10;
+    let cmp5: boolean = a > 5;
+    if (cmp5) {
+        let cmp6: boolean = a < 20;
+        if (cmp6) {
+            let cmp7: boolean = a != 15;
+            if (cmp7) {
+                print_int(6);  // True path
+            }
+        }
+    }
+}

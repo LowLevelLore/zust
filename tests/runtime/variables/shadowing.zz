@@ -1,0 +1,29 @@
+// Test variable shadowing and scope
+extern fn printf(fmt: string, ...) -> int32_t;
+
+let global_x: int64_t = 100;
+
+fn test_scope() -> int64_t {
+    let global_x: int64_t = 50;  // Shadows global
+    return global_x;
+}
+
+fn main() {
+    printf("%d\n", global_x);  // 100
+    
+    let result: int64_t = test_scope();
+    printf("%d\n", result);  // 50
+    
+    printf("%d\n", global_x);  // Still 100
+    
+    // Local shadowing
+    let local_var: int64_t = 10;
+    printf("%d\n", local_var);
+    
+    if (local_var > 5) {
+        let local_var: int64_t = 20;  // Shadow in block
+        printf("%d\n", local_var);  // 20
+    }
+    
+    printf("%d\n", local_var);  // Still 10
+}

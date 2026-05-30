@@ -1,0 +1,23 @@
+// Test all basic type declarations
+extern fn printf(fmt: string, ...) -> int32_t;
+
+fn main() {
+    let i8: int8_t = -100;
+    let i16: int16_t = -1000;
+    let i32: int32_t = -100000;
+    let i64: int64_t = -9000000;
+    
+    let u8: uint8_t = 255;
+    let u16: uint16_t = 65535;
+    let u32: uint32_t = 4000000;
+    let u64: uint64_t = 8000000;
+    
+    let f: float = 1.5;
+    let d: double = 2.5;
+    
+    let b: boolean = true;
+    
+    printf("%d\n", i64);
+    printf("%d\n", u64);
+    printf("%f\n", d);
+}

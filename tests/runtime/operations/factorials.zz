@@ -1,0 +1,16 @@
+// Test factorial with intermediate results
+extern fn printf(fmt: string, ...) -> int32_t;
+
+fn main() {
+    let factorial_1: int64_t = 1;
+    let factorial_2: int64_t = 1 * 2;
+    let factorial_3: int64_t = 1 * 2 * 3;
+    let factorial_4: int64_t = 1 * 2 * 3 * 4;
+    let factorial_5: int64_t = 1 * 2 * 3 * 4 * 5;
+    
+    printf("%d\n", factorial_1);  // 1
+    printf("%d\n", factorial_2);  // 2
+    printf("%d\n", factorial_3);  // 6
+    printf("%d\n", factorial_4);  // 24
+    printf("%d\n", factorial_5);  // 120
+}

@@ -1,0 +1,37 @@
+// Test boolean combinations with mixed types
+extern fn printf(fmt: string, ...) -> int32_t;
+
+fn main() {
+    let a: int64_t = 5;
+    let b: int64_t = 10;
+    let f: float = 7.5;
+    let flag: boolean = true;
+    
+    // Complex boolean expression
+    let cmp1: boolean = a < b;
+    let cmp2: boolean = f > a;
+    let expr1: boolean = cmp1 && cmp2;
+    
+    let cmp3: boolean = a > b;
+    let expr2: boolean = cmp3 || flag;
+    
+    let cmp4: boolean = a == b;
+    let expr3: boolean = !cmp4;
+    
+    let cmp5: boolean = a < b;
+    let cmp6: boolean = b < 20;
+    let expr4: boolean = cmp5 && cmp6 && flag;
+    
+    if (expr1 && expr2) {
+        printf("1\n");
+    }
+    
+    let not_flag: boolean = !flag;
+    if (expr3 || not_flag) {
+        printf("1\n");
+    }
+    
+    if (expr4) {
+        printf("1\n");
+    }
+}

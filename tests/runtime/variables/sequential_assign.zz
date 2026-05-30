@@ -1,0 +1,30 @@
+// Test multiple sequential assignments
+extern fn printf(fmt: string, ...) -> int32_t;
+
+fn main() {
+    let x: int64_t = 0;
+    let y: int64_t = 0;
+    let z: int64_t = 0;
+    
+    printf("%d\n", x);
+    printf("%d\n", y);
+    printf("%d\n", z);
+    
+    x = 10;
+    y = 20;
+    z = 30;
+    
+    printf("%d\n", x);
+    printf("%d\n", y);
+    printf("%d\n", z);
+    
+    // Reassignments
+    x = y + z;
+    printf("%d\n", x);
+    
+    y = x - 10;
+    printf("%d\n", y);
+    
+    z = x * y;
+    printf("%d\n", z);
+}

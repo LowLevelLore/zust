@@ -1,0 +1,25 @@
+// Test for-loop with various increment patterns
+extern fn printf(fmt: string, ...) -> int32_t;
+
+fn main() {
+    // Count by 1
+    let count1: int32_t = 0;
+    for(let i: int32_t = 0; i < 5; i = i + 1;) {
+        count1 = count1 + 1;
+    }
+    printf("%d\n", count1);  // 5
+    
+    // Count by 2
+    let sum: int32_t = 0;
+    for(let i: int32_t = 0; i <= 10; i = i + 2;) {
+        sum = sum + i;
+    }
+    printf("%d\n", sum);  // 0+2+4+6+8+10 = 30
+    
+    // Countdown
+    let countdown_sum: int32_t = 0;
+    for(let i: int32_t = 5; i > 0; i = i - 1;) {
+        countdown_sum = countdown_sum + i;
+    }
+    printf("%d\n", countdown_sum);  // 5+4+3+2+1 = 15
+}

@@ -1,0 +1,29 @@
+// Test mixed type arithmetic and comparisons
+extern fn printf(fmt: string, ...) -> int32_t;
+
+fn main() {
+    let i: int64_t = 10;
+    let f: float = 3.5;
+    let d: double = 5.2;
+    
+    // Mixed type operations
+    let mix1: float = i + f;       // 10 + 3.5 = 13.5
+    printf("%f\n", mix1);
+    
+    let mix2: double = d + i;      // 5.2 + 10 = 15.2
+    printf("%f\n", mix2);
+    
+    let mix3: float = f * 2;       // 3.5 * 2 = 7.0
+    printf("%f\n", mix3);
+    
+    // Mixed type comparisons
+    let cmp1: boolean = i > f;     // 10 > 3.5 = true
+    if (cmp1) {
+        printf("1\n");
+    }
+    
+    let cmp2: boolean = f < d;     // 3.5 < 5.2 = true
+    if (cmp2) {
+        printf("1\n");
+    }
+}

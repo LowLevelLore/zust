@@ -1,0 +1,21 @@
+// Test conditional with exit codes
+extern fn exit(code: int32_t) -> none;
+extern fn printf(fmt: string, ...) -> int32_t;
+
+fn verify_sum(sum: int32_t, expected: int32_t) -> none {
+    if (sum != expected) {
+        exit(1);
+    }
+}
+
+fn main() {
+    let total: int32_t = 0;
+    
+    for(let i: int32_t = 1; i <= 5; i = i + 1;) {
+        total = total + i;
+    }
+    
+    verify_sum(total, 15);  // 1+2+3+4+5 = 15
+    
+    printf("1\n");  // This should print if verify_sum passes
+}
