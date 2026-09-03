@@ -1,21 +1,52 @@
-zpiler
+# --- Build output ---
 build/
-
+build-*/
+cmake-build-*/
+compile_commands.json
+zpiler
+zpiler.exe
+program
+program.exe
 *.o
-*.asm
+*.obj
+*.a
+*.lib
+*.exe
+*.pdb
+*.ilk
 
+# --- Compiler intermediate output ---
+*.asm
+*.s
+*.ll
+*.zir
+out.*
+test.asm
 temp*
 
+# --- Test artifacts ---
 tests/asm/
 tests/executable/
 tests/object/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+.coverage
+htmlcov/
 
-*vscode*
+# --- Editors / tooling ---
+.vscode/
+.idea/
+*.swp
+.cache/
+.direnv/
 
-**.obj
-**.exe
-
+# --- Local, unversioned side projects ---
 zlang-support/
 zust-support/
 
-**/.vscode/
+# --- Exceptions: sources and fixtures that share an ignored extension ---
+!examples/*.zz
+!tests/**/*.zz
+!.claude/**
+!.github/**

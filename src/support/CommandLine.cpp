@@ -125,10 +125,15 @@ namespace zust {
     }
 
     void CommandLine::printFormats() {
+        // NOTE: hand-maintained and therefore prone to drift -- llvm-ir was
+        // supported and tested for a long time while going unlisted here.
+        // docs/BACKENDS.md Phase A replaces this with a query against the
+        // backend registry so a new target lists itself.
         std::cout << "Acceptable formats include:\n"
                   << " -> default\n"
                   << " -> x86_64-mswin\n"
-                  << " -> x86_64-linux\n";
+                  << " -> x86_64-linux\n"
+                  << " -> llvm-ir\n";
     }
 
 }  // namespace zust
