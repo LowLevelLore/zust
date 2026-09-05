@@ -13,8 +13,6 @@
 #include "typechecker/TypeChecker.hpp"
 
 namespace zust {
-    enum class TargetTriple { X86_64_LINUX, X86_64_WINDOWS, LLVM_IR };
-
     class CodeGen {
     protected:
         std::map<std::string, std::string> assembly_comparison_operations = {
@@ -131,7 +129,6 @@ namespace zust {
 
         virtual ~CodeGen();
         virtual void generate(std::unique_ptr<ASTNode> program) = 0;
-        static std::unique_ptr<CodeGen> create(TargetTriple target, std::ostream &outstream);
     };
 
     class CodeGenLinux : public CodeGen {
@@ -176,7 +173,9 @@ namespace zust {
 
     public:
         ~CodeGenLinux() override = default;
-        CodeGenLinux(std::ostream &outstream) : CodeGen(RegisterAllocator::forSysV(), outstream){};
+
+        CodeGenLinux(std::ostream &outstream) : CodeGen(RegisterAllocator::forSysV(), outstream) {}
+
         void generate(std::unique_ptr<ASTNode> program) override;
     };
 
@@ -221,7 +220,9 @@ namespace zust {
 
     public:
         ~CodeGenWindows() override = default;
-        CodeGenWindows(std::ostream &outstream) : CodeGen(RegisterAllocator::forMSVC(), outstream){};
+
+        CodeGenWindows(std::ostream &outstream) : CodeGen(RegisterAllocator::forMSVC(), outstream) {}
+
         void generate(std::unique_ptr<ASTNode> program) override;
     };
 
@@ -262,7 +263,9 @@ namespace zust {
 
     public:
         ~CodeGenLLVM() override = default;
-        CodeGenLLVM(std::ostream &outstream) : CodeGen(RegisterAllocator(), outstream){};
+
+        CodeGenLLVM(std::ostream &outstream) : CodeGen(RegisterAllocator(), outstream) {}
+
         void generate(std::unique_ptr<ASTNode> program) override;
     };
 }  // namespace zust

@@ -1,4 +1,6 @@
-#include "all.hpp"
+#include "typechecker/TypeChecker.hpp"
+
+#include "common/Logging.hpp"
 
 namespace zust {
     void TypeChecker::check(const std::unique_ptr<ASTNode> &program) {
@@ -75,7 +77,16 @@ namespace zust {
                 const std::vector<zust::ParamInfo> &functionParams = functionInfo.paramTypes;
                 const std::vector<std::unique_ptr<ASTNode>> &functionArguments = node->children[0]->children;
 
-                if (functionArguments.size() != functionParams.size()) {
+                // Variadic call tails are exempt from arity and per-argument
+                // type checking (docs/PRD-ZIR.md "the landmine"): a variadic
+                // function may be called with more arguments than it
+                // declares, and this checker has no way to know what type
+                // each trailing argument "should" be. Still enforce the
+                // minimum -- a variadic function can't be called with fewer
+                // arguments than its declared (non-variadic) parameters.
+                bool arityOk = functionInfo.isVariadic ? functionArguments.size() >= functionParams.size()
+                                                       : functionArguments.size() == functionParams.size();
+                if (!arityOk) {
                     logError(Error{ErrorType::Type, "Function '" + node->value + "' expects " +
                                                         std::to_string(functionParams.size()) + " arguments, got " +
                                                         std::to_string(functionArguments.size()) + "."});
@@ -83,7 +94,16 @@ namespace zust {
                     return "";
                 }
 
+                // Type-check only the declared (non-variadic) parameters;
+                // still walk every argument expression (via checkNode) so
+                // side effects of type-checking within variadic tail
+                // arguments (e.g. catching an undefined variable) still
+                // happen, just without comparing their type to anything.
                 for (size_t i = 0; i < functionArguments.size(); ++i) {
+                    if (i >= functionParams.size()) {
+                        checkNode(functionArguments[i].get());
+                        continue;
+                    }
                     std::string argType = checkNode(functionArguments[i].get());
                     std::string paramType = functionParams[i].type;
 
@@ -129,11 +149,32 @@ namespace zust {
                                                         node->value + "'."});
                     shouldCodegen_ = false;
                 }
+                // Wave 2.3 (docs/PRD-ZIR.md "the landmine"): this case used to
+                // stop here, so a function's body was never type-checked at
+                // all. Every statement/expression case in this switch already
+                // handles what a body needs correctly (confirmed by reading
+                // each one) -- the only change needed was this recursive
+                // call.
+                checkNode(node->getFunctionBody());
+                checkDefiniteReturn(node);
                 return "";
             }
 
             case NodeType::ReturnStatement: {
-                std::string expectedRet = scope->returnType;
+                // A `return` nested inside an if/for/while has `scope` set to
+                // that construct's own BlockScope, whose `returnType` member
+                // defaults to "none" (ScopeContext's base default) and is
+                // never itself populated -- only the FunctionScope's is, in
+                // makeFunctionDeclaration. Reading `scope->returnType`
+                // directly was therefore only ever correct for a
+                // return statement at a function's top level; walking up to
+                // the enclosing FunctionScope is what makes it correct at
+                // any nesting depth. This was unreachable before Wave 2.3
+                // (function bodies were never type-checked at all), so it's
+                // a real pre-existing scope bug this surfaced, not a new
+                // exemption -- fixed here rather than papered over.
+                auto funcScope = scope->findEnclosingFunctionScope();
+                std::string expectedRet = funcScope ? funcScope->returnType : scope->returnType;
                 std::string actualRet = "none";
                 if (!node->children.empty()) {
                     actualRet = checkNode(node->children[0].get());
@@ -255,6 +296,16 @@ namespace zust {
                     if (lhs == rhs && !isNumeric(lhs))
                         return "boolean";
 
+                    // boolean vs numeric → OK (docs/PRD-ZIR.md "the
+                    // landmine": `x == 1` where `x: boolean` is exactly the
+                    // pattern every print_bool()-style helper across the
+                    // test suite uses; the native backends already compare
+                    // it as a plain numeric value regardless of the
+                    // "boolean" label, so this checker treats it the same
+                    // way rather than rejecting programs that already work)
+                    if ((lhs == "boolean" && isNumeric(rhs)) || (rhs == "boolean" && isNumeric(lhs)))
+                        return "boolean";
+
                     logError({ErrorType::Type, "Comparison '" + op +
                                                    "' requires both operands to be numeric or same type, "
                                                    "got '" +
@@ -335,6 +386,59 @@ namespace zust {
 
     bool TypeChecker::isComparable(const std::string &ty) {
         return isNumeric(ty);
+    }
+
+    void TypeChecker::checkDefiniteReturn(const ASTNode *functionNode) {
+        const std::string &declaredRet = functionNode->getFunctionParamReturnType()->value;
+        if (declaredRet == "none")
+            return;  // nothing to enforce -- falling off the end is fine
+        if (!definitelyReturns(functionNode->getFunctionBody())) {
+            logWarning("Function '" + functionNode->value + "' does not definitely return a value of type '" +
+                       declaredRet + "' on every path");
+        }
+    }
+
+    bool TypeChecker::definitelyReturns(const ASTNode *node) {
+        if (!node)
+            return false;
+        switch (node->type) {
+            case NodeType::ReturnStatement:
+                return true;
+            case NodeType::Program:
+                // A block: definitely returns if any statement in it does
+                // (everything after that point is unreachable, but still a
+                // definite return for the block as a whole).
+                for (const auto &child : node->children) {
+                    if (definitelyReturns(child.get()))
+                        return true;
+                }
+                return false;
+            case NodeType::IfStatement:
+            case NodeType::ElseIfStatement: {
+                if (node->children.size() < 2)
+                    return false;
+                bool thenReturns = definitelyReturns(node->children[1].get());
+                const ASTNode *elseBranch = node->getElseBranch();
+                // No trailing `else` means control can fall through the
+                // whole if/elseif chain without returning, regardless of
+                // whether every branch that *does* run would have returned.
+                if (!elseBranch)
+                    return false;
+                return thenReturns && definitelyReturns(elseBranch);
+            }
+            case NodeType::ElseStatement:
+                if (node->children.empty())
+                    return false;
+                return definitelyReturns(node->children[0].get());
+            default:
+                // For loops, break/continue, bare expressions, and anything
+                // else: conservatively not a definite return. A `for`/`while`
+                // might execute zero times, so its body returning is never
+                // enough on its own -- deliberately conservative, since this
+                // is advisory (Wave 2.4 is warning-only), not a soundness
+                // guarantee anything downstream relies on.
+                return false;
+        }
     }
 
 }  // namespace zust

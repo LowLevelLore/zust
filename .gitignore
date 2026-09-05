@@ -47,5 +47,6 @@ zust-support/
 # --- Exceptions: sources and fixtures that share an ignored extension ---
 !examples/*.zz
 !tests/**/*.zz
+!tests/zir/**/*.zir
 !.claude/**
 !.github/**

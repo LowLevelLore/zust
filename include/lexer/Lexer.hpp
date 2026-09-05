@@ -1,8 +1,10 @@
 #pragma once
+#include <ostream>
 #include <string>
 #include <vector>
 
 #include "../common/Errors.hpp"
+#include "../common/Span.hpp"
 
 namespace zust {
     struct Token {
@@ -41,6 +43,10 @@ namespace zust {
         std::string text;
         size_t line;
         size_t column;
+
+        Span span() const noexcept {
+            return Span{static_cast<std::uint32_t>(line), static_cast<std::uint32_t>(column)};
+        }
 
         std::string to_string() const {
             return "Token { kind = " + kindToString(kind) + ", text = \"" + text +

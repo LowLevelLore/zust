@@ -1,0 +1,8 @@
+; t.zz
+module "t.zz" target = "generic"
+
+fn @add2(%v0: i64, %v1: i64) -> i64 {
+^entry(%v0: i64, %v1: i64):
+    %v2   = add i64 %v0, %v1
+    ret i64 %v2
+}

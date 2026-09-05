@@ -161,10 +161,14 @@ Analyses (`DominatorTree`, `LoopInfo`, `AliasAnalysis`) are cached in the
 Pipelines:
 
 - `-O0`: lowering + verifier only. Fast, debuggable, 1:1 with source.
-- `-O1`: mem2reg, simplifycfg, instcombine, dce.
-- `-O2`: `-O1` + sccp, gvn, inline, licm, tailcall, then a second cleanup round.
-- `-O3`: `-O2` + aggressive inlining, unrolling, more iterations.
-- `-Os`: `-O2` with a size-biased inliner cost model.
+- `-O1`: mem2reg, constfold, simplifycfg, dce.
+- `-O2`: `-O1` + sccp, gvn, instcombine, tailcall, then a second cleanup round.
+- `-O3`: `-O2` + inline, licm, loop unrolling, more iterations.
+- `-Os`: out of scope for the initial pass catalogue; revisit once `-O2`/`-O3`
+  are proven (a size-biased inliner cost model on top of `-O2`).
+
+(`docs/PRD-ZIR.md` tracks the implementation of this pipeline and is the
+authoritative pass-to-level assignment; this section mirrors it.)
 
 Debug flags: `--print-zir-after=<pass>`, `--print-zir-after-all`,
 `--disable-pass=<name>`, `--time-passes`.

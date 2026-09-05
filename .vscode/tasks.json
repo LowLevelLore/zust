@@ -147,6 +147,18 @@
                 "cwd": "${workspaceFolder}"
             },
             "problemMatcher": []
+        },
+        {
+            "label": "zpiler: format (clang-format all)",
+            "type": "shell",
+            "command": "python",
+            "args": ["scripts/format.py"],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "build",
+            "problemMatcher": [],
+            "detail": "Runs clang-format -i over every tracked .cpp/.hpp file (include/, src/, main.cpp, tests/unit/). Run before committing to avoid CI's clang-format lint job failing."
         }
     ],
     "inputs": [

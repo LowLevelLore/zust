@@ -8,8 +8,6 @@
 #include "common/Errors.hpp"
 #include "parser/ScopeContext.hpp"
 
-// TODO: Check that all paths inside the function return appropriate value.
-
 namespace zust {
     static const std::set<std::string> numeric_types = {"integer",  "size_t",   "uint8_t", "uint16_t",
                                                         "uint32_t", "uint64_t", "int8_t",  "int16_t",
@@ -84,6 +82,13 @@ namespace zust {
         bool isInteger(const std::string &ty);
         bool isComparable(const std::string &ty);
         bool shouldCodegen_ = true;
+
+        // Definite-return analysis (docs/PRD-ZIR.md Wave 2.4): warning-only
+        // in this rewrite -- an error here would change compile_fail's
+        // frozen stderr-substring surface, and is deferred to when the
+        // language actually needs it enforced.
+        void checkDefiniteReturn(const ASTNode *functionNode);
+        static bool definitelyReturns(const ASTNode *node);
     };
 
 }  // namespace zust

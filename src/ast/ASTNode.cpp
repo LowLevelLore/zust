@@ -1,27 +1,28 @@
-#include "all.hpp"
+#include "ast/ASTNode.hpp"
 
 namespace zust {
-    std::unique_ptr<ASTNode> ASTNode::makeProgramNode(const std::shared_ptr<ScopeContext> scope) {
-        return std::make_unique<ASTNode>(NodeType::Program, "", scope);
+    std::unique_ptr<ASTNode> ASTNode::makeProgramNode(const std::shared_ptr<ScopeContext> scope, Span span) {
+        return std::make_unique<ASTNode>(NodeType::Program, "", scope, span);
     }
 
     std::unique_ptr<ASTNode> ASTNode::makeVariableReassignmentNode(const std::string &name,
                                                                    std::unique_ptr<ASTNode> expr,
-                                                                   const std::shared_ptr<ScopeContext> scope) {
-        auto node = std::make_unique<ASTNode>(NodeType::VariableReassignment, name, scope);
+                                                                   const std::shared_ptr<ScopeContext> scope,
+                                                                   Span span) {
+        auto node = std::make_unique<ASTNode>(NodeType::VariableReassignment, name, scope, span);
         if (expr)
             node->addChild(std::move(expr));
         return node;
     }
 
     std::unique_ptr<ASTNode> ASTNode::makeVariableAccessNode(const std::string &name,
-                                                             const std::shared_ptr<ScopeContext> scope) {
-        return std::make_unique<ASTNode>(NodeType::VariableAccess, name, scope);
+                                                             const std::shared_ptr<ScopeContext> scope, Span span) {
+        return std::make_unique<ASTNode>(NodeType::VariableAccess, name, scope, span);
     }
 
     std::unique_ptr<ASTNode> ASTNode::makeIntegerLiteralNode(const std::string &literal,
-                                                             const std::shared_ptr<ScopeContext> scope) {
-        return std::make_unique<ASTNode>(NodeType::IntegerLiteral, literal, scope);
+                                                             const std::shared_ptr<ScopeContext> scope, Span span) {
+        return std::make_unique<ASTNode>(NodeType::IntegerLiteral, literal, scope, span);
     }
 
     void ASTNode::setElseBranch(std::unique_ptr<ASTNode> elseNode) {
@@ -113,9 +114,10 @@ namespace zust {
 
     std::optional<std::unique_ptr<ASTNode>> ASTNode::makeVariableDeclarationNode(
         const std::string &name, std::unique_ptr<ASTNode> typeAnnotation, std::unique_ptr<ASTNode> initializer,
-        const std::shared_ptr<ScopeContext> scope) {
-        auto node = std::make_unique<ASTNode>(NodeType::VariableDeclaration, name, scope);
-        bool result = scope.get()->defineVariable(name, {typeAnnotation.get()->value});
+        const std::shared_ptr<ScopeContext> scope, Span span) {
+        auto node = std::make_unique<ASTNode>(NodeType::VariableDeclaration, name, scope, span);
+        bool result =
+            scope.get()->defineVariable(name, VariableInfo{.type = typeAnnotation.get()->value, .symbolId = {}});
         if (result) {
             if (typeAnnotation)
                 node->addChild(std::move(typeAnnotation));
@@ -127,49 +129,49 @@ namespace zust {
         }
     }
 
-    std::unique_ptr<ASTNode> ASTNode::makeSymbolNode(const std::string &name,
-                                                     const std::shared_ptr<ScopeContext> scope) {
-        return std::make_unique<ASTNode>(NodeType::Symbol, name, scope);
+    std::unique_ptr<ASTNode> ASTNode::makeSymbolNode(const std::string &name, const std::shared_ptr<ScopeContext> scope,
+                                                     Span span) {
+        return std::make_unique<ASTNode>(NodeType::Symbol, name, scope, span);
     }
 
     std::unique_ptr<ASTNode> ASTNode::makeFloatLiteralNode(const std::string &lit,
-                                                           const std::shared_ptr<ScopeContext> scope) {
-        return std::make_unique<ASTNode>(NodeType::FloatLiteral, lit, scope);
+                                                           const std::shared_ptr<ScopeContext> scope, Span span) {
+        return std::make_unique<ASTNode>(NodeType::FloatLiteral, lit, scope, span);
     }
 
     std::unique_ptr<ASTNode> ASTNode::makeStringLiteralNode(const std::string &lit,
-                                                            const std::shared_ptr<ScopeContext> scope) {
-        return std::make_unique<ASTNode>(NodeType::StringLiteral, lit, scope);
+                                                            const std::shared_ptr<ScopeContext> scope, Span span) {
+        return std::make_unique<ASTNode>(NodeType::StringLiteral, lit, scope, span);
     }
 
     std::unique_ptr<ASTNode> ASTNode::makeBooleanLiteralNode(const bool value,
-                                                             const std::shared_ptr<ScopeContext> scope) {
+                                                             const std::shared_ptr<ScopeContext> scope, Span span) {
         if (value) {
-            return std::make_unique<ASTNode>(NodeType::BooleanLiteral, "true", scope);
+            return std::make_unique<ASTNode>(NodeType::BooleanLiteral, "true", scope, span);
         } else {
-            return std::make_unique<ASTNode>(NodeType::BooleanLiteral, "false", scope);
+            return std::make_unique<ASTNode>(NodeType::BooleanLiteral, "false", scope, span);
         }
     }
 
     std::unique_ptr<ASTNode> ASTNode::makeBinaryOp(const std::string &op, std::unique_ptr<ASTNode> lhs,
                                                    std::unique_ptr<ASTNode> rhs,
-                                                   const std::shared_ptr<ScopeContext> scope) {
-        auto node = std::make_unique<ASTNode>(NodeType::BinaryOp, op, scope);
+                                                   const std::shared_ptr<ScopeContext> scope, Span span) {
+        auto node = std::make_unique<ASTNode>(NodeType::BinaryOp, op, scope, span);
         node->addChild(std::move(lhs));
         node->addChild(std::move(rhs));
         return node;
     }
 
     std::unique_ptr<ASTNode> ASTNode::makeUnaryOp(const std::string &op, std::unique_ptr<ASTNode> operand,
-                                                  const std::shared_ptr<ScopeContext> scope) {
-        auto node = std::make_unique<ASTNode>(NodeType::UnaryOp, op, scope);
+                                                  const std::shared_ptr<ScopeContext> scope, Span span) {
+        auto node = std::make_unique<ASTNode>(NodeType::UnaryOp, op, scope, span);
         node->addChild(std::move(operand));
         return node;
     }
 
     std::unique_ptr<ASTNode> ASTNode::makeIfStatement(std::unique_ptr<ASTNode> cond, std::unique_ptr<ASTNode> thenBlock,
-                                                      const std::shared_ptr<ScopeContext> scope) {
-        auto node = std::make_unique<ASTNode>(NodeType::IfStatement, "", scope);
+                                                      const std::shared_ptr<ScopeContext> scope, Span span) {
+        auto node = std::make_unique<ASTNode>(NodeType::IfStatement, "", scope, span);
         node->addChild(std::move(cond));
         node->addChild(std::move(thenBlock));
         return node;
@@ -177,27 +179,27 @@ namespace zust {
 
     std::unique_ptr<ASTNode> ASTNode::makeElseIfStatement(std::unique_ptr<ASTNode> cond,
                                                           std::unique_ptr<ASTNode> thenBlock,
-                                                          const std::shared_ptr<ScopeContext> scope) {
-        auto node = std::make_unique<ASTNode>(NodeType::ElseIfStatement, "", scope);
+                                                          const std::shared_ptr<ScopeContext> scope, Span span) {
+        auto node = std::make_unique<ASTNode>(NodeType::ElseIfStatement, "", scope, span);
         node->addChild(std::move(cond));
         node->addChild(std::move(thenBlock));
         return node;
     }
 
     std::unique_ptr<ASTNode> ASTNode::makeElseStatement(std::unique_ptr<ASTNode> elseBlock,
-                                                        const std::shared_ptr<ScopeContext> scope) {
-        auto node = std::make_unique<ASTNode>(NodeType::ElseStatement, "", scope);
+                                                        const std::shared_ptr<ScopeContext> scope, Span span) {
+        auto node = std::make_unique<ASTNode>(NodeType::ElseStatement, "", scope, span);
         node->addChild(std::move(elseBlock));
         return node;
     }
 
     std::unique_ptr<ASTNode> ASTNode::makeFunctionParameterList(const std::vector<ParamInfo> params,
-                                                                std::shared_ptr<ScopeContext> scope) {
-        auto node = std::make_unique<ASTNode>(NodeType::FunctionParameterList, "", scope);
+                                                                std::shared_ptr<ScopeContext> scope, Span span) {
+        auto node = std::make_unique<ASTNode>(NodeType::FunctionParameterList, "", scope, span);
         for (ParamInfo pi : params) {
-            auto child = std::make_unique<ASTNode>(NodeType::FunctionParameter, "", scope);
-            auto name = std::make_unique<ASTNode>(NodeType::Symbol, pi.name, scope);
-            auto type = std::make_unique<ASTNode>(NodeType::Symbol, pi.type, scope);
+            auto child = std::make_unique<ASTNode>(NodeType::FunctionParameter, "", scope, span);
+            auto name = std::make_unique<ASTNode>(NodeType::Symbol, pi.name, scope, span);
+            auto type = std::make_unique<ASTNode>(NodeType::Symbol, pi.type, scope, span);
             child->children.push_back(std::move(name));
             child->children.push_back(std::move(type));
             node->children.push_back(std::move(child));
@@ -208,10 +210,11 @@ namespace zust {
     std::unique_ptr<ASTNode> ASTNode::makeExternFunctionDeclaration(std::string name,
                                                                     const std::shared_ptr<ScopeContext> scope,
                                                                     std::vector<ParamInfo> params,
-                                                                    std::string returnType, bool isVariadic) {
-        auto node = std::make_unique<ASTNode>(NodeType::ExternFunction, name, scope);
-        auto paramsList = ASTNode::makeFunctionParameterList(params, scope);
-        auto returnType_ = std::make_unique<ASTNode>(NodeType::FunctionReturnType, returnType, scope);
+                                                                    std::string returnType, bool isVariadic,
+                                                                    Span span) {
+        auto node = std::make_unique<ASTNode>(NodeType::ExternFunction, name, scope, span);
+        auto paramsList = ASTNode::makeFunctionParameterList(params, scope, span);
+        auto returnType_ = std::make_unique<ASTNode>(NodeType::FunctionReturnType, returnType, scope, span);
         node->children.push_back(std::move(paramsList));
         node->children.push_back(std::move(returnType_));
         scope->defineFunction(name, FunctionInfo{.paramTypes = params,
@@ -219,22 +222,24 @@ namespace zust {
                                                  .name = name,
                                                  .label = "",
                                                  .isExtern = true,
-                                                 .isVariadic = isVariadic});
+                                                 .isVariadic = isVariadic,
+                                                 .symbolId = {}});
         return node;
     }
 
     std::unique_ptr<ASTNode> ASTNode::makeFunctionDeclaration(std::string name,
                                                               const std::shared_ptr<ScopeContext> scope,
                                                               std::vector<ParamInfo> params, std::string returnType,
-                                                              std::unique_ptr<ASTNode> body, bool isVariadic) {
-        auto node = std::make_unique<ASTNode>(NodeType::Function, name, scope);
-        auto paramsList = ASTNode::makeFunctionParameterList(params, scope);
-        auto returnType_ = std::make_unique<ASTNode>(NodeType::FunctionReturnType, returnType, scope);
+                                                              std::unique_ptr<ASTNode> body, bool isVariadic,
+                                                              Span span) {
+        auto node = std::make_unique<ASTNode>(NodeType::Function, name, scope, span);
+        auto paramsList = ASTNode::makeFunctionParameterList(params, scope, span);
+        auto returnType_ = std::make_unique<ASTNode>(NodeType::FunctionReturnType, returnType, scope, span);
         node->children.push_back(std::move(paramsList));
         node->children.push_back(std::move(returnType_));
         body->scope->returnType = returnType;
         for (ParamInfo pi : params) {
-            body->scope->defineVariable(pi.name, VariableInfo{.type = pi.type});
+            body->scope->defineVariable(pi.name, VariableInfo{.type = pi.type, .symbolId = {}});
         }
         node->children.push_back(std::move(body));
         scope->defineFunction(name, FunctionInfo{.paramTypes = params,
@@ -242,7 +247,8 @@ namespace zust {
                                                  .name = name,
                                                  .label = "",
                                                  .isExtern = false,
-                                                 .isVariadic = isVariadic});
+                                                 .isVariadic = isVariadic,
+                                                 .symbolId = {}});
         return node;
     }
 
@@ -263,9 +269,9 @@ namespace zust {
 
     std::unique_ptr<ASTNode> ASTNode::makeFunctionCall(std::string name,
                                                        std::vector<std::unique_ptr<ASTNode>> arguments,
-                                                       const std::shared_ptr<ScopeContext> scope) {
-        auto node = std::make_unique<ASTNode>(NodeType::FunctionCall, name, scope);
-        auto args = std::make_unique<ASTNode>(NodeType::FunctionCallArgumentList, "", scope);
+                                                       const std::shared_ptr<ScopeContext> scope, Span span) {
+        auto node = std::make_unique<ASTNode>(NodeType::FunctionCall, name, scope, span);
+        auto args = std::make_unique<ASTNode>(NodeType::FunctionCallArgumentList, "", scope, span);
         for (auto &arg : arguments) {
             args->addChild(std::move(arg));
         }
@@ -276,8 +282,8 @@ namespace zust {
     std::unique_ptr<ASTNode> ASTNode::makeForLoopNode(std::unique_ptr<ASTNode> initializer,
                                                       std::unique_ptr<ASTNode> condition,
                                                       std::unique_ptr<ASTNode> postLoop, std::unique_ptr<ASTNode> body,
-                                                      const std::shared_ptr<ScopeContext> scope) {
-        auto node = std::make_unique<ASTNode>(NodeType::ForLoop, "", scope);
+                                                      const std::shared_ptr<ScopeContext> scope, Span span) {
+        auto node = std::make_unique<ASTNode>(NodeType::ForLoop, "", scope, span);
         node->addChild(std::move(initializer));
         node->addChild(std::move(condition));
         node->addChild(std::move(postLoop));
@@ -287,19 +293,19 @@ namespace zust {
 
     std::unique_ptr<ASTNode> ASTNode::makeWhileLoopNode(std::unique_ptr<ASTNode> condition,
                                                         std::unique_ptr<ASTNode> body,
-                                                        const std::shared_ptr<ScopeContext> scope) {
-        auto node = std::make_unique<ASTNode>(NodeType::WhileLoop, "", scope);
+                                                        const std::shared_ptr<ScopeContext> scope, Span span) {
+        auto node = std::make_unique<ASTNode>(NodeType::WhileLoop, "", scope, span);
         node->addChild(std::move(condition));
         node->addChild(std::move(body));
         return node;
     }
 
-    std::unique_ptr<ASTNode> ASTNode::makeBreakStatementNode(const std::shared_ptr<ScopeContext> scope) {
-        return std::make_unique<ASTNode>(NodeType::BreakStatement, "break", scope);
+    std::unique_ptr<ASTNode> ASTNode::makeBreakStatementNode(const std::shared_ptr<ScopeContext> scope, Span span) {
+        return std::make_unique<ASTNode>(NodeType::BreakStatement, "break", scope, span);
     }
 
-    std::unique_ptr<ASTNode> ASTNode::makeContinueStatementNode(const std::shared_ptr<ScopeContext> scope) {
-        return std::make_unique<ASTNode>(NodeType::ContinueStatement, "continue", scope);
+    std::unique_ptr<ASTNode> ASTNode::makeContinueStatementNode(const std::shared_ptr<ScopeContext> scope, Span span) {
+        return std::make_unique<ASTNode>(NodeType::ContinueStatement, "continue", scope, span);
     }
 
     void ASTNode::addChild(std::unique_ptr<ASTNode> child) {

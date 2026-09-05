@@ -1,13 +1,40 @@
-#include <all.hpp>
+#include "parser/ScopeContext.hpp"
+
+#include <ostream>
+
+#include "parser/NameMapper.hpp"
 
 namespace zust {
+    namespace {
+        // The name mapper mangles declaration names into globally-unique
+        // labels/SSA names; every scope in one compiler invocation must share
+        // the same counters, so this is the single instance for the process,
+        // not a per-TU static (this used to live in include/all.hpp as
+        // `static zust::NameMapper GLOBAL_NAME_MAPPER;` -- a namespace-scope
+        // `static` in a header gives every translation unit its own copy;
+        // harmless here only because this was the one .cpp file that ever
+        // called into it, but still a footgun worth removing).
+        NameMapper GLOBAL_NAME_MAPPER;
+
+        // One counter for the whole compilation, same reasoning as the name
+        // mapper above: every SymbolId must be unique across the entire
+        // program, not just within one scope.
+        std::uint32_t nextSymbolIdValue = 0;
+
+        SymbolId allocateSymbolId() {
+            return SymbolId{nextSymbolIdValue++};
+        }
+    }  // namespace
+
     bool ScopeContext::defineVariable(const std::string &name, const VariableInfo &info) {
         if (!parent_ || (parent_->kind() == "Namespace" && kind() != "Function")) {
             if (lookupVariableInCurrentContext(name).has_value()) {
                 return false;
             }
             TypeInfo ti = lookupType(info.type);
-            vars_[name] = info;
+            VariableInfo recorded = info;
+            recorded.symbolId = allocateSymbolId();
+            vars_[name] = recorded;
             variable_name_mappings[name] = GLOBAL_NAME_MAPPER.mapVariable(name, name_);
             return true;
         } else {
@@ -15,9 +42,12 @@ namespace zust {
                 return false;
             }
             TypeInfo ti = lookupType(info.type);
-            std::int64_t offset = allocateStack(name, ti);
-            vars_[name] = info;
-            offsetTable_[name] = offset;
+            // Frame slots are no longer assigned here -- allocateStack runs
+            // lazily, on first call to getVariableOffset (see that method).
+            // Only the symbol identity is assigned at definition time.
+            VariableInfo recorded = info;
+            recorded.symbolId = allocateSymbolId();
+            vars_[name] = recorded;
             variable_name_mappings[name] = GLOBAL_NAME_MAPPER.mapVariable(name, name_);
             return true;
         }
@@ -27,6 +57,7 @@ namespace zust {
         if (!info.isExtern) {
             info.label = GLOBAL_NAME_MAPPER.mapFunction(name, name_);
         }
+        info.symbolId = allocateSymbolId();
         funcs_[name] = info;
     }
 
@@ -79,14 +110,29 @@ namespace zust {
         return std::nullopt;
     }
 
-    std::int64_t ScopeContext::allocateStack(const std::string & /*varName*/, const TypeInfo & /*type*/) {
+    std::int64_t ScopeContext::allocateStack(const std::string & /*varName*/, const TypeInfo & /*type*/) const {
         throw std::runtime_error("allocateStack not implemented for scope: " + kind());
     }
 
     std::int64_t ScopeContext::getVariableOffset(const std::string &name) const {
-        auto it = offsetTable_.find(name);
-        if (it != offsetTable_.end()) {
-            return it->second;
+        // Is this variable actually defined in *this* scope? If so, this is
+        // the scope responsible for its offset -- allocate lazily on first
+        // request and cache it, exactly mirroring what defineVariable used
+        // to do eagerly (see the M0-1 shadowing-fix comment on
+        // FunctionScope::allocateStack: recording must happen in the
+        // defining scope, never in the enclosing function scope, or a
+        // shadowed outer variable's slot gets clobbered).
+        auto varIt = vars_.find(name);
+        if (varIt != vars_.end()) {
+            SymbolId id = varIt->second.symbolId;
+            auto offIt = offsetTable_.find(id);
+            if (offIt != offsetTable_.end()) {
+                return offIt->second;
+            }
+            TypeInfo ti = lookupType(varIt->second.type);
+            std::int64_t offset = allocateStack(name, ti);
+            offsetTable_[id] = offset;
+            return offset;
         }
         if (parent_) {
             if (this->kind() == "Function" && parent_->kind() == "Function" && parent_->parent_) {
@@ -181,7 +227,7 @@ namespace zust {
 
     FunctionScope::~FunctionScope() = default;
 
-    std::int64_t FunctionScope::allocateStack(const std::string & /*varName*/, const TypeInfo &type) {
+    std::int64_t FunctionScope::allocateStack(const std::string & /*varName*/, const TypeInfo &type) const {
         // Only hand out the slot; recording it belongs to the scope that is
         // *defining* the variable (see ScopeContext::defineVariable). A block
         // scope allocates out of its enclosing function's frame, so recording
@@ -202,68 +248,23 @@ namespace zust {
         return stackOffset_;
     }
 
-    std::string FunctionScope::allocateSpillSlot(std::int64_t size, CodegenOutputFormat format) {
+    std::int64_t FunctionScope::allocateSpillSlot(std::int64_t size) {
         for (auto it = freeSpillSlots_.begin(); it != freeSpillSlots_.end(); ++it) {
             if (it->second == size) {
                 std::int64_t offset = it->first;
                 freeSpillSlots_.erase(it);
-                switch (format) {
-                    case CodegenOutputFormat::X86_64_LINUX:
-                        return "-" + std::to_string(offset) + "(%rbp)";
-                    case CodegenOutputFormat::X86_64_MSWIN:
-                        return "[rbp - " + std::to_string(stackOffset_ + offset) + "]";
-                    default:
-                        return "";
-                }
+                return offset;
             }
         }
         nextSpillOffset_ -= size;
-        std::int64_t offset = nextSpillOffset_;
-        switch (format) {
-            case CodegenOutputFormat::X86_64_LINUX:
-                return std::to_string(offset) + "(%rbp)";
-            case CodegenOutputFormat::X86_64_MSWIN:
-                return "[rbp - " + std::to_string(std::abs(stackOffset_ + offset)) + "]";
-            default:
-                return "";
-        }
+        return nextSpillOffset_;
     }
 
     std::int64_t FunctionScope::getSpillSize() const {
         return nextSpillOffset_;
     }
 
-    void FunctionScope::freeSpillSlot(const std::string &slot, std::int64_t size) {
-        std::int64_t offset = 0;
-        if (!slot.empty() && slot.front() == '[') {
-            auto close = slot.find(']');
-            if (close == std::string::npos)
-                throw std::runtime_error("Invalid MASM spill slot format: " + slot);
-
-            std::string inside = slot.substr(1, close - 1);
-            auto opPos = inside.find_first_of("+-", 3);
-            if (opPos == std::string::npos)
-                throw std::runtime_error("No offset operator in MASM spill slot: " + slot);
-
-            char op = inside[opPos];
-            std::string numStr = inside.substr(opPos + 1);
-            numStr.erase(0, numStr.find_first_not_of(" \t"));
-            numStr.erase(numStr.find_last_not_of(" \t") + 1);
-
-            offset = std::stoll(numStr);
-            if (op == '-')
-                offset = -offset;
-        } else {
-            // existing style: "(<offset>)", e.g. "-8(rbp)"
-            auto paren = slot.find('(');
-            if (paren == std::string::npos)
-                throw std::runtime_error("Invalid spill slot format: " + slot);
-
-            // e.g. slot = "-8(rbp)" → offsetStr = "-8"
-            std::string offsetStr = slot.substr(0, paren);
-            offset = std::stoll(offsetStr);
-        }
-
+    void FunctionScope::freeSpillSlot(std::int64_t offset, std::int64_t size) {
         freeSpillSlots_.emplace_back(offset, size);
     }
 
@@ -273,7 +274,7 @@ namespace zust {
 
     BlockScope::~BlockScope() = default;
 
-    std::int64_t BlockScope::allocateStack(const std::string &varName, const TypeInfo &type) {
+    std::int64_t BlockScope::allocateStack(const std::string &varName, const TypeInfo &type) const {
         return funcScope_->allocateStack(varName, type);
     }
 

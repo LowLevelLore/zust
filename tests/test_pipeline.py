@@ -96,23 +96,24 @@ def compile_source(
     return cmd, run_process(cmd)
 
 
+def substitute_cmd(template: tuple[str, ...], *, IN: str, OUT: str) -> list[str]:
+    return [part.replace("$IN", IN).replace("$OUT", OUT) for part in template]
+
+
 def assemble_source(
     *,
     target_name: str,
+    target_config,
     asm_out: Path,
     obj_out: Path,
     work_dir: Path,
 ) -> tuple[list[str], subprocess.CompletedProcess[bytes]]:
-    if target_name == "linux":
-        cmd = ["as", str(asm_out), "-o", str(obj_out)]
-        return cmd, run_process(cmd)
-
-    if target_name == "llvm":
-        cmd = ["llc", "-filetype=obj", str(asm_out), "-o", str(obj_out)]
-        return cmd, run_process(cmd)
+    cmd = substitute_cmd(target_config.assemble_cmd, IN=str(asm_out), OUT=str(obj_out))
 
     if target_name == "windows":
-        cmd = ["ml64", "/nologo", "/c", str(asm_out)]
+        # ml64 only accepts one input and always writes <stem>.obj next to it
+        # -- $OUT can't be substituted into the command itself, so run it in
+        # work_dir and move the result into place afterward.
         proc = run_process(cmd, cwd=work_dir)
         if proc.returncode != 0:
             return cmd, proc
@@ -134,18 +135,16 @@ def assemble_source(
         shutil.move(str(obj_temp), str(obj_out))
         return cmd, proc
 
-    raise ValueError(f"Unknown target: {target_name}")
+    return cmd, run_process(cmd)
 
 
 def link_object(
     *,
-    target_name: str,
+    target_config,
     obj_out: Path,
     exe_out: Path,
 ) -> tuple[list[str], subprocess.CompletedProcess[bytes]]:
-    cmd = ["gcc", str(obj_out), "-o", str(exe_out)]
-    if target_name == "llvm":
-        cmd.append("-no-pie")
+    cmd = substitute_cmd(target_config.link_cmd, IN=str(obj_out), OUT=str(exe_out))
     return cmd, run_process(cmd)
 
 
@@ -295,6 +294,7 @@ def build_and_run(
 
     assemble_cmd, assemble_proc = assemble_source(
         target_name=target_name,
+        target_config=target_config,
         asm_out=asm_out,
         obj_out=obj_out,
         work_dir=case_root,
@@ -305,7 +305,7 @@ def build_and_run(
         )
 
     link_cmd, link_proc = link_object(
-        target_name=target_name,
+        target_config=target_config,
         obj_out=obj_out,
         exe_out=exe_out,
     )
