@@ -159,7 +159,10 @@ and the C backend passes the golden suite.
 
 ## M3 — ZIR: the intermediate representation
 
-The centerpiece. Spec lives in `docs/IR-DESIGN.md`.
+The centerpiece. Spec lives in `docs/IR-DESIGN.md`. Tracked implementation
+work (spans M3/M4/M5 together — stage isolation, ZIR, and -O0..-O3 land as one
+piece of work) lives in `docs/PRD-ZIR.md`; check it for current progress before
+starting related work.
 
 - Typed SSA: `Module → Function → BasicBlock → Instruction`, block arguments
   instead of phi nodes, `alloca`/`load`/`store` for locals (SSA-ified later by

@@ -81,9 +81,11 @@ Positional children are the current design; when you add a node type:
 
 - A backend emits; it does not decide. No folding, no reassociation, no dead-store
   elimination in an emitter.
-- Anything conditional on target must go through the ABI table in
-  `RegisterAllocator` / the target description — never `#ifdef _WIN64` inside
+- Anything conditional on target must go through the `TargetABI` data struct
+  (see `docs/PRD-ZIR.md` / `docs/BACKENDS.md`) — never `#ifdef _WIN64` inside
   lowering logic. (`main.cpp` selecting a default target is the one exception.)
+  `RegisterAllocator` is being replaced by a linear-scan allocator over ZIR and
+  should not gain new target knowledge in the meantime.
 - Emit through the provided `std::ostringstream&`, not to `std::cout`.
 - Keep the assembly commented. The existing `# load canary` style comments are
   what makes generated code debuggable; preserve them.
