@@ -148,7 +148,7 @@ goldens do NOT exercise but a naive rewrite would still change). Get these into
 - [x] **0.3 [S]** Delete `include/all.hpp`; give every TU precise includes; move
       `GLOBAL_NAME_MAPPER` off being a per-TU global. *Exit:* suite green, no file
       includes `all.hpp`.
-- [ ] **0.4 [S]** Add `Span` to `Token` and `ASTNode`, threaded through every
+- [x] **0.4 [S]** Add `Span` to `Token` and `ASTNode`, threaded through every
       `make*Node` factory. No diagnostic text changes. *Exit:* suite green,
       `compile_fail` stderr substrings unchanged.
 

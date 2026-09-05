@@ -204,7 +204,7 @@ namespace zust {
     }
 
     std::unique_ptr<ASTNode> Parser::parse() {
-        auto program = ASTNode::makeProgramNode(currentScope);
+        auto program = ASTNode::makeProgramNode(currentScope, currentToken.span());
         while (currentToken.kind != Token::Kind::EndOfFile) {
             auto stmt = parseStatement();
             if (stmt)
@@ -223,10 +223,11 @@ namespace zust {
                 advance();
                 return nullptr;
             } else {
+                Span returnSpan = currentToken.span();
                 advance();
-                auto node = std::make_unique<ASTNode>(NodeType::ReturnStatement, "", currentScope);
+                auto node = std::make_unique<ASTNode>(NodeType::ReturnStatement, "", currentScope, returnSpan);
                 if (currentToken.kind == Token::Kind::SemiColon) {
-                    auto ret = std::make_unique<ASTNode>(NodeType::Symbol, "none", currentScope);
+                    auto ret = std::make_unique<ASTNode>(NodeType::Symbol, "none", currentScope, currentToken.span());
                     node->addChild(std::move(ret));
                 } else {
                     node->addChild(parseExpression(true));
@@ -250,14 +251,15 @@ namespace zust {
             return parseWhileLoop();
         if (currentToken.kind == Token::Kind::Break || currentToken.kind == Token::Kind::Continue) {
             bool isBreak = currentToken.kind == Token::Kind::Break;
+            Span loopCtrlSpan = currentToken.span();
             if (loopDepth == 0) {
                 logError({ErrorType::Syntax, "'" + currentToken.text + "' can only be used inside a loop."});
                 shouldTypecheck = false;
             }
             advance();
             expect(Token::Kind::SemiColon, "Expected ';' after loop control statement.");
-            return isBreak ? ASTNode::makeBreakStatementNode(currentScope)
-                           : ASTNode::makeContinueStatementNode(currentScope);
+            return isBreak ? ASTNode::makeBreakStatementNode(currentScope, loopCtrlSpan)
+                           : ASTNode::makeContinueStatementNode(currentScope, loopCtrlSpan);
         }
         if (currentToken.kind == Token::Kind::Symbol || currentToken.kind == Token::Kind::Identifier)
             return parseExpression(true);
@@ -269,6 +271,7 @@ namespace zust {
     }
 
     std::unique_ptr<ASTNode> Parser::parseFunctionDeclaration() {
+        Span declSpan = currentToken.span();
         bool isExtern = false;
         bool isVariadic = false;
         if (currentToken.kind == Token::Kind::Symbol && currentToken.text == "extern") {
@@ -364,7 +367,8 @@ namespace zust {
 
         if (isExtern) {
             expect(Token::Kind::SemiColon, "Expected ';' after extern function declaration");
-            return ASTNode::makeExternFunctionDeclaration(name, currentScope, params, returnTypeName, isVariadic);
+            return ASTNode::makeExternFunctionDeclaration(name, currentScope, params, returnTypeName, isVariadic,
+                                                          declSpan);
         }
         enterScope(currentScope->name() + "___" + name, true);
         auto body = parseBlock();
@@ -377,13 +381,13 @@ namespace zust {
             }
         }
         return ASTNode::makeFunctionDeclaration(name, currentScope, params, returnTypeName, std::move(body),
-                                                isVariadic);
+                                                isVariadic, declSpan);
     }
 
     std::unique_ptr<ASTNode> Parser::parseBlock() {
         expect(Token::Kind::LeftBrace, "Expected a '{' to open a scope, at line " + std::to_string(currentToken.line) +
                                            ", column " + std::to_string(currentToken.column) + ".");
-        auto blockNode = std::make_unique<ASTNode>(NodeType::Program, "", currentScope);
+        auto blockNode = std::make_unique<ASTNode>(NodeType::Program, "", currentScope, currentToken.span());
         while (!match(Token::Kind::RightBrace) && currentToken.kind != Token::Kind::EndOfFile) {
             if (currentToken.kind == Token::Kind::EndOfFile) {
                 logError({ErrorType::Syntax, "Expected token '}' found 'End Of File' at line " +
@@ -398,6 +402,7 @@ namespace zust {
     }
 
     std::unique_ptr<ASTNode> Parser::parseConditionals() {
+        Span ifSpan = currentToken.span();
         if (!match(Token::Kind::If)) {
             logError({ErrorType::Syntax, "Expected 'if'"});
             shouldTypecheck = false;
@@ -413,10 +418,13 @@ namespace zust {
         enterScope("Block__" + std::to_string(++blockNumber), false);
         auto ifBlock = parseBlock();
         exitScope();
-        auto root = ASTNode::makeIfStatement(std::move(condition), std::move(ifBlock), currentScope);
+        auto root = ASTNode::makeIfStatement(std::move(condition), std::move(ifBlock), currentScope, ifSpan);
         ASTNode *current = root.get();
 
-        while (match(Token::Kind::ElseIf)) {
+        while (true) {
+            Span elifSpan = currentToken.span();
+            if (!match(Token::Kind::ElseIf))
+                break;
             expect(Token::Kind::LeftParen, "Expected a '(' after if block at line " +
                                                std::to_string(currentToken.line) + ", column " +
                                                std::to_string(currentToken.column) + ".");
@@ -427,17 +435,19 @@ namespace zust {
             enterScope("Block__" + std::to_string(++blockNumber), false);
             auto elifBlock = parseBlock();
             exitScope();
-            auto elifNode = ASTNode::makeElseIfStatement(std::move(condition), std::move(elifBlock), currentScope);
+            auto elifNode =
+                ASTNode::makeElseIfStatement(std::move(condition), std::move(elifBlock), currentScope, elifSpan);
             current->setElseBranch(std::move(elifNode));
             current = current->getElseBranch();
         }
 
         // optional 'else'
+        Span elseSpan = currentToken.span();
         if (match(Token::Kind::Else)) {
             enterScope("Block__" + std::to_string(++blockNumber), false);
             auto elseBlock = parseBlock();
             exitScope();
-            auto elseNode = ASTNode::makeElseStatement(std::move(elseBlock), currentScope);
+            auto elseNode = ASTNode::makeElseStatement(std::move(elseBlock), currentScope, elseSpan);
             current->setElseBranch(std::move(elseNode));
         }
 
@@ -445,6 +455,7 @@ namespace zust {
     }
 
     std::unique_ptr<ASTNode> Parser::parseForLoop() {
+        Span forSpan = currentToken.span();
         expect(Token::Kind::For, "Expected 'for' keyword at line " + std::to_string(currentToken.line) + ", column " +
                                      std::to_string(currentToken.column) + ".");
 
@@ -466,11 +477,12 @@ namespace zust {
         exitScope();
 
         auto forNode = ASTNode::makeForLoopNode(std::move(init), std::move(condition), std::move(postLoop),
-                                                std::move(body), currentScope);
+                                                std::move(body), currentScope, forSpan);
         return forNode;
     }
 
     std::unique_ptr<ASTNode> Parser::parseWhileLoop() {
+        Span whileSpan = currentToken.span();
         expect(Token::Kind::While, "Expected 'while' keyword at line " + std::to_string(currentToken.line) +
                                        ", column " + std::to_string(currentToken.column) + ".");
 
@@ -489,11 +501,12 @@ namespace zust {
         --loopDepth;
         exitScope();
 
-        auto whileNode = ASTNode::makeWhileLoopNode(std::move(condition), std::move(body), currentScope);
+        auto whileNode = ASTNode::makeWhileLoopNode(std::move(condition), std::move(body), currentScope, whileSpan);
         return whileNode;
     }
 
     std::unique_ptr<ASTNode> Parser::parseVariableDeclaration() {
+        Span declSpan = currentToken.span();
         if (currentToken.kind != Token::Kind::Identifier)
             expect(Token::Kind::Identifier, "Expected variable name after 'let'");
 
@@ -502,7 +515,7 @@ namespace zust {
         std::unique_ptr<ASTNode> typeNode, initNode;
 
         if (match(Token::Kind::Colon)) {
-            typeNode = ASTNode::makeSymbolNode(currentToken.text, currentScope);
+            typeNode = ASTNode::makeSymbolNode(currentToken.text, currentScope, currentToken.span());
             advance();
         } else {
             // TODO: Handle type deduction but its a far far task.
@@ -521,22 +534,22 @@ namespace zust {
             if (zust::numeric_types.find(typeNode->value) != zust::numeric_types.end()) {
                 if (ty.isFloat) {
                     if (ty.bits == 32)
-                        initNode = ASTNode::makeFloatLiteralNode("0.0F", currentScope);
+                        initNode = ASTNode::makeFloatLiteralNode("0.0F", currentScope, declSpan);
                     else
-                        initNode = ASTNode::makeFloatLiteralNode("0.0", currentScope);
+                        initNode = ASTNode::makeFloatLiteralNode("0.0", currentScope, declSpan);
                 } else
-                    initNode = ASTNode::makeIntegerLiteralNode("0", currentScope);
+                    initNode = ASTNode::makeIntegerLiteralNode("0", currentScope, declSpan);
             } else {
                 if (typeNode->value == "boolean")
-                    initNode = ASTNode::makeBooleanLiteralNode(true, currentScope);
+                    initNode = ASTNode::makeBooleanLiteralNode(true, currentScope, declSpan);
 
                 else if (typeNode->value == "string")
-                    initNode = ASTNode::makeStringLiteralNode("", currentScope);
+                    initNode = ASTNode::makeStringLiteralNode("", currentScope, declSpan);
             }
         }
         expect(Token::Kind::SemiColon, "Expected ';' after declaration");
-        std::optional<std::unique_ptr<ASTNode>> result =
-            ASTNode::makeVariableDeclarationNode(name, std::move(typeNode), std::move(initNode), currentScope);
+        std::optional<std::unique_ptr<ASTNode>> result = ASTNode::makeVariableDeclarationNode(
+            name, std::move(typeNode), std::move(initNode), currentScope, declSpan);
         if (!result.has_value()) {
             logError(Error(ErrorType::Generic, "Variable '" + name + "' already defined in current scope."));
             shouldTypecheck = false;
@@ -547,13 +560,14 @@ namespace zust {
     }
 
     std::unique_ptr<ASTNode> Parser::parseVariableReassignment() {
+        Span reassignSpan = currentToken.span();
         std::string name = currentToken.text;
         advance();
 
         expect(Token::Kind::Equal, "Expected '=' for variable reassignment");
         auto expr = parseExpression();
         expect(Token::Kind::SemiColon, "Expected ';' after reassignment");
-        return ASTNode::makeVariableReassignmentNode(name, std::move(expr), currentScope);
+        return ASTNode::makeVariableReassignmentNode(name, std::move(expr), currentScope, reassignSpan);
     }
 
     std::unique_ptr<ASTNode> Parser::parseExpression(bool expect_exclaim) {
@@ -566,38 +580,39 @@ namespace zust {
     }
 
     std::unique_ptr<ASTNode> Parser::parsePrimary() {
+        Span primarySpan = currentToken.span();
         if (currentToken.kind == Token::Kind::Symbol && currentToken.text == "-") {
             advance();
             if (currentToken.kind == Token::Kind::FloatLiteral) {
                 std::string f = currentToken.text;
                 advance();
-                return ASTNode::makeFloatLiteralNode("-" + f, currentScope);
+                return ASTNode::makeFloatLiteralNode("-" + f, currentScope, primarySpan);
             }
             if (currentToken.kind == Token::Kind::IntegerLiteral) {
                 std::string val = currentToken.text;
                 advance();
-                return ASTNode::makeIntegerLiteralNode("-" + val, currentScope);
+                return ASTNode::makeIntegerLiteralNode("-" + val, currentScope, primarySpan);
             }
         }
         if (currentToken.kind == Token::Kind::BoolLiteral) {
             bool val = (currentToken.text == "true");
             advance();
-            return ASTNode::makeBooleanLiteralNode(val, currentScope);
+            return ASTNode::makeBooleanLiteralNode(val, currentScope, primarySpan);
         }
         if (currentToken.kind == Token::Kind::StringLiteral) {
             std::string s = currentToken.text;
             advance();
-            return ASTNode::makeStringLiteralNode(s, currentScope);
+            return ASTNode::makeStringLiteralNode(s, currentScope, primarySpan);
         }
         if (currentToken.kind == Token::Kind::FloatLiteral) {
             std::string f = currentToken.text;
             advance();
-            return ASTNode::makeFloatLiteralNode(f, currentScope);
+            return ASTNode::makeFloatLiteralNode(f, currentScope, primarySpan);
         }
         if (currentToken.kind == Token::Kind::IntegerLiteral) {
             std::string val = currentToken.text;
             advance();
-            return ASTNode::makeIntegerLiteralNode(val, currentScope);
+            return ASTNode::makeIntegerLiteralNode(val, currentScope, primarySpan);
         }
         if (currentToken.kind == Token::Kind::Identifier) {
             std::string name = currentToken.text;
@@ -618,14 +633,14 @@ namespace zust {
                     }
                 }
                 expect(Token::Kind::RightParen, "Expected ')' after function arguments");
-                return ASTNode::makeFunctionCall(name, std::move(arguments), currentScope);
+                return ASTNode::makeFunctionCall(name, std::move(arguments), currentScope, primarySpan);
             }
 
-            auto node = ASTNode::makeVariableAccessNode(name, currentScope);
+            auto node = ASTNode::makeVariableAccessNode(name, currentScope, primarySpan);
             if (currentToken.kind == Token::Kind::Symbol && (currentToken.text == "++" || currentToken.text == "--")) {
                 std::string op = currentToken.text;
                 advance();
-                node = ASTNode::makeUnaryOp(op, std::move(node), currentScope);
+                node = ASTNode::makeUnaryOp(op, std::move(node), currentScope, primarySpan);
             }
 
             return node;
@@ -638,12 +653,13 @@ namespace zust {
     }
 
     std::unique_ptr<ASTNode> Parser::parseUnary() {
+        Span unarySpan = currentToken.span();
         if (currentToken.kind == Token::Kind::Symbol &&
             (currentToken.text == "++" || currentToken.text == "--" || currentToken.text == "!")) {
             std::string op = currentToken.text;
             advance();
             auto operand = parseUnary();
-            return ASTNode::makeUnaryOp(op, std::move(operand), currentScope);
+            return ASTNode::makeUnaryOp(op, std::move(operand), currentScope, unarySpan);
         }
         return parsePrimary();
     }
@@ -655,6 +671,7 @@ namespace zust {
                   (currentToken.kind == Token::Kind::Equal and currentToken.text == "==")))
                 break;
 
+            Span opSpan = currentToken.span();
             std::string op = currentToken.text;
             int tokPrec = getPrecedence(op);
 
@@ -670,7 +687,7 @@ namespace zust {
             if (tokPrec < nextPrec)
                 rhs = parseBinaryRHS(tokPrec + 1, std::move(rhs));
 
-            lhs = ASTNode::makeBinaryOp(op, std::move(lhs), std::move(rhs), currentScope);
+            lhs = ASTNode::makeBinaryOp(op, std::move(lhs), std::move(rhs), currentScope, opSpan);
         }
         return lhs;
     }
