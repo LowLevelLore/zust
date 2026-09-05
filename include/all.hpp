@@ -1,13 +1,13 @@
 #pragma once
 
-#include <assert.h>
-
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <map>
 #include <memory>
 #include <sstream>
+
+#include <assert.h>
 
 #include "ast/ASTNode.hpp"
 #include "codegen/Canaries.hpp"

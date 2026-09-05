@@ -1,24 +1,20 @@
 #include "all.hpp"
 
 namespace zust {
-    RegisterAllocator::RegisterAllocator(std::vector<std::string> regs, std::vector<std::string> XMMregs, std::vector<std::string> argumentRegs, std::vector<std::string> argumentXMMRegs)
-        : available(std::move(regs)), availableXMM(std::move(XMMregs)), availableArgumentRegs(std::move(argumentRegs)), availableArgumentRegsXMM(std::move(argumentXMMRegs)) {
-    }
+    RegisterAllocator::RegisterAllocator(std::vector<std::string> regs, std::vector<std::string> XMMregs,
+                                         std::vector<std::string> argumentRegs,
+                                         std::vector<std::string> argumentXMMRegs)
+        : available(std::move(regs)),
+          availableXMM(std::move(XMMregs)),
+          availableArgumentRegs(std::move(argumentRegs)),
+          availableArgumentRegsXMM(std::move(argumentXMMRegs)) {}
 
     RegisterAllocator RegisterAllocator::forSysV() {
-        return RegisterAllocator(
-            SCRATCH_GPR_LINUX,
-            SCRATCH_XMM_LINUX,
-            ARG_GPR_LINUX,
-            ARG_XMM_LINUX);
+        return RegisterAllocator(SCRATCH_GPR_LINUX, SCRATCH_XMM_LINUX, ARG_GPR_LINUX, ARG_XMM_LINUX);
     }
 
     RegisterAllocator RegisterAllocator::forMSVC() {
-        return RegisterAllocator(
-            SCRATCH_GPR_MSVC,
-            SCRATCH_XMM_MSVC,
-            ARG_GPR_MSVC,
-            ARG_XMM_MSVC);
+        return RegisterAllocator(SCRATCH_GPR_MSVC, SCRATCH_XMM_MSVC, ARG_GPR_MSVC, ARG_XMM_MSVC);
     }
 
     std::string RegisterAllocator::allocate() {
@@ -42,7 +38,17 @@ namespace zust {
 
     std::string RegisterAllocator::getBaseReg(const std::string &reg) {
         static const std::unordered_map<std::string, std::string> reg_to_base = {
-            {"rax", "rax"}, {"eax", "rax"}, {"ax", "rax"}, {"al", "rax"}, {"rbx", "rbx"}, {"ebx", "rbx"}, {"bx", "rbx"}, {"bl", "rbx"}, {"rcx", "rcx"}, {"ecx", "rcx"}, {"cx", "rcx"}, {"cl", "rcx"}, {"rdx", "rdx"}, {"edx", "rdx"}, {"dx", "rdx"}, {"dl", "rdx"}, {"rsi", "rsi"}, {"esi", "rsi"}, {"si", "rsi"}, {"sil", "rsi"}, {"rdi", "rdi"}, {"edi", "rdi"}, {"di", "rdi"}, {"dil", "rdi"}, {"rbp", "rbp"}, {"ebp", "rbp"}, {"bp", "rbp"}, {"bpl", "rbp"}, {"rsp", "rsp"}, {"esp", "rsp"}, {"sp", "rsp"}, {"spl", "rsp"}, {"r8", "r8"}, {"r8d", "r8"}, {"r8w", "r8"}, {"r8b", "r8"}, {"r9", "r9"}, {"r9d", "r9"}, {"r9w", "r9"}, {"r9b", "r9"}, {"r10", "r10"}, {"r10d", "r10"}, {"r10w", "r10"}, {"r10b", "r10"}, {"r11", "r11"}, {"r11d", "r11"}, {"r11w", "r11"}, {"r11b", "r11"}, {"r12", "r12"}, {"r12d", "r12"}, {"r12w", "r12"}, {"r12b", "r12"}, {"r13", "r13"}, {"r13d", "r13"}, {"r13w", "r13"}, {"r13b", "r13"}, {"r14", "r14"}, {"r14d", "r14"}, {"r14w", "r14"}, {"r14b", "r14"}, {"r15", "r15"}, {"r15d", "r15"}, {"r15w", "r15"}, {"r15b", "r15"}};
+            {"rax", "rax"},  {"eax", "rax"},  {"ax", "rax"},   {"al", "rax"},   {"rbx", "rbx"},  {"ebx", "rbx"},
+            {"bx", "rbx"},   {"bl", "rbx"},   {"rcx", "rcx"},  {"ecx", "rcx"},  {"cx", "rcx"},   {"cl", "rcx"},
+            {"rdx", "rdx"},  {"edx", "rdx"},  {"dx", "rdx"},   {"dl", "rdx"},   {"rsi", "rsi"},  {"esi", "rsi"},
+            {"si", "rsi"},   {"sil", "rsi"},  {"rdi", "rdi"},  {"edi", "rdi"},  {"di", "rdi"},   {"dil", "rdi"},
+            {"rbp", "rbp"},  {"ebp", "rbp"},  {"bp", "rbp"},   {"bpl", "rbp"},  {"rsp", "rsp"},  {"esp", "rsp"},
+            {"sp", "rsp"},   {"spl", "rsp"},  {"r8", "r8"},    {"r8d", "r8"},   {"r8w", "r8"},   {"r8b", "r8"},
+            {"r9", "r9"},    {"r9d", "r9"},   {"r9w", "r9"},   {"r9b", "r9"},   {"r10", "r10"},  {"r10d", "r10"},
+            {"r10w", "r10"}, {"r10b", "r10"}, {"r11", "r11"},  {"r11d", "r11"}, {"r11w", "r11"}, {"r11b", "r11"},
+            {"r12", "r12"},  {"r12d", "r12"}, {"r12w", "r12"}, {"r12b", "r12"}, {"r13", "r13"},  {"r13d", "r13"},
+            {"r13w", "r13"}, {"r13b", "r13"}, {"r14", "r14"},  {"r14d", "r14"}, {"r14w", "r14"}, {"r14b", "r14"},
+            {"r15", "r15"},  {"r15d", "r15"}, {"r15w", "r15"}, {"r15b", "r15"}};
 
         if (reg.starts_with("xmm")) {
             return reg;
@@ -100,11 +106,13 @@ namespace zust {
         inUseArgument.insert(reg);
         return reg;
     }
+
     std::string RegisterAllocator::allocateArgumentXMM(uint8_t position) {
         std::string reg = availableArgumentRegsXMM[position];
         inUseArgumentXMM.insert(reg);
         return reg;
     }
+
     void RegisterAllocator::freeArgument(const std::string &reg) {
         auto it = inUseArgument.find(getBaseReg(reg));
         if (it == inUseArgument.end()) {
@@ -115,6 +123,7 @@ namespace zust {
         }
         inUseArgument.erase(it);
     }
+
     bool RegisterAllocator::freeArgumentXMM(const std::string &reg) {
         auto it = inUseArgumentXMM.find(getBaseReg(reg));
         if (it == inUseArgumentXMM.end()) {
@@ -123,18 +132,22 @@ namespace zust {
         inUseArgumentXMM.erase(it);
         return true;
     }
+
     bool RegisterAllocator::isInUseArgument(const std::string &reg) const {
         return inUseArgument.find(reg) != inUseArgument.end();
     }
+
     bool RegisterAllocator::isInUseArgumentXMM(const std::string &reg) const {
         return inUseArgumentXMM.find(reg) != inUseArgumentXMM.end();
     }
+
     std::string RegisterAllocator::pickVictimXMM() {
         if (lruXMMRegs.empty()) {
             throw std::runtime_error("No victim available for XMM registers");
         }
         return lruXMMRegs.front();
     }
+
     std::string RegisterAllocator::pickVictim() {
         if (lruRegs.empty()) {
             throw std::runtime_error("No victim available for general-purpose registers");
@@ -179,7 +192,8 @@ namespace zust {
         spilledRegs.erase(it);
     }
 
-    void RegisterAllocator::emitSpillRestore(const std::string &reg, const std::string &slot, bool isXMM, zust::CodegenOutputFormat format, std::ostream &out) {
+    void RegisterAllocator::emitSpillRestore(const std::string &reg, const std::string &slot, bool isXMM,
+                                             zust::CodegenOutputFormat format, std::ostream &out) {
         if (format == CodegenOutputFormat::X86_64_LINUX) {
             if (isXMM)
                 out << "    movdqu " << slot << ", %" << reg << "\n";

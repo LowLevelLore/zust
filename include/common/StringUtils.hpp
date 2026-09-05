@@ -2,32 +2,27 @@
 #include <string>
 #include <vector>
 
-namespace zust
-{
+namespace zust {
 
     bool startsWith(const std::string &str, const std::string &prefix);
     bool endsWith(const std::string &str, const std::string &suffix);
     std::vector<std::string> split(const std::string &str, char delimiter);
     std::string trim(const std::string &str);
 
-    inline bool isWhitespace(char c)
-    {
+    inline bool isWhitespace(char c) {
         return c == ' ' || c == '\t' || c == '\n' || c == '\r';
     }
 
-    inline bool isAlpha(char c)
-    {
+    inline bool isAlpha(char c) {
         return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
     }
 
-    inline bool isDigit(char c)
-    {
+    inline bool isDigit(char c) {
         return c >= '0' && c <= '9';
     }
 
-    inline bool isSymbolChar(char c)
-    {
+    inline bool isSymbolChar(char c) {
         return isAlpha(c) || isDigit(c) || c == '_';
     }
 
-} // namespace zust
+}  // namespace zust

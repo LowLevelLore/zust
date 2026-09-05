@@ -356,7 +356,6 @@ namespace zust {
         }
 
         // 6. Integer operations
-        char suf = integer_suffixes.at(tr.bits);  // e.g. 'q' for 64, 'l' for 32
         std::string adj_l = adjustReg(rl, tr.bits);
         std::string adj_r = adjustReg(rr, tr.bits);
 
@@ -409,7 +408,7 @@ namespace zust {
         // 8. Bitwise/logical ops: &&, ||, &, |
         if (op == "&&" || op == "||" || op == "&" || op == "|") {
             std::string instr = (op == "&&" ? "and" : op == "||" ? "or" : op);
-            out << "    " << instr << suf << " " << adj_l << ", " << adj_r << "\n";
+            out << "    " << instr << " " << adj_l << ", " << adj_r << "\n";
             alloc.free(rr);
             noteType(rl, tr);
             return rl;

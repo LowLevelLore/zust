@@ -25,4 +25,4 @@ namespace zust {
         size_t funcCounter_ = 0;
         size_t typeCounter_ = 0;
     };
-}
+}  // namespace zust
