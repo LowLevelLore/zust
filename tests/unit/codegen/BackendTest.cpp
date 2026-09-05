@@ -1,6 +1,6 @@
-#include <doctest/doctest.h>
-
 #include <sstream>
+
+#include <doctest/doctest.h>
 
 #include "codegen/Backend.hpp"
 
@@ -10,7 +10,9 @@ namespace {
     class FakeBackend final : public Backend {
     public:
         explicit FakeBackend(TargetInfo info) : info_(std::move(info)) {}
+
         const TargetInfo &info() const override { return info_; }
+
         void emit(std::unique_ptr<ASTNode>, std::ostream &) override {}
 
     private:

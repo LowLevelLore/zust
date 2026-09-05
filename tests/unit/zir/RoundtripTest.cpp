@@ -1,8 +1,8 @@
-#include <doctest/doctest.h>
-
 #include <filesystem>
 #include <fstream>
 #include <sstream>
+
+#include <doctest/doctest.h>
 
 #include "zir/Printer.hpp"
 #include "zir/TextParser.hpp"

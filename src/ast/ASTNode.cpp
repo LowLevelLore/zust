@@ -116,7 +116,8 @@ namespace zust {
         const std::string &name, std::unique_ptr<ASTNode> typeAnnotation, std::unique_ptr<ASTNode> initializer,
         const std::shared_ptr<ScopeContext> scope, Span span) {
         auto node = std::make_unique<ASTNode>(NodeType::VariableDeclaration, name, scope, span);
-        bool result = scope.get()->defineVariable(name, VariableInfo{.type = typeAnnotation.get()->value, .symbolId = {}});
+        bool result =
+            scope.get()->defineVariable(name, VariableInfo{.type = typeAnnotation.get()->value, .symbolId = {}});
         if (result) {
             if (typeAnnotation)
                 node->addChild(std::move(typeAnnotation));
@@ -128,8 +129,8 @@ namespace zust {
         }
     }
 
-    std::unique_ptr<ASTNode> ASTNode::makeSymbolNode(const std::string &name,
-                                                     const std::shared_ptr<ScopeContext> scope, Span span) {
+    std::unique_ptr<ASTNode> ASTNode::makeSymbolNode(const std::string &name, const std::shared_ptr<ScopeContext> scope,
+                                                     Span span) {
         return std::make_unique<ASTNode>(NodeType::Symbol, name, scope, span);
     }
 
@@ -303,8 +304,7 @@ namespace zust {
         return std::make_unique<ASTNode>(NodeType::BreakStatement, "break", scope, span);
     }
 
-    std::unique_ptr<ASTNode> ASTNode::makeContinueStatementNode(const std::shared_ptr<ScopeContext> scope,
-                                                                 Span span) {
+    std::unique_ptr<ASTNode> ASTNode::makeContinueStatementNode(const std::shared_ptr<ScopeContext> scope, Span span) {
         return std::make_unique<ASTNode>(NodeType::ContinueStatement, "continue", scope, span);
     }
 

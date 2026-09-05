@@ -1,6 +1,7 @@
+#include "parser/Parser.hpp"
+
 #include <cstdlib>
 
-#include "parser/Parser.hpp"
 #include "typechecker/TypeChecker.hpp"
 
 // TODO: 4 Things then I'm done
@@ -380,8 +381,8 @@ namespace zust {
                 throw std::runtime_error("Main should be in global scope");
             }
         }
-        return ASTNode::makeFunctionDeclaration(name, currentScope, params, returnTypeName, std::move(body),
-                                                isVariadic, declSpan);
+        return ASTNode::makeFunctionDeclaration(name, currentScope, params, returnTypeName, std::move(body), isVariadic,
+                                                declSpan);
     }
 
     std::unique_ptr<ASTNode> Parser::parseBlock() {

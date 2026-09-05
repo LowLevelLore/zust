@@ -1,5 +1,6 @@
-#include "common/Logging.hpp"
 #include "typechecker/TypeChecker.hpp"
+
+#include "common/Logging.hpp"
 
 namespace zust {
     void TypeChecker::check(const std::unique_ptr<ASTNode> &program) {
@@ -392,8 +393,8 @@ namespace zust {
         if (declaredRet == "none")
             return;  // nothing to enforce -- falling off the end is fine
         if (!definitelyReturns(functionNode->getFunctionBody())) {
-            logWarning("Function '" + functionNode->value +
-                      "' does not definitely return a value of type '" + declaredRet + "' on every path");
+            logWarning("Function '" + functionNode->value + "' does not definitely return a value of type '" +
+                       declaredRet + "' on every path");
         }
     }
 

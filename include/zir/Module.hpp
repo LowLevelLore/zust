@@ -24,12 +24,15 @@ namespace zust::zir {
         const std::string &label() const { return label_; }
 
         std::vector<ValueId> &params() { return params_; }
+
         const std::vector<ValueId> &params() const { return params_; }
 
         std::vector<InstId> &insts() { return insts_; }
+
         const std::vector<InstId> &insts() const { return insts_; }
 
         Terminator &term() { return term_; }
+
         const Terminator &term() const { return term_; }
 
     private:
@@ -50,11 +53,15 @@ namespace zust::zir {
             : name_(std::move(name)), signature_(signature), isExtern_(isExtern), isVariadic_(isVariadic) {}
 
         const std::string &name() const { return name_; }
+
         TypeId signature() const { return signature_; }
+
         bool isExtern() const { return isExtern_; }
+
         bool isVariadic() const { return isVariadic_; }
 
         BlockId entry() const { return entry_; }
+
         void setEntry(BlockId b) { entry_ = b; }
 
         BlockId addBlock(std::string label) {
@@ -69,6 +76,7 @@ namespace zust::zir {
                 throw std::runtime_error("Function::block: invalid BlockId");
             return blocks_[id.value()];
         }
+
         const BasicBlock &block(BlockId id) const {
             if (!id.isValid() || id.value() >= blocks_.size())
                 throw std::runtime_error("Function::block: invalid BlockId");
@@ -83,14 +91,17 @@ namespace zust::zir {
             valueTypes_.push_back(type);
             return ValueId(static_cast<ValueId::Value>(valueTypes_.size() - 1));
         }
+
         TypeId typeOf(ValueId v) const {
             if (!v.isValid() || v.value() >= valueTypes_.size())
                 throw std::runtime_error("Function::typeOf: invalid ValueId");
             return valueTypes_[v.value()];
         }
+
         std::size_t valueCount() const { return valueTypes_.size(); }
 
         void setValueName(ValueId v, std::string name) { valueNames_[v] = std::move(name); }
+
         // The printer's name for a value: the user-assigned name if one was
         // set (e.g. "n" for source variable `n`, printed as "%n"), else a
         // synthesized "v<N>" (printed as "%v3").
@@ -107,16 +118,19 @@ namespace zust::zir {
             this->block(block).insts().push_back(id);
             return id;
         }
+
         Instruction &inst(InstId id) {
             if (!id.isValid() || id.value() >= insts_.size())
                 throw std::runtime_error("Function::inst: invalid InstId");
             return insts_[id.value()];
         }
+
         const Instruction &inst(InstId id) const {
             if (!id.isValid() || id.value() >= insts_.size())
                 throw std::runtime_error("Function::inst: invalid InstId");
             return insts_[id.value()];
         }
+
         std::size_t instCount() const { return insts_.size(); }
 
     private:
@@ -153,38 +167,47 @@ namespace zust::zir {
             : sourceName_(std::move(sourceName)), targetName_(std::move(targetName)) {}
 
         const std::string &sourceName() const { return sourceName_; }
+
         const std::string &targetName() const { return targetName_; }
 
         TypeTable &types() { return types_; }
+
         const TypeTable &types() const { return types_; }
+
         TargetLayout &layout() { return layout_; }
+
         const TargetLayout &layout() const { return layout_; }
 
         GlobalId addGlobal(GlobalVar g) {
             globals_.push_back(std::move(g));
             return GlobalId(static_cast<GlobalId::Value>(globals_.size() - 1));
         }
+
         const GlobalVar &global(GlobalId id) const {
             if (!id.isValid() || id.value() >= globals_.size())
                 throw std::runtime_error("Module::global: invalid GlobalId");
             return globals_[id.value()];
         }
+
         const std::vector<GlobalVar> &globals() const { return globals_; }
 
         FuncId addFunction(Function fn) {
             functions_.push_back(std::move(fn));
             return FuncId(static_cast<FuncId::Value>(functions_.size() - 1));
         }
+
         Function &function(FuncId id) {
             if (!id.isValid() || id.value() >= functions_.size())
                 throw std::runtime_error("Module::function: invalid FuncId");
             return functions_[id.value()];
         }
+
         const Function &function(FuncId id) const {
             if (!id.isValid() || id.value() >= functions_.size())
                 throw std::runtime_error("Module::function: invalid FuncId");
             return functions_[id.value()];
         }
+
         const std::vector<Function> &functions() const { return functions_; }
 
     private:

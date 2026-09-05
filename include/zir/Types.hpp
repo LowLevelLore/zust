@@ -47,6 +47,7 @@ namespace zust::zir {
         bool variadic = false;
 
         bool operator==(const Type &other) const;
+
         bool operator!=(const Type &other) const { return !(*this == other); }
     };
 
@@ -64,17 +65,21 @@ namespace zust::zir {
         TypeTable();
 
         TypeId voidType() const { return voidType_; }
+
         TypeId intType(std::uint32_t bits, bool isSigned) const;
+
         // bool == Int{1, false} in ZIR proper; lowering/backends decide how
         // that 1-bit value is represented in memory (TargetLayout rounds it
         // up to 1 byte -- see sizeOfBytes).
         TypeId boolType() const { return intType(1, false); }
+
         TypeId floatType(std::uint32_t bits) const;
         TypeId ptrType(TypeId pointee) const;
         TypeId arrayType(TypeId elem, std::uint64_t len) const;
         TypeId fnType(std::vector<TypeId> params, TypeId ret, bool variadic) const;
 
         const Type &get(TypeId id) const;
+
         std::size_t size() const { return types_.size(); }
 
     private:

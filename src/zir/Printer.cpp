@@ -9,7 +9,9 @@ namespace zust::zir {
 
     namespace {
 
-        std::string typeStr(const TypeTable &table, TypeId id) { return Printer::printType(table, id); }
+        std::string typeStr(const TypeTable &table, TypeId id) {
+            return Printer::printType(table, id);
+        }
 
         std::string opcodeKeyword(Opcode op) {
             switch (op) {
@@ -199,7 +201,9 @@ namespace zust::zir {
             return out;
         }
 
-        std::string valueRef(const Function &fn, ValueId v) { return "%" + fn.nameOf(v); }
+        std::string valueRef(const Function &fn, ValueId v) {
+            return "%" + fn.nameOf(v);
+        }
 
         std::string blockRef(const Function &fn, const BlockRef &target) {
             std::string s = "^" + fn.block(target.block).label();
@@ -235,8 +239,8 @@ namespace zust::zir {
                     out << "load " << typeStr(table, inst.type) << ", " << valueRef(fn, inst.operands[0]);
                     break;
                 case Opcode::Store:
-                    out << "store " << typeStr(table, fn.typeOf(inst.operands[0])) << " " << valueRef(fn, inst.operands[0])
-                        << ", " << valueRef(fn, inst.operands[1]);
+                    out << "store " << typeStr(table, fn.typeOf(inst.operands[0])) << " "
+                        << valueRef(fn, inst.operands[0]) << ", " << valueRef(fn, inst.operands[1]);
                     break;
                 case Opcode::Add:
                 case Opcode::Sub:
@@ -255,8 +259,8 @@ namespace zust::zir {
                 case Opcode::FSub:
                 case Opcode::FMul:
                 case Opcode::FDiv:
-                    out << opcodeKeyword(inst.op) << " " << typeStr(table, inst.type) << " " << valueRef(fn, inst.operands[0])
-                        << ", " << valueRef(fn, inst.operands[1]);
+                    out << opcodeKeyword(inst.op) << " " << typeStr(table, inst.type) << " "
+                        << valueRef(fn, inst.operands[0]) << ", " << valueRef(fn, inst.operands[1]);
                     break;
                 case Opcode::ICmp:
                 case Opcode::FCmp:
@@ -266,7 +270,8 @@ namespace zust::zir {
                     break;
                 case Opcode::Neg:
                 case Opcode::Not:
-                    out << opcodeKeyword(inst.op) << " " << typeStr(table, inst.type) << " " << valueRef(fn, inst.operands[0]);
+                    out << opcodeKeyword(inst.op) << " " << typeStr(table, inst.type) << " "
+                        << valueRef(fn, inst.operands[0]);
                     break;
                 case Opcode::Trunc:
                 case Opcode::ZExt:
@@ -285,7 +290,8 @@ namespace zust::zir {
                     break;
                 case Opcode::Gep: {
                     out << "gep " << typeStr(table, inst.elemType) << ", " << valueRef(fn, inst.operands[0]);
-                    for (std::size_t i = 1; i < inst.operands.size(); ++i) out << ", " << valueRef(fn, inst.operands[i]);
+                    for (std::size_t i = 1; i < inst.operands.size(); ++i)
+                        out << ", " << valueRef(fn, inst.operands[i]);
                     break;
                 }
                 case Opcode::Call: {

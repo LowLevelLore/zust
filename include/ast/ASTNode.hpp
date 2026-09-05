@@ -72,8 +72,7 @@ namespace zust {
         static std::unique_ptr<ASTNode> makeSymbolNode(const std::string &name,
                                                        const std::shared_ptr<ScopeContext> scope, Span span = {});
         static std::unique_ptr<ASTNode> makeFloatLiteralNode(const std::string &literal,
-                                                             const std::shared_ptr<ScopeContext> scope,
-                                                             Span span = {});
+                                                             const std::shared_ptr<ScopeContext> scope, Span span = {});
         static std::unique_ptr<ASTNode> makeStringLiteralNode(const std::string &literal,
                                                               const std::shared_ptr<ScopeContext> scope,
                                                               Span span = {});
@@ -90,8 +89,7 @@ namespace zust {
                                                         const std::shared_ptr<ScopeContext> scope, Span span = {});
         static std::unique_ptr<ASTNode> makeElseIfStatement(std::unique_ptr<ASTNode> condition,
                                                             std::unique_ptr<ASTNode> program,
-                                                            const std::shared_ptr<ScopeContext> scope,
-                                                            Span span = {});
+                                                            const std::shared_ptr<ScopeContext> scope, Span span = {});
         static std::unique_ptr<ASTNode> makeElseStatement(std::unique_ptr<ASTNode> program,
                                                           const std::shared_ptr<ScopeContext> scope, Span span = {});
         static std::unique_ptr<ASTNode> makeExternFunctionDeclaration(std::string name,
@@ -121,7 +119,7 @@ namespace zust {
         static std::unique_ptr<ASTNode> makeBreakStatementNode(const std::shared_ptr<ScopeContext> scope,
                                                                Span span = {});
         static std::unique_ptr<ASTNode> makeContinueStatementNode(const std::shared_ptr<ScopeContext> scope,
-                                                                   Span span = {});
+                                                                  Span span = {});
         void addChild(std::unique_ptr<ASTNode> child);
         void setElseBranch(std::unique_ptr<ASTNode> elseNode);
         ASTNode *getElseBranch() const;

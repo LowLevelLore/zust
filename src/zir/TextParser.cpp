@@ -63,8 +63,8 @@ namespace zust::zir {
                 pos++;  // consume opening quote
                 std::string out;
                 while (pos < src.size() && src[pos] != '"') {
-                    if (hexUnescape && src[pos] == '\\' && pos + 2 < src.size() && std::isxdigit((unsigned char)src[pos + 1]) &&
-                        std::isxdigit((unsigned char)src[pos + 2])) {
+                    if (hexUnescape && src[pos] == '\\' && pos + 2 < src.size() &&
+                        std::isxdigit((unsigned char)src[pos + 1]) && std::isxdigit((unsigned char)src[pos + 2])) {
                         auto hexVal = [](char c) -> int {
                             if (c >= '0' && c <= '9')
                                 return c - '0';
@@ -87,10 +87,12 @@ namespace zust::zir {
 
             while (true) {
                 // Skip whitespace and `; ...` line comments.
-                while (pos < src.size() && (src[pos] == ' ' || src[pos] == '\t' || src[pos] == '\r' || src[pos] == '\n'))
+                while (pos < src.size() &&
+                       (src[pos] == ' ' || src[pos] == '\t' || src[pos] == '\r' || src[pos] == '\n'))
                     pos++;
                 if (pos < src.size() && src[pos] == ';') {
-                    while (pos < src.size() && src[pos] != '\n') pos++;
+                    while (pos < src.size() && src[pos] != '\n')
+                        pos++;
                     continue;
                 }
                 if (pos >= src.size())
@@ -100,19 +102,22 @@ namespace zust::zir {
                 if (c == '%') {
                     pos++;
                     std::string name;
-                    while (pos < src.size() && (std::isalnum((unsigned char)src[pos]) || src[pos] == '_' || src[pos] == '.'))
+                    while (pos < src.size() &&
+                           (std::isalnum((unsigned char)src[pos]) || src[pos] == '_' || src[pos] == '.'))
                         name += src[pos++];
                     toks.push_back({Tok::Percent, name});
                 } else if (c == '@') {
                     pos++;
                     std::string name;
-                    while (pos < src.size() && (std::isalnum((unsigned char)src[pos]) || src[pos] == '_' || src[pos] == '.'))
+                    while (pos < src.size() &&
+                           (std::isalnum((unsigned char)src[pos]) || src[pos] == '_' || src[pos] == '.'))
                         name += src[pos++];
                     toks.push_back({Tok::At, name});
                 } else if (c == '^') {
                     pos++;
                     std::string name;
-                    while (pos < src.size() && (std::isalnum((unsigned char)src[pos]) || src[pos] == '_' || src[pos] == '.'))
+                    while (pos < src.size() &&
+                           (std::isalnum((unsigned char)src[pos]) || src[pos] == '_' || src[pos] == '.'))
                         name += src[pos++];
                     toks.push_back({Tok::Caret, name});
                 } else if (c == '-' && peek(1) == '>') {
@@ -157,20 +162,25 @@ namespace zust::zir {
                     std::string num;
                     if (c == '-')
                         num += src[pos++];
-                    while (pos < src.size() && std::isdigit((unsigned char)src[pos])) num += src[pos++];
+                    while (pos < src.size() && std::isdigit((unsigned char)src[pos]))
+                        num += src[pos++];
                     if (pos < src.size() && src[pos] == '.') {
                         num += src[pos++];
-                        while (pos < src.size() && std::isdigit((unsigned char)src[pos])) num += src[pos++];
+                        while (pos < src.size() && std::isdigit((unsigned char)src[pos]))
+                            num += src[pos++];
                     }
                     if (pos < src.size() && (src[pos] == 'e' || src[pos] == 'E')) {
                         num += src[pos++];
-                        if (pos < src.size() && (src[pos] == '+' || src[pos] == '-')) num += src[pos++];
-                        while (pos < src.size() && std::isdigit((unsigned char)src[pos])) num += src[pos++];
+                        if (pos < src.size() && (src[pos] == '+' || src[pos] == '-'))
+                            num += src[pos++];
+                        while (pos < src.size() && std::isdigit((unsigned char)src[pos]))
+                            num += src[pos++];
                     }
                     toks.push_back({Tok::Number, num});
                 } else if (std::isalpha((unsigned char)c) || c == '_') {
                     std::string id;
-                    while (pos < src.size() && (std::isalnum((unsigned char)src[pos]) || src[pos] == '_')) id += src[pos++];
+                    while (pos < src.size() && (std::isalnum((unsigned char)src[pos]) || src[pos] == '_'))
+                        id += src[pos++];
                     toks.push_back({Tok::Ident, id});
                 } else {
                     throw ParseError(std::string("unexpected character '") + c + "'");
@@ -191,13 +201,13 @@ namespace zust::zir {
         };
         const std::unordered_map<std::string, Opcode> kUnopKeywords = {{"neg", Opcode::Neg}, {"not", Opcode::Not}};
         const std::unordered_map<std::string, Opcode> kCastKeywords = {
-            {"trunc", Opcode::Trunc},     {"zext", Opcode::ZExt},       {"sext", Opcode::SExt},
-            {"fptrunc", Opcode::FPTrunc}, {"fpext", Opcode::FPExt},     {"fptosi", Opcode::FPToSI},
-            {"fptoui", Opcode::FPToUI},   {"sitofp", Opcode::SIToFP},   {"uitofp", Opcode::UIToFP},
+            {"trunc", Opcode::Trunc},       {"zext", Opcode::ZExt},         {"sext", Opcode::SExt},
+            {"fptrunc", Opcode::FPTrunc},   {"fpext", Opcode::FPExt},       {"fptosi", Opcode::FPToSI},
+            {"fptoui", Opcode::FPToUI},     {"sitofp", Opcode::SIToFP},     {"uitofp", Opcode::UIToFP},
             {"ptrtoint", Opcode::PtrToInt}, {"inttoptr", Opcode::IntToPtr}, {"bitcast", Opcode::Bitcast},
         };
         const std::unordered_map<std::string, CmpPred> kIcmpPreds = {
-            {"eq", CmpPred::Eq}, {"ne", CmpPred::Ne}, {"slt", CmpPred::Slt}, {"sle", CmpPred::Sle},
+            {"eq", CmpPred::Eq},   {"ne", CmpPred::Ne},   {"slt", CmpPred::Slt}, {"sle", CmpPred::Sle},
             {"sgt", CmpPred::Sgt}, {"sge", CmpPred::Sge}, {"ult", CmpPred::Ult}, {"ule", CmpPred::Ule},
             {"ugt", CmpPred::Ugt}, {"uge", CmpPred::Uge},
         };
@@ -224,6 +234,7 @@ namespace zust::zir {
                     std::size_t start;
                     std::size_t end;  // index of the matching '}' (exclusive)
                 };
+
                 std::vector<PendingBody> pending;
 
                 while (!at(Tok::Eof)) {
@@ -254,8 +265,11 @@ namespace zust::zir {
             std::size_t pos_ = 0;
 
             const Token &cur() const { return toks_[pos_]; }
+
             bool at(Tok k) const { return cur().kind == k; }
+
             bool atIdent(const std::string &s) const { return cur().kind == Tok::Ident && cur().text == s; }
+
             void advance() {
                 if (pos_ + 1 < toks_.size())
                     pos_++;
@@ -266,11 +280,13 @@ namespace zust::zir {
                     throw ParseError(std::string("expected ") + what + ", got '" + cur().text + "'");
                 advance();
             }
+
             void expectIdent(const std::string &s) {
                 if (!atIdent(s))
                     throw ParseError("expected '" + s + "', got '" + cur().text + "'");
                 advance();
             }
+
             std::string expectAnyIdent() {
                 if (cur().kind != Tok::Ident)
                     throw ParseError("expected an identifier, got '" + cur().text + "'");
@@ -278,6 +294,7 @@ namespace zust::zir {
                 advance();
                 return s;
             }
+
             std::string expectPercent() {
                 if (cur().kind != Tok::Percent)
                     throw ParseError("expected a %value, got '" + cur().text + "'");
@@ -285,6 +302,7 @@ namespace zust::zir {
                 advance();
                 return s;
             }
+
             std::string expectAt() {
                 if (cur().kind != Tok::At)
                     throw ParseError("expected an @name, got '" + cur().text + "'");
@@ -292,6 +310,7 @@ namespace zust::zir {
                 advance();
                 return s;
             }
+
             std::string expectCaret() {
                 if (cur().kind != Tok::Caret)
                     throw ParseError("expected a ^label, got '" + cur().text + "'");
@@ -299,6 +318,7 @@ namespace zust::zir {
                 advance();
                 return s;
             }
+
             std::string expectNumber() {
                 if (cur().kind != Tok::Number)
                     throw ParseError("expected a number, got '" + cur().text + "'");
@@ -306,6 +326,7 @@ namespace zust::zir {
                 advance();
                 return s;
             }
+
             std::string expectByteString() {
                 if (cur().kind != Tok::ByteString)
                     throw ParseError("expected a quoted string, got '" + cur().text + "'");
@@ -505,7 +526,8 @@ namespace zust::zir {
             void parseFunctionBody(Module &m, Function &fn, std::size_t bodyEnd) {
                 std::vector<std::string> labels = scanBlockLabels(pos_, bodyEnd);
                 std::unordered_map<std::string, BlockId> labelToId;
-                for (const std::string &label : labels) labelToId[label] = fn.addBlock(label);
+                for (const std::string &label : labels)
+                    labelToId[label] = fn.addBlock(label);
                 if (!labels.empty())
                     fn.setEntry(labelToId[labels.front()]);
 

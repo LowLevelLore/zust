@@ -1,7 +1,7 @@
-#include <doctest/doctest.h>
-
 #include <string>
 #include <vector>
+
+#include <doctest/doctest.h>
 
 #include "typechecker/TypeChecker.hpp"
 #include "zir/TypeRules.hpp"
@@ -30,10 +30,10 @@ namespace {
             return LegacyEntry{name, t};
         };
         return {
-            mk("integer", 64, false, true),  mk("size_t", 64, false, false),  mk("uint8_t", 8, false, false),
+            mk("integer", 64, false, true),   mk("size_t", 64, false, false),   mk("uint8_t", 8, false, false),
             mk("uint16_t", 16, false, false), mk("uint32_t", 32, false, false), mk("uint64_t", 64, false, false),
-            mk("int8_t", 8, false, true),    mk("int16_t", 16, false, true),  mk("int32_t", 32, false, true),
-            mk("int64_t", 64, false, true),  mk("float", 32, true, true),     mk("double", 64, true, true),
+            mk("int8_t", 8, false, true),     mk("int16_t", 16, false, true),   mk("int32_t", 32, false, true),
+            mk("int64_t", 64, false, true),   mk("float", 32, true, true),      mk("double", 64, true, true),
         };
     }
 

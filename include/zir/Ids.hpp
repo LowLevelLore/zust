@@ -20,13 +20,17 @@ namespace zust::zir {
         static constexpr Value kInvalidValue = std::numeric_limits<Value>::max();
 
         constexpr Id() noexcept : value_(kInvalidValue) {}
+
         constexpr explicit Id(Value v) noexcept : value_(v) {}
 
         constexpr Value value() const noexcept { return value_; }
+
         constexpr bool isValid() const noexcept { return value_ != kInvalidValue; }
 
         constexpr bool operator==(const Id &other) const noexcept { return value_ == other.value_; }
+
         constexpr bool operator!=(const Id &other) const noexcept { return value_ != other.value_; }
+
         constexpr bool operator<(const Id &other) const noexcept { return value_ < other.value_; }
 
     private:
@@ -35,10 +39,15 @@ namespace zust::zir {
 
     namespace detail {
         struct TypeIdTag {};
+
         struct ValueIdTag {};
+
         struct BlockIdTag {};
+
         struct InstIdTag {};
+
         struct FuncIdTag {};
+
         struct GlobalIdTag {};
     }  // namespace detail
 

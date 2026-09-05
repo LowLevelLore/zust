@@ -20,9 +20,14 @@ namespace zust {
 
             static const TargetInfo kInfo;
         };
-        const TargetInfo LinuxBackend::kInfo{
-            "x86_64-linux", "Linux x86-64, SysV ABI, GNU assembler (AT&T syntax)", ".s", AsmSyntax::ATT,
-            /*isNative=*/true, {"as", "$IN", "-o", "$OUT"}, {"gcc", "$IN", "-o", "$OUT"}};
+
+        const TargetInfo LinuxBackend::kInfo{"x86_64-linux",
+                                             "Linux x86-64, SysV ABI, GNU assembler (AT&T syntax)",
+                                             ".s",
+                                             AsmSyntax::ATT,
+                                             /*isNative=*/true,
+                                             {"as", "$IN", "-o", "$OUT"},
+                                             {"gcc", "$IN", "-o", "$OUT"}};
 
         class WindowsBackend final : public Backend {
         public:
@@ -35,9 +40,14 @@ namespace zust {
 
             static const TargetInfo kInfo;
         };
-        const TargetInfo WindowsBackend::kInfo{
-            "x86_64-mswin", "Windows x86-64, Win64 ABI, MASM (Intel syntax)", ".asm", AsmSyntax::Intel,
-            /*isNative=*/true, {"ml64", "/nologo", "/c", "$IN"}, {"gcc", "$IN", "-o", "$OUT"}};
+
+        const TargetInfo WindowsBackend::kInfo{"x86_64-mswin",
+                                               "Windows x86-64, Win64 ABI, MASM (Intel syntax)",
+                                               ".asm",
+                                               AsmSyntax::Intel,
+                                               /*isNative=*/true,
+                                               {"ml64", "/nologo", "/c", "$IN"},
+                                               {"gcc", "$IN", "-o", "$OUT"}};
 
         class LlvmBackend final : public Backend {
         public:
@@ -50,6 +60,7 @@ namespace zust {
 
             static const TargetInfo kInfo;
         };
+
         const TargetInfo LlvmBackend::kInfo{"llvm-ir",
                                             "Textual LLVM IR",
                                             ".ll",

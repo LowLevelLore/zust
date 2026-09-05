@@ -20,7 +20,10 @@ namespace zust {
         // mapper above: every SymbolId must be unique across the entire
         // program, not just within one scope.
         std::uint32_t nextSymbolIdValue = 0;
-        SymbolId allocateSymbolId() { return SymbolId{nextSymbolIdValue++}; }
+
+        SymbolId allocateSymbolId() {
+            return SymbolId{nextSymbolIdValue++};
+        }
     }  // namespace
 
     bool ScopeContext::defineVariable(const std::string &name, const VariableInfo &info) {

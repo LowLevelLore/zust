@@ -96,8 +96,8 @@ namespace zust::zir {
     // void Call, which define nothing).
     struct Instruction {
         Opcode op = Opcode::Const;
-        TypeId type;      // result type; unset/Void for non-value instructions
-        ValueId result;   // kInvalid for non-value instructions
+        TypeId type;     // result type; unset/Void for non-value instructions
+        ValueId result;  // kInvalid for non-value instructions
 
         // Operand order matches docs/IR-DESIGN.md's instruction table:
         //   binop/fbinop/icmp/fcmp: [a, b]
@@ -134,10 +134,10 @@ namespace zust::zir {
     struct Terminator {
         TermKind kind = TermKind::Unreachable;
 
-        ValueId cond;                                 // CondBr
-        ValueId retValue;                             // Ret (kInvalid == `ret void`)
-        std::vector<BlockRef> targets;                 // Br: [target]; CondBr: [then, else]; Switch: [default, cases...]
-        std::vector<std::int64_t> caseValues;           // Switch, parallel to targets[1..]
+        ValueId cond;                          // CondBr
+        ValueId retValue;                      // Ret (kInvalid == `ret void`)
+        std::vector<BlockRef> targets;         // Br: [target]; CondBr: [then, else]; Switch: [default, cases...]
+        std::vector<std::int64_t> caseValues;  // Switch, parallel to targets[1..]
     };
 
 }  // namespace zust::zir

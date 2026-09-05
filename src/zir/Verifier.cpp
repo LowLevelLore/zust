@@ -46,10 +46,11 @@ namespace zust::zir {
         }
 
         std::vector<std::vector<BlockId>> computePredecessors(const Function &fn,
-                                                               const std::vector<std::vector<BlockId>> &succ) {
+                                                              const std::vector<std::vector<BlockId>> &succ) {
             std::vector<std::vector<BlockId>> preds(fn.blockCount());
             for (std::size_t i = 0; i < succ.size(); ++i) {
-                for (BlockId s : succ[i]) preds[s.value()].push_back(BlockId(static_cast<BlockId::Value>(i)));
+                for (BlockId s : succ[i])
+                    preds[s.value()].push_back(BlockId(static_cast<BlockId::Value>(i)));
             }
             return preds;
         }
@@ -80,8 +81,8 @@ namespace zust::zir {
         // from entry get an all-false row: nothing is checked for dominance
         // inside dead code.
         std::vector<std::vector<bool>> computeDominators(const Function &fn,
-                                                          const std::vector<std::vector<BlockId>> &preds,
-                                                          const std::vector<bool> &reachable) {
+                                                         const std::vector<std::vector<BlockId>> &preds,
+                                                         const std::vector<bool> &reachable) {
             std::size_t n = fn.blockCount();
             std::vector<std::vector<bool>> dom(n, std::vector<bool>(n, false));
             if (!fn.entry().isValid())
@@ -90,7 +91,8 @@ namespace zust::zir {
             dom[entryIdx][entryIdx] = true;
             for (std::size_t i = 0; i < n; ++i) {
                 if (reachable[i] && i != entryIdx) {
-                    for (std::size_t j = 0; j < n; ++j) dom[i][j] = reachable[j];
+                    for (std::size_t j = 0; j < n; ++j)
+                        dom[i][j] = reachable[j];
                 }
             }
 
@@ -109,7 +111,8 @@ namespace zust::zir {
                             newDom = dom[p.value()];
                             first = false;
                         } else {
-                            for (std::size_t k = 0; k < n; ++k) newDom[k] = newDom[k] && dom[p.value()][k];
+                            for (std::size_t k = 0; k < n; ++k)
+                                newDom[k] = newDom[k] && dom[p.value()][k];
                         }
                     }
                     if (first)
@@ -136,7 +139,8 @@ namespace zust::zir {
             std::unordered_map<ValueId::Value, DefSite> defs;
             for (std::size_t bi = 0; bi < fn.blockCount(); ++bi) {
                 BlockId b(static_cast<BlockId::Value>(bi));
-                for (ValueId p : fn.block(b).params()) defs[p.value()] = DefSite{b, -1};
+                for (ValueId p : fn.block(b).params())
+                    defs[p.value()] = DefSite{b, -1};
                 const auto &insts = fn.block(b).insts();
                 for (std::size_t ii = 0; ii < insts.size(); ++ii) {
                     const Instruction &inst = fn.inst(insts[ii]);
@@ -161,7 +165,8 @@ namespace zust::zir {
                 auto checkTarget = [&](const BlockRef &ref, const char *label) {
                     if (!ref.block.isValid() || ref.block.value() >= fn.blockCount()) {
                         fail(out, VerifierCheck::Terminator, fn,
-                             "block " + std::to_string(bi) + "'s " + label + " target is not a valid block in this function");
+                             "block " + std::to_string(bi) + "'s " + label +
+                                 " target is not a valid block in this function");
                     }
                 };
                 switch (t.kind) {
@@ -191,9 +196,11 @@ namespace zust::zir {
                             checkTarget(t.targets[0], "switch default");
                             if (t.targets.size() != t.caseValues.size() + 1)
                                 fail(out, VerifierCheck::Terminator, fn,
-                                     "block " + std::to_string(bi) + "'s switch has " + std::to_string(t.targets.size()) +
-                                         " targets but " + std::to_string(t.caseValues.size()) + " case values");
-                            for (std::size_t i = 1; i < t.targets.size(); ++i) checkTarget(t.targets[i], "switch case");
+                                     "block " + std::to_string(bi) + "'s switch has " +
+                                         std::to_string(t.targets.size()) + " targets but " +
+                                         std::to_string(t.caseValues.size()) + " case values");
+                            for (std::size_t i = 1; i < t.targets.size(); ++i)
+                                checkTarget(t.targets[i], "switch case");
                         }
                         break;
                     case TermKind::Ret:
@@ -246,7 +253,8 @@ namespace zust::zir {
                 if (t.kind == TermKind::Switch)
                     checkUse(t.cond, b, termPos);
                 for (const BlockRef &ref : t.targets)
-                    for (ValueId arg : ref.args) checkUse(arg, b, termPos);
+                    for (ValueId arg : ref.args)
+                        checkUse(arg, b, termPos);
             }
         }
 
@@ -285,7 +293,8 @@ namespace zust::zir {
                         case Opcode::ICmp:
                         case Opcode::FCmp:
                             if (inst.operands.size() == 2)
-                                sameType(fn.typeOf(inst.operands[0]), fn.typeOf(inst.operands[1]), "comparison operand");
+                                sameType(fn.typeOf(inst.operands[0]), fn.typeOf(inst.operands[1]),
+                                         "comparison operand");
                             if (inst.type != m.types().boolType())
                                 fail(out, VerifierCheck::OperandTypes, fn, "comparison result must be bool");
                             break;
@@ -421,7 +430,8 @@ namespace zust::zir {
             std::unordered_map<ValueId::Value, int> defCount;
             for (std::size_t bi = 0; bi < fn.blockCount(); ++bi) {
                 BlockId b(static_cast<BlockId::Value>(bi));
-                for (ValueId p : fn.block(b).params()) defCount[p.value()]++;
+                for (ValueId p : fn.block(b).params())
+                    defCount[p.value()]++;
                 for (InstId id : fn.block(b).insts()) {
                     const Instruction &inst = fn.inst(id);
                     if (inst.result.isValid())
@@ -446,13 +456,15 @@ namespace zust::zir {
                 if (t.retValue.isValid()) {
                     if (fn.typeOf(t.retValue) != declaredRet) {
                         fail(out, VerifierCheck::ReturnType, fn,
-                             "block " + std::to_string(bi) + " returns a value whose type does not match the "
-                                                              "function's declared return type");
+                             "block " + std::to_string(bi) +
+                                 " returns a value whose type does not match the "
+                                 "function's declared return type");
                     }
                 } else if (declaredRet != m.types().voidType()) {
                     fail(out, VerifierCheck::ReturnType, fn,
-                         "block " + std::to_string(bi) + " returns void but the function's declared return type is "
-                                                          "not void");
+                         "block " + std::to_string(bi) +
+                             " returns void but the function's declared return type is "
+                             "not void");
                 }
             }
         }

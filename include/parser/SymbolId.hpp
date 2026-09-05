@@ -18,7 +18,9 @@ namespace zust {
         std::uint32_t value = kInvalid;
 
         constexpr bool isValid() const noexcept { return value != kInvalid; }
+
         constexpr bool operator==(const SymbolId &other) const noexcept { return value == other.value; }
+
         constexpr bool operator!=(const SymbolId &other) const noexcept { return value != other.value; }
     };
 
@@ -26,7 +28,5 @@ namespace zust {
 
 template <>
 struct std::hash<zust::SymbolId> {
-    std::size_t operator()(const zust::SymbolId &id) const noexcept {
-        return std::hash<std::uint32_t>{}(id.value);
-    }
+    std::size_t operator()(const zust::SymbolId &id) const noexcept { return std::hash<std::uint32_t>{}(id.value); }
 };

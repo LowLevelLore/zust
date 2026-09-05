@@ -25,6 +25,7 @@ namespace zust::zir {
         }
 
         void setInsertBlock(BlockId block) { insertBlock_ = block; }
+
         BlockId insertBlock() const { return insertBlock_; }
 
         ValueId constInt(TypeId ty, std::uint64_t bits) {
@@ -121,7 +122,8 @@ namespace zust::zir {
             inst.type = resultTy;
             inst.elemType = elemType;
             inst.operands.push_back(base);
-            for (ValueId idx : indices) inst.operands.push_back(idx);
+            for (ValueId idx : indices)
+                inst.operands.push_back(idx);
             return emit(std::move(inst));
         }
 
