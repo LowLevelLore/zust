@@ -1,0 +1,22 @@
+; hello.zz
+module "hello.zz" target = "generic"
+
+@.str0 = private constant [4 x i8] c"%d\0A\00"
+
+declare i32 @printf(ptr, ...) variadic
+
+fn @factorial(%n: i64) -> i64 {
+^entry(%n: i64):
+    %c1   = const i64 1
+    %cmp  = icmp sle i64 %n, %c1
+    condbr %cmp, ^base, ^rec
+
+^base:
+    ret i64 %c1
+
+^rec:
+    %sub  = sub i64 %n, %c1
+    %rc   = call i64 @factorial(%sub)
+    %mul  = mul i64 %n, %rc
+    ret i64 %mul
+}

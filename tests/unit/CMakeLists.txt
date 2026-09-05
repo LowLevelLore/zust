@@ -21,6 +21,10 @@ file(GLOB_RECURSE ZUST_UNIT_TEST_SRCS CONFIGURE_DEPENDS
 add_executable(zust_unit_tests ${ZUST_UNIT_TEST_SRCS})
 target_link_libraries(zust_unit_tests PRIVATE zust_core doctest::doctest)
 target_include_directories(zust_unit_tests PRIVATE ${PROJECT_SOURCE_DIR}/include)
+# tests/zir/<pass>/ .zir fixtures (round-trip today; per-pass in/out once
+# Wave 4 lands passes) are read from disk at test time, not embedded.
+target_compile_definitions(zust_unit_tests PRIVATE
+    ZUST_ZIR_FIXTURES_DIR="${PROJECT_SOURCE_DIR}/tests/zir")
 
 include(${doctest_SOURCE_DIR}/scripts/cmake/doctest.cmake)
 doctest_discover_tests(zust_unit_tests)

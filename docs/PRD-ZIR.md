@@ -166,7 +166,7 @@ Build in this order — each step is independently testable
       arguments, not phi nodes. *Exit:* a hand-built module round-trips.
 - [x] **1.3 [S]** `Printer` — textual form per `docs/IR-DESIGN.md`. *Exit:* the
       spec's `@factorial` example prints byte-for-byte.
-- [ ] **1.4 [S]** `.zir` `TextParser`. *Exit:* print→parse→print is a fixed point
+- [x] **1.4 [S]** `.zir` `TextParser`. *Exit:* print→parse→print is a fixed point
       on every fixture in `tests/zir/roundtrip/`.
 - [ ] **1.5 [S]** `Verifier`, all 8 checks from `docs/IR-DESIGN.md`. *Exit:* eight
       hand-broken `.zir` fixtures each trip exactly their intended check.

@@ -49,7 +49,7 @@ namespace {
         b.setInsertBlock(entry);
         ValueId c1 = b.constInt(i64, 1);
         fn.setValueName(c1, "c1");
-        ValueId cmp = b.icmp(CmpPred::Sle, i64, n, c1);
+        ValueId cmp = b.icmp(CmpPred::Sle, types.boolType(), n, c1);
         fn.setValueName(cmp, "cmp");
         b.condBr(cmp, base, {}, rec, {});
 
