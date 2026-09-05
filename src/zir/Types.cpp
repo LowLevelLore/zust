@@ -30,7 +30,7 @@ namespace zust::zir {
         voidType_ = intern(v);
     }
 
-    TypeId TypeTable::intern(Type t) {
+    TypeId TypeTable::intern(Type t) const {
         for (std::size_t i = 0; i < types_.size(); ++i) {
             if (types_[i] == t)
                 return TypeId(static_cast<TypeId::Value>(i));
@@ -39,7 +39,7 @@ namespace zust::zir {
         return TypeId(static_cast<TypeId::Value>(types_.size() - 1));
     }
 
-    TypeId TypeTable::intType(std::uint32_t bits, bool isSigned) {
+    TypeId TypeTable::intType(std::uint32_t bits, bool isSigned) const {
         Type t;
         t.kind = TypeKind::Int;
         t.bits = bits;
@@ -47,21 +47,21 @@ namespace zust::zir {
         return intern(t);
     }
 
-    TypeId TypeTable::floatType(std::uint32_t bits) {
+    TypeId TypeTable::floatType(std::uint32_t bits) const {
         Type t;
         t.kind = TypeKind::Float;
         t.bits = bits;
         return intern(t);
     }
 
-    TypeId TypeTable::ptrType(TypeId pointee) {
+    TypeId TypeTable::ptrType(TypeId pointee) const {
         Type t;
         t.kind = TypeKind::Ptr;
         t.pointee = pointee;
         return intern(t);
     }
 
-    TypeId TypeTable::arrayType(TypeId elem, std::uint64_t len) {
+    TypeId TypeTable::arrayType(TypeId elem, std::uint64_t len) const {
         Type t;
         t.kind = TypeKind::Array;
         t.elem = elem;
@@ -69,7 +69,7 @@ namespace zust::zir {
         return intern(t);
     }
 
-    TypeId TypeTable::fnType(std::vector<TypeId> params, TypeId ret, bool variadic) {
+    TypeId TypeTable::fnType(std::vector<TypeId> params, TypeId ret, bool variadic) const {
         Type t;
         t.kind = TypeKind::Fn;
         t.params = std::move(params);
