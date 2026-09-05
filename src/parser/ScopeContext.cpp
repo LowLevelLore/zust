@@ -1,6 +1,22 @@
-#include <all.hpp>
+#include "parser/ScopeContext.hpp"
+
+#include <ostream>
+
+#include "parser/NameMapper.hpp"
 
 namespace zust {
+    namespace {
+        // The name mapper mangles declaration names into globally-unique
+        // labels/SSA names; every scope in one compiler invocation must share
+        // the same counters, so this is the single instance for the process,
+        // not a per-TU static (this used to live in include/all.hpp as
+        // `static zust::NameMapper GLOBAL_NAME_MAPPER;` -- a namespace-scope
+        // `static` in a header gives every translation unit its own copy;
+        // harmless here only because this was the one .cpp file that ever
+        // called into it, but still a footgun worth removing).
+        NameMapper GLOBAL_NAME_MAPPER;
+    }  // namespace
+
     bool ScopeContext::defineVariable(const std::string &name, const VariableInfo &info) {
         if (!parent_ || (parent_->kind() == "Namespace" && kind() != "Function")) {
             if (lookupVariableInCurrentContext(name).has_value()) {

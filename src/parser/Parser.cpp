@@ -1,4 +1,7 @@
-#include "all.hpp"
+#include <cstdlib>
+
+#include "parser/Parser.hpp"
+#include "typechecker/TypeChecker.hpp"
 
 // TODO: 4 Things then I'm done
 // Loops

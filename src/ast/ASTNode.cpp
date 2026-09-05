@@ -1,4 +1,4 @@
-#include "all.hpp"
+#include "ast/ASTNode.hpp"
 
 namespace zust {
     std::unique_ptr<ASTNode> ASTNode::makeProgramNode(const std::shared_ptr<ScopeContext> scope) {

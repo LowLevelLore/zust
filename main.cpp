@@ -1,4 +1,20 @@
-#include "all.hpp"
+#include <cstdlib>
+#include <fstream>
+#include <iostream>
+#include <memory>
+#include <optional>
+#include <string>
+
+#include "ast/ASTNode.hpp"
+#include "codegen/Backend.hpp"
+#include "common/Errors.hpp"
+#include "common/Logging.hpp"
+#include "lexer/Lexer.hpp"
+#include "parser/Parser.hpp"
+#include "parser/ScopeContext.hpp"
+#include "support/CommandLine.hpp"
+#include "support/File.hpp"
+#include "typechecker/TypeChecker.hpp"
 
 using namespace zust;
 

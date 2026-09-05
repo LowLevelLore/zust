@@ -145,7 +145,7 @@ goldens do NOT exercise but a naive rewrite would still change). Get these into
       `conftest.py`/`test_pipeline.py` consume the JSON instead of a hardcoded
       `TARGETS` dict. *Exit:* suite green; adding a target is one directory + one
       line in `registerBuiltinBackends`.
-- [ ] **0.3 [S]** Delete `include/all.hpp`; give every TU precise includes; move
+- [x] **0.3 [S]** Delete `include/all.hpp`; give every TU precise includes; move
       `GLOBAL_NAME_MAPPER` off being a per-TU global. *Exit:* suite green, no file
       includes `all.hpp`.
 - [ ] **0.4 [S]** Add `Span` to `Token` and `ASTNode`, threaded through every

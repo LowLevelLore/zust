@@ -1,4 +1,5 @@
-#include "all.hpp"
+#include "common/Logging.hpp"
+#include "typechecker/TypeChecker.hpp"
 
 namespace zust {
     void TypeChecker::check(const std::unique_ptr<ASTNode> &program) {

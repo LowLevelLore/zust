@@ -1,4 +1,4 @@
-#include "all.hpp"
+#include "codegen/RegisterAllocator.hpp"
 
 namespace zust {
     RegisterAllocator::RegisterAllocator(std::vector<std::string> regs, std::vector<std::string> XMMregs,
