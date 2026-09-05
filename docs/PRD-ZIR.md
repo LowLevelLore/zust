@@ -177,7 +177,7 @@ Build in this order — each step is independently testable
       `ScopeContext::defineVariable → allocateStack` — no more frame slots at
       parse time. *Exit:* every reference has a `SymbolId`; legacy backends keep
       working via a temporary `SymbolId → offset` shim.
-- [ ] **2.2 [S]** `TypeRules::promote` ported bit-for-bit from
+- [x] **2.2 [S]** `TypeRules::promote` ported bit-for-bit from
       `TypeChecker::promoteType`, over `TypeId`. *Exit:* a generated 13×13 table
       test comparing the new function against the old one before the old one is
       deleted.
