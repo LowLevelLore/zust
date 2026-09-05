@@ -43,4 +43,8 @@ namespace zust {
         std::cout << colors::GREEN << "[Info] " << colors::RESET << message << std::endl;
     }
 
+    void logWarning(const std::string &message) {
+        std::cerr << colors::YELLOW << "[Warning] " << colors::RESET << message << std::endl;
+    }
+
 }  // namespace zust

@@ -184,7 +184,7 @@ Build in this order — each step is independently testable
 - [x] **2.3 [S] — the landmine item.** Sema over function bodies, with the
       exemptions above. Land alone, on the legacy backends, before ZIR consumes
       anything. *Exit:* all 40 cases still compile unchanged.
-- [ ] **2.4 [S]** Definite-return analysis, **warning-only** in this rewrite (an
+- [x] **2.4 [S]** Definite-return analysis, **warning-only** in this rewrite (an
       error here would change `compile_fail` surface, which is frozen). *Exit:*
       reports nothing on the current suite.
 

@@ -155,6 +155,7 @@ namespace zust {
                 // each one) -- the only change needed was this recursive
                 // call.
                 checkNode(node->getFunctionBody());
+                checkDefiniteReturn(node);
                 return "";
             }
 
@@ -384,6 +385,59 @@ namespace zust {
 
     bool TypeChecker::isComparable(const std::string &ty) {
         return isNumeric(ty);
+    }
+
+    void TypeChecker::checkDefiniteReturn(const ASTNode *functionNode) {
+        const std::string &declaredRet = functionNode->getFunctionParamReturnType()->value;
+        if (declaredRet == "none")
+            return;  // nothing to enforce -- falling off the end is fine
+        if (!definitelyReturns(functionNode->getFunctionBody())) {
+            logWarning("Function '" + functionNode->value +
+                      "' does not definitely return a value of type '" + declaredRet + "' on every path");
+        }
+    }
+
+    bool TypeChecker::definitelyReturns(const ASTNode *node) {
+        if (!node)
+            return false;
+        switch (node->type) {
+            case NodeType::ReturnStatement:
+                return true;
+            case NodeType::Program:
+                // A block: definitely returns if any statement in it does
+                // (everything after that point is unreachable, but still a
+                // definite return for the block as a whole).
+                for (const auto &child : node->children) {
+                    if (definitelyReturns(child.get()))
+                        return true;
+                }
+                return false;
+            case NodeType::IfStatement:
+            case NodeType::ElseIfStatement: {
+                if (node->children.size() < 2)
+                    return false;
+                bool thenReturns = definitelyReturns(node->children[1].get());
+                const ASTNode *elseBranch = node->getElseBranch();
+                // No trailing `else` means control can fall through the
+                // whole if/elseif chain without returning, regardless of
+                // whether every branch that *does* run would have returned.
+                if (!elseBranch)
+                    return false;
+                return thenReturns && definitelyReturns(elseBranch);
+            }
+            case NodeType::ElseStatement:
+                if (node->children.empty())
+                    return false;
+                return definitelyReturns(node->children[0].get());
+            default:
+                // For loops, break/continue, bare expressions, and anything
+                // else: conservatively not a definite return. A `for`/`while`
+                // might execute zero times, so its body returning is never
+                // enough on its own -- deliberately conservative, since this
+                // is advisory (Wave 2.4 is warning-only), not a soundness
+                // guarantee anything downstream relies on.
+                return false;
+        }
     }
 
 }  // namespace zust
