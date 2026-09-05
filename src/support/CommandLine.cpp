@@ -25,7 +25,8 @@ namespace zust {
                 printAST_ = true;
             } else if (std::strcmp(arg, "--formats") == 0) {
                 formatsFlag = true;
-                return;
+            } else if (std::strcmp(arg, "--json") == 0) {
+                jsonFlag = true;
             } else if (std::strcmp(arg, "-v") == 0 || std::strcmp(arg, "--verbose") == 0) {
                 verbosity = 1;
             } else if (std::strcmp(arg, "-o") == 0 || std::strcmp(arg, "--output") == 0) {
@@ -46,20 +47,11 @@ namespace zust {
                     error.message = std::string("Expected format after format argument, got: ") + argv[i];
                     return;
                 }
-                std::string fmt = argv[i];
-                if (fmt == "default") {
-                    format = CodegenOutputFormat::Default;
-                } else if (fmt == "x86_64-mswin") {
-                    format = CodegenOutputFormat::X86_64_MSWIN;
-                } else if (fmt == "x86_64-linux") {
-                    format = CodegenOutputFormat::X86_64_LINUX;
-                } else if (fmt == "llvm-ir") {
-                    format = CodegenOutputFormat::LLVM_IR;
-                } else {
-                    errorFlag = true;
-                    error.message = "Unrecognized format: " + fmt;
-                    return;
-                }
+                // Syntactic acceptance only -- this class does not know which
+                // names are valid targets. Semantic validation against the
+                // BackendRegistry happens in main.cpp, the one place that is
+                // allowed to know about targets.
+                format = argv[i];
             } else {
                 // treat as input file
                 if (!inputFile.empty()) {
@@ -68,13 +60,10 @@ namespace zust {
                 inputFile = arg;
             }
         }
-        if (helpFlag && !formatsFlag) {
+        if (helpFlag || formatsFlag) {
             return;
         }
-        if (formatsFlag) {
-            return;
-        }
-        if (inputFile.empty() && !helpFlag && !formatsFlag) {
+        if (inputFile.empty()) {
             errorFlag = true;
             error.message = "No input file specified";
         }
@@ -96,6 +85,10 @@ namespace zust {
         return formatsFlag;
     }
 
+    bool CommandLine::wantsJson() const noexcept {
+        return jsonFlag;
+    }
+
     std::string CommandLine::getInputFile() const noexcept {
         return inputFile;
     }
@@ -104,7 +97,7 @@ namespace zust {
         return outputFile;
     }
 
-    CodegenOutputFormat CommandLine::getFormat() const noexcept {
+    std::string CommandLine::getFormat() const noexcept {
         return format;
     }
 
@@ -116,24 +109,13 @@ namespace zust {
         std::cout << "\nUSAGE: " << programName << " [FLAGS] [OPTIONS] <path to file to compile>\n"
                   << "Flags:\n"
                   << "   `-h`, `--help`    :: Show this help and usage information.\n"
-                  << "   `--formats`       :: List acceptable output formats.\n"
+                  << "   `--formats`       :: List acceptable output formats (add `--json` for machine-readable "
+                     "output).\n"
                   << "   `-v`, `--verbose` :: Print out more information.\n"
                   << "Options:\n"
                   << "    `-o`, `--output`  :: Set the output filepath.\n"
                   << "    `-f`, `--format`  :: Set the output format.\n"
                   << "Anything else is treated as the input file path.\n";
-    }
-
-    void CommandLine::printFormats() {
-        // NOTE: hand-maintained and therefore prone to drift -- llvm-ir was
-        // supported and tested for a long time while going unlisted here.
-        // docs/BACKENDS.md Phase A replaces this with a query against the
-        // backend registry so a new target lists itself.
-        std::cout << "Acceptable formats include:\n"
-                  << " -> default\n"
-                  << " -> x86_64-mswin\n"
-                  << " -> x86_64-linux\n"
-                  << " -> llvm-ir\n";
     }
 
 }  // namespace zust

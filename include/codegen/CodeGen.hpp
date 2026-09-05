@@ -13,8 +13,6 @@
 #include "typechecker/TypeChecker.hpp"
 
 namespace zust {
-    enum class TargetTriple { X86_64_LINUX, X86_64_WINDOWS, LLVM_IR };
-
     class CodeGen {
     protected:
         std::map<std::string, std::string> assembly_comparison_operations = {
@@ -131,7 +129,6 @@ namespace zust {
 
         virtual ~CodeGen();
         virtual void generate(std::unique_ptr<ASTNode> program) = 0;
-        static std::unique_ptr<CodeGen> create(TargetTriple target, std::ostream &outstream);
     };
 
     class CodeGenLinux : public CodeGen {

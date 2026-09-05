@@ -10,6 +10,7 @@
 #include <assert.h>
 
 #include "ast/ASTNode.hpp"
+#include "codegen/Backend.hpp"
 #include "codegen/Canaries.hpp"
 #include "codegen/CodeGen.hpp"
 #include "codegen/RegisterAllocator.hpp"

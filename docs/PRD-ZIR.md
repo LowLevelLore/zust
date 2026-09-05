@@ -139,7 +139,7 @@ goldens do NOT exercise but a naive rewrite would still change). Get these into
       it. `RegisterAllocator::emitSpillRestore`/`unSpill` stop emitting assembly
       text. *Exit:* `grep -rn "CodegenOutputFormat" src/parser
       src/codegen/RegisterAllocator.cpp` empty; suite green on all 3 targets.
-- [ ] **0.2 [S]** `Backend` + `BackendRegistry` + `TargetInfo`, still AST-consuming
+- [x] **0.2 [S]** `Backend` + `BackendRegistry` + `TargetInfo`, still AST-consuming
       for now. Delete `TargetTriple`; collapse the `main.cpp` switch; `--formats`
       / `--formats --json` generated from the registry;
       `conftest.py`/`test_pipeline.py` consume the JSON instead of a hardcoded
