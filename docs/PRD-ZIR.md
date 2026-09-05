@@ -157,7 +157,7 @@ goldens do NOT exercise but a naive rewrite would still change). Get these into
 Build in this order — each step is independently testable
 (`.claude/skills/zust-ir`).
 
-- [ ] **1.1 [S]** `TypeTable` with interning + `TargetLayout` (sizes/alignment
+- [x] **1.1 [S]** `TypeTable` with interning + `TargetLayout` (sizes/alignment
       come from the layout, never hardcoded on the type — `docs/IR-DESIGN.md`
       calls out today's hardcoded `size_t = 64` as the mistake not to repeat).
       *Exit:* unit test — structurally identical types intern to equal `TypeId`.
