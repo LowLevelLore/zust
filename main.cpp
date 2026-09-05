@@ -40,8 +40,7 @@ int main(int argc, char *argv[]) {
 
     std::optional<std::string> source = zust::File::readAllText(inputFile);
     if (!source) {
-        logError(zust::Error(zust::ErrorType::Generic,
-                              "Failed to read from " + inputFile));
+        logError(zust::Error(zust::ErrorType::Generic, "Failed to read from " + inputFile));
         return 1;
     }
 
@@ -87,44 +86,42 @@ int main(int argc, char *argv[]) {
     if (!cli.getOutputFile().empty()) {
         ofs.open(cli.getOutputFile());
         if (!ofs) {
-            std::cerr << "Error: cannot open output file: "
-                      << cli.getOutputFile() << "\n";
+            std::cerr << "Error: cannot open output file: " << cli.getOutputFile() << "\n";
             std::exit(1);
         }
         outstream = &ofs;  // now point at the file
     }
 
-    std::unique_ptr<zust::CodeGen> cg =
-        CodeGen::create(TargetTriple::X86_64_LINUX, *outstream);
+    std::unique_ptr<zust::CodeGen> cg = CodeGen::create(TargetTriple::X86_64_LINUX, *outstream);
 
     switch (cli.getFormat()) {
-    case CodegenOutputFormat::Default:
+        case CodegenOutputFormat::Default:
 #ifdef _WIN64
-        cg = CodeGen::create(TargetTriple::X86_64_WINDOWS, *outstream);
+            cg = CodeGen::create(TargetTriple::X86_64_WINDOWS, *outstream);
 #endif
 #ifdef __linux__
-        cg = CodeGen::create(TargetTriple::X86_64_LINUX, *outstream);
+            cg = CodeGen::create(TargetTriple::X86_64_LINUX, *outstream);
 #endif
-        break;
+            break;
 
-    case CodegenOutputFormat::X86_64_MSWIN: {
-        cg = CodeGen::create(TargetTriple::X86_64_WINDOWS, *outstream);
-        break;
-    }
+        case CodegenOutputFormat::X86_64_MSWIN: {
+            cg = CodeGen::create(TargetTriple::X86_64_WINDOWS, *outstream);
+            break;
+        }
 
-    case CodegenOutputFormat::X86_64_LINUX: {
-        cg = CodeGen::create(TargetTriple::X86_64_LINUX, *outstream);
-        break;
-    }
+        case CodegenOutputFormat::X86_64_LINUX: {
+            cg = CodeGen::create(TargetTriple::X86_64_LINUX, *outstream);
+            break;
+        }
 
-    case CodegenOutputFormat::LLVM_IR: {
-        cg = CodeGen::create(TargetTriple::LLVM_IR, *outstream);
-        break;
-    }
+        case CodegenOutputFormat::LLVM_IR: {
+            cg = CodeGen::create(TargetTriple::LLVM_IR, *outstream);
+            break;
+        }
 
-    default:
-        std::cerr << "This should not happen, ACP Pradhyumn...\n";
-        exit(1);
+        default:
+            std::cerr << "This should not happen, ACP Pradhyumn...\n";
+            exit(1);
     }
     try {
         cg->generate(std::move(program));

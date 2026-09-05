@@ -7,17 +7,13 @@
 #include "common/Logging.hpp"
 #include "parser/ScopeContext.hpp"
 
-namespace zust
-{
-    class Parser
-    {
+namespace zust {
+    class Parser {
     public:
         explicit Parser(Lexer &lexer);
         std::unique_ptr<ASTNode> parse();
-        bool isCorrect()
-        {
-            return shouldTypecheck;
-        }
+
+        bool isCorrect() { return shouldTypecheck; }
 
     private:
         int blockNumber = 0;
@@ -49,4 +45,4 @@ namespace zust
         void exitScope();
         std::unique_ptr<ASTNode> parseBlock();
     };
-}
+}  // namespace zust

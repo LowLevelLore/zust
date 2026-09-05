@@ -1,0 +1,32 @@
+// Regression: a block-scoped `let` must get its own stack slot and must not
+// clobber the enclosing variable's entry in the function's offset table.
+extern fn printf(fmt: string, ...) -> int32_t;
+
+fn main() {
+    let x: int64_t = 1;
+
+    if (x > 0) {
+        let x: int64_t = 2;
+        printf("%d\n", x);          // 2
+        if (x > 0) {
+            let x: int64_t = 3;
+            printf("%d\n", x);      // 3
+        }
+        printf("%d\n", x);          // 2 - inner block must not leak
+    }
+    printf("%d\n", x);              // 1 - outer must survive the block
+
+    let i: int64_t = 0;
+    while (i < 2) {
+        let x: int64_t = 9;
+        printf("%d\n", x);          // 9, 9
+        i = i + 1;
+    }
+    printf("%d\n", x);              // 1
+
+    for (let k: int64_t = 0; k < 2; k = k + 1;) {
+        let x: int64_t = 7;
+        printf("%d\n", x);          // 7, 7
+    }
+    printf("%d\n", x);              // 1
+}

@@ -1,20 +1,18 @@
 #include "all.hpp"
 
-namespace zust
-{
+namespace zust {
 
-    std::string llvmTypeName(const std::string &typeName)
-    {
+    std::string llvmTypeName(const std::string &typeName) {
         if (typeName == "boolean")
-            return "i8"; // Boolean as 1-bit integer
+            return "i8";  // Boolean as 1-bit integer
         if (typeName == "none")
-            return "void"; // No type
+            return "void";  // No type
         if (typeName == "string")
-            return "i8*"; // Pointer to characters
+            return "i8*";  // Pointer to characters
         if (typeName == "size_t")
-            return "i64"; // Platform word size
+            return "i64";  // Platform word size
         if (typeName == "integer")
-            return "i64"; // Default signed integer
+            return "i64";  // Default signed integer
 
         // Unsigned integers
         if (typeName == "uint8_t")
@@ -46,150 +44,119 @@ namespace zust
         return typeName;
     }
 
-    std::string unescapeString(const std::string &input)
-    {
+    std::string unescapeString(const std::string &input) {
         std::string result;
         result.reserve(input.size());
 
-        for (size_t i = 0; i < input.size(); ++i)
-        {
-            if (input[i] == '\\' && i + 1 < input.size())
-            {
-                switch (input[++i])
-                {
-                case 'n':
-                    result += '\n';
-                    break;
-                case 't':
-                    result += '\t';
-                    break;
-                case 'r':
-                    result += '\r';
-                    break;
-                case '\\':
-                    result += '\\';
-                    break;
-                case '"':
-                    result += '"';
-                    break;
-                case '0':
-                    result += '\0';
-                    break; // Null byte
-                default:   // Keep unrecognized escapes as-is
-                    result += '\\';
-                    result += input[i];
-                    break;
+        for (size_t i = 0; i < input.size(); ++i) {
+            if (input[i] == '\\' && i + 1 < input.size()) {
+                switch (input[++i]) {
+                    case 'n':
+                        result += '\n';
+                        break;
+                    case 't':
+                        result += '\t';
+                        break;
+                    case 'r':
+                        result += '\r';
+                        break;
+                    case '\\':
+                        result += '\\';
+                        break;
+                    case '"':
+                        result += '"';
+                        break;
+                    case '0':
+                        result += '\0';
+                        break;  // Null byte
+                    default:    // Keep unrecognized escapes as-is
+                        result += '\\';
+                        result += input[i];
+                        break;
                 }
-            }
-            else
-            {
+            } else {
                 result += input[i];
             }
         }
         return result;
     }
 
-    static std::string fresh()
-    {
+    static std::string fresh() {
         static int cnt = 0;
         return "%tmp" + std::to_string(cnt++);
     }
-    std::string toHexFloatFromStr(const std::string &valStr, bool isF32, std::ostringstream &out)
-    {
+
+    std::string toHexFloatFromStr(const std::string &valStr, bool isF32, std::ostringstream &out) {
         std::ostringstream oss;
         oss << std::scientific << std::setprecision(16);
-        if (isF32)
-        {
+        if (isF32) {
             float v = std::stof(valStr);
             oss << v;
-        }
-        else
-        {
+        } else {
             double v = std::stod(valStr);
             oss << v;
         }
         return oss.str();
     }
-    std::string CodeGenLLVM::castValue(const std::string &val, const TypeInfo &fromType, const TypeInfo &toType, std::ostringstream &out)
-    {
-        if (fromType.isFloat == toType.isFloat && fromType.bits == toType.bits)
-        {
+
+    std::string CodeGenLLVM::castValue(const std::string &val, const TypeInfo &fromType, const TypeInfo &toType,
+                                       std::ostringstream &out) {
+        if (fromType.isFloat == toType.isFloat && fromType.bits == toType.bits) {
             return val;
         }
 
         std::string tmp = fresh();
 
-        if (!fromType.isFloat && toType.isFloat)
-        {
+        if (!fromType.isFloat && toType.isFloat) {
             std::string intTy = "i" + std::to_string(fromType.bits);
             std::string floatTy = (toType.bits == 64 ? "double" : "float");
             std::string instr = fromType.isSigned ? "sitofp" : "uitofp";
             out << "  " << tmp << " = " << instr << " " << intTy << " " << val << " to " << floatTy << "\n";
-        }
-        else if (fromType.isFloat && !toType.isFloat)
-        {
+        } else if (fromType.isFloat && !toType.isFloat) {
             std::string floatTy = (fromType.bits == 64 ? "double" : "float");
             std::string intTy = "i" + std::to_string(toType.bits);
             std::string instr = toType.isSigned ? "fptosi" : "fptoui";
             out << "  " << tmp << " = " << instr << " " << floatTy << " " << val << " to " << intTy << "\n";
-        }
-        else if (!fromType.isFloat && !toType.isFloat)
-        {
+        } else if (!fromType.isFloat && !toType.isFloat) {
             std::string fromTy = "i" + std::to_string(fromType.bits);
             std::string toTy = "i" + std::to_string(toType.bits);
-            if (fromType.bits < toType.bits)
-            {
+            if (fromType.bits < toType.bits) {
                 std::string instr = fromType.isSigned ? "sext" : "zext";
                 out << "  " << tmp << " = " << instr << " " << fromTy << " " << val << " to " << toTy << "\n";
-            }
-            else if (fromType.bits > toType.bits)
-            {
+            } else if (fromType.bits > toType.bits) {
                 out << "  " << tmp << " = trunc " << fromTy << " " << val << " to " << toTy << "\n";
-            }
-            else if (fromType.isSigned != toType.isSigned)
-            {
+            } else if (fromType.isSigned != toType.isSigned) {
                 // Retag value if signedness differs but bit-width is the same
                 out << "  " << tmp << " = add " << fromTy << " " << val << ", 0\n";
-            }
-            else
-            {
+            } else {
                 return val;
             }
-        }
-        else if (fromType.isFloat && toType.isFloat)
-        {
+        } else if (fromType.isFloat && toType.isFloat) {
             std::string fromTy = (fromType.bits == 64 ? "double" : "float");
             std::string toTy = (toType.bits == 64 ? "double" : "float");
-            if (fromType.bits < toType.bits)
-            {
+            if (fromType.bits < toType.bits) {
                 out << "  " << tmp << " = fpext " << fromTy << " " << val << " to " << toTy << "\n";
-            }
-            else if (fromType.bits > toType.bits)
-            {
+            } else if (fromType.bits > toType.bits) {
                 out << "  " << tmp << " = fptrunc " << fromTy << " " << val << " to " << toTy << "\n";
-            }
-            else
-            {
+            } else {
                 return val;
             }
-        }
-        else
-        {
+        } else {
             throw std::runtime_error("Unsupported cast from type to type");
         }
 
         noteType(tmp, toType);
         return tmp;
     }
-    std::string CodeGenLLVM::generateIntegerLiteral(std::unique_ptr<ASTNode> node, std::ostringstream &out)
-    {
+
+    std::string CodeGenLLVM::generateIntegerLiteral(std::unique_ptr<ASTNode> node, std::ostringstream &out) {
         std::string name = fresh();
         out << "  " << name << " = add i64 0, " << node->value << "\n";
         noteType(name, node->scope->lookupType("int64_t"));
         return name;
     }
-    std::string CodeGenLLVM::generateFloatLiteral(std::unique_ptr<ASTNode> node, std::ostringstream &out)
-    {
+
+    std::string CodeGenLLVM::generateFloatLiteral(std::unique_ptr<ASTNode> node, std::ostringstream &out) {
         std::string tmp = fresh();
         std::string val = node->value;
         bool isF32 = (!val.empty() && (val.back() == 'f' || val.back() == 'F'));
@@ -198,35 +165,28 @@ namespace zust
 
         std::string hexVal = toHexFloatFromStr(val, isF32, out);
 
-        if (isF32)
-        {
+        if (isF32) {
             out << "  " << tmp << " = fadd float 0.0, " << hexVal << "\n";
             noteType(tmp, node->scope->lookupType("float"));
-        }
-        else
-        {
+        } else {
             out << "  " << tmp << " = fadd double 0.0, " << hexVal << "\n";
             noteType(tmp, node->scope->lookupType("double"));
         }
         return tmp;
     }
-    std::string CodeGenLLVM::generateStringLiteral(std::unique_ptr<ASTNode> node, std::ostringstream &out)
-    {
+
+    std::string CodeGenLLVM::generateStringLiteral(std::unique_ptr<ASTNode> node, std::ostringstream &out) {
         std::string value = node->value;
 
         std::string name = "@.str" + std::to_string(stringLabelCount++);
         std::string unescaped = unescapeString(value);
-        size_t total_bytes = unescaped.size() + 1; // +1 for null terminator
+        size_t total_bytes = unescaped.size() + 1;  // +1 for null terminator
 
         std::string llvmEscaped;
-        for (unsigned char c : unescaped)
-        {
-            if (isprint(c) && c != '"' && c != '\\')
-            {
+        for (unsigned char c : unescaped) {
+            if (isprint(c) && c != '"' && c != '\\') {
                 llvmEscaped += c;
-            }
-            else
-            {
+            } else {
                 char buf[5];
                 snprintf(buf, sizeof(buf), "\\%02x", c);
                 llvmEscaped += buf;
@@ -234,50 +194,43 @@ namespace zust
         }
         llvmEscaped += "\\00";
 
-        outGlobalStream << name << " = private unnamed_addr constant ["
-                        << total_bytes << " x i8] c\"" << llvmEscaped << "\"\n";
+        outGlobalStream << name << " = private unnamed_addr constant [" << total_bytes << " x i8] c\"" << llvmEscaped
+                        << "\"\n";
 
         std::string ptr = fresh();
-        out << "  " << ptr << " = getelementptr inbounds ["
-            << total_bytes << " x i8], [" << total_bytes << " x i8]* "
+        out << "  " << ptr << " = getelementptr inbounds [" << total_bytes << " x i8], [" << total_bytes << " x i8]* "
             << name << ", i64 0, i64 0\n";
 
         // Cast pointer to i64 if storing in i64* variable
         std::string casted = fresh();
         out << "  " << casted << " = ptrtoint i8* " << ptr << " to i64\n";
 
-        noteType(casted, node->scope->lookupType("int64_t")); // casted is now i64
+        noteType(casted, node->scope->lookupType("int64_t"));  // casted is now i64
         stringLiterals[value] = casted;
         return casted;
     }
-    std::string CodeGenLLVM::generateBooleanLiteral(std::unique_ptr<ASTNode> node, std::ostringstream &out)
-    {
+
+    std::string CodeGenLLVM::generateBooleanLiteral(std::unique_ptr<ASTNode> node, std::ostringstream &out) {
         std::string name = fresh();
-        out << "  " << name << " = add i8 0, "
-            << (node->value == "true" ? "1" : "0") << "\n";
+        out << "  " << name << " = add i8 0, " << (node->value == "true" ? "1" : "0") << "\n";
         noteType(name, node->scope->lookupType("boolean"));
         return name;
     }
-    std::string CodeGenLLVM::generateVariableAccess(std::unique_ptr<ASTNode> node, std::ostringstream &out)
-    {
+
+    std::string CodeGenLLVM::generateVariableAccess(std::unique_ptr<ASTNode> node, std::ostringstream &out) {
         auto &scope = *node->scope;
         auto name = node->value;
 
         // Lookup type info
         auto ti = scope.lookupType(scope.lookupVariable(name).type);
-        std::string ty = ti.isFloat
-                             ? (ti.bits == 32 ? "float" : "double")
-                             : "i" + std::to_string(ti.bits);
+        std::string ty = ti.isFloat ? (ti.bits == 32 ? "float" : "double") : "i" + std::to_string(ti.bits);
 
         // Determine if it's a global or local variable
         bool isGlobal = scope.isGlobalVariable(name);
         std::string ptr;
-        if (!isGlobal)
-        {
+        if (!isGlobal) {
             ptr = "%" + node->scope->getMapping(name);
-        }
-        else
-        {
+        } else {
             ptr = "@" + name;
         }
 
@@ -288,8 +241,8 @@ namespace zust
         noteType(loaded, ti);
         return loaded;
     }
-    std::string CodeGenLLVM::generateBinaryOperation(std::unique_ptr<ASTNode> node, std::ostringstream &out)
-    {
+
+    std::string CodeGenLLVM::generateBinaryOperation(std::unique_ptr<ASTNode> node, std::ostringstream &out) {
         auto lhs = emitExpression(std::move(node->children[0]), out);
         auto rhs = emitExpression(std::move(node->children[1]), out);
         TypeInfo t1 = regType[lhs];
@@ -299,20 +252,18 @@ namespace zust
         std::string R = castValue(rhs, t2, tr, out);
         std::string res = fresh();
 
-        if (tr.isFloat)
-        {
+        if (tr.isFloat) {
             std::string target = (tr.bits == 64 ? "double" : "float");
-            static const std::unordered_map<std::string, std::string> fp_ops = {{"+", "fadd"}, {"-", "fsub"}, {"*", "fmul"}, {"/", "fdiv"}};
-            static const std::unordered_map<std::string, std::string> fcmp_ops = {{"==", "oeq"}, {"!=", "one"}, {"<", "olt"}, {"<=", "ole"}, {">", "ogt"}, {">=", "oge"}};
+            static const std::unordered_map<std::string, std::string> fp_ops = {
+                {"+", "fadd"}, {"-", "fsub"}, {"*", "fmul"}, {"/", "fdiv"}};
+            static const std::unordered_map<std::string, std::string> fcmp_ops = {
+                {"==", "oeq"}, {"!=", "one"}, {"<", "olt"}, {"<=", "ole"}, {">", "ogt"}, {">=", "oge"}};
 
-            if (fp_ops.count(node->value))
-            {
+            if (fp_ops.count(node->value)) {
                 out << "  " << res << " = " << fp_ops.at(node->value) << " " << target << " " << L << ", " << R << "\n";
                 noteType(res, tr);
                 return res;
-            }
-            else
-            {
+            } else {
                 std::string cmpop = fcmp_ops.at(node->value);
                 out << "  " << res << " = fcmp " << cmpop << " " << target << " " << L << ", " << R << "\n";
                 std::string zext = fresh();
@@ -320,14 +271,11 @@ namespace zust
                 noteType(zext, node->scope->lookupType("boolean"));
                 return zext;
             }
-        }
-        else
-        {
+        } else {
             std::string intTy = "i" + std::to_string(tr.bits);
             bool isSigned = tr.isSigned;
 
-            if (node->value == "+" || node->value == "-" || node->value == "*" || node->value == "/")
-            {
+            if (node->value == "+" || node->value == "-" || node->value == "*" || node->value == "/") {
                 std::string op;
                 if (node->value == "+")
                     op = "add";
@@ -344,11 +292,11 @@ namespace zust
             }
 
             static const std::unordered_map<std::string, std::pair<std::string, std::string>> cmp_map = {
-                {"==", {"eq", "eq"}}, {"!=", {"ne", "ne"}}, {"<", {"slt", "ult"}}, {"<=", {"sle", "ule"}}, {">", {"sgt", "ugt"}}, {">=", {"sge", "uge"}}};
+                {"==", {"eq", "eq"}},   {"!=", {"ne", "ne"}},  {"<", {"slt", "ult"}},
+                {"<=", {"sle", "ule"}}, {">", {"sgt", "ugt"}}, {">=", {"sge", "uge"}}};
 
             auto it = cmp_map.find(node->value);
-            if (it != cmp_map.end())
-            {
+            if (it != cmp_map.end()) {
                 std::string signedOp = it->second.first;
                 std::string unsignedOp = it->second.second;
                 std::string cmpop = isSigned ? signedOp : unsignedOp;
@@ -360,11 +308,23 @@ namespace zust
                 return zext;
             }
 
+            // Bitwise/logical ops: &&, ||, &, |
+            // The TypeChecker restricts && and || to boolean operands, and
+            // booleans are always 0 or 1 here (comparisons zext an i1), so a
+            // bitwise and/or gives the same result. This matches the native
+            // backends, which are likewise non-short-circuiting.
+            if (node->value == "&&" || node->value == "||" || node->value == "&" || node->value == "|") {
+                std::string op = (node->value == "&&" || node->value == "&") ? "and" : "or";
+                out << "  " << res << " = " << op << " " << intTy << " " << L << ", " << R << "\n";
+                noteType(res, tr);
+                return res;
+            }
+
             throw std::runtime_error("Unsupported integer op " + node->value);
         }
     }
-    std::string CodeGenLLVM::generateUnaryOperation(std::unique_ptr<ASTNode> node, std::ostringstream &out)
-    {
+
+    std::string CodeGenLLVM::generateUnaryOperation(std::unique_ptr<ASTNode> node, std::ostringstream &out) {
         auto &scope = *node->children[0]->scope;
         auto varName = node->children[0]->value;
         TypeInfo ti = scope.lookupType(scope.lookupVariable(varName).type);
@@ -377,8 +337,7 @@ namespace zust
         else
             llvmType = "i" + std::to_string(ti.bits);
 
-        if (node->value == "!")
-        {
+        if (node->value == "!") {
             TypeInfo boolType = node->scope->lookupType("boolean");
             val = castValue(val, regType.at(val), boolType, out);
             std::string res = fresh();
@@ -387,9 +346,7 @@ namespace zust
             out << "  " << zero << " = zext i1 " << res << " to i8\n";
             noteType(zero, node->scope->lookupType("boolean"));
             return zero;
-        }
-        else if (node->value == "++" || node->value == "--")
-        {
+        } else if (node->value == "++" || node->value == "--") {
             if (child_type != NodeType::VariableAccess)
                 throw std::runtime_error(node->value + " can only be applied to variables");
 
@@ -403,143 +360,127 @@ namespace zust
             out << "  " << cur << " = load " << llvmType << ", " << llvmType << "* " << ptr << "\n";
 
             std::string updated = fresh();
-            out << "  " << updated << " = "
-                << (node->value == "++" ? "add" : "sub")
-                << " " << llvmType << " " << cur << ", 1\n";
+            out << "  " << updated << " = " << (node->value == "++" ? "add" : "sub") << " " << llvmType << " " << cur
+                << ", 1\n";
 
             out << "  store " << llvmType << " " << updated << ", " << llvmType << "* " << ptr << "\n";
 
             noteType(updated, ti);
             return updated;
-        }
-        else
-        {
+        } else {
             throw std::runtime_error("Unsupported unary: " + node->value);
         }
     }
-    std::string CodeGenLLVM::emitExpression(std::unique_ptr<ASTNode> node, std::ostringstream &out)
-    {
-        switch (node->type)
-        {
-        case NodeType::IntegerLiteral:
-            return generateIntegerLiteral(std::move(node), out);
-        case NodeType::FloatLiteral:
-            return generateFloatLiteral(std::move(node), out);
-        case NodeType::StringLiteral:
-            return generateStringLiteral(std::move(node), out);
-        case NodeType::BooleanLiteral:
-            return generateBooleanLiteral(std::move(node), out);
-        case NodeType::VariableAccess:
-            return generateVariableAccess(std::move(node), out);
-        case NodeType::BinaryOp:
-            return generateBinaryOperation(std::move(node), out);
-        case NodeType::UnaryOp:
-            return generateUnaryOperation(std::move(node), out);
-        case NodeType::FunctionCall:
-            return generateFunctionCall(std::move(node), out);
-        default:
-            throw std::runtime_error("Unknown statement encountered.");
+
+    std::string CodeGenLLVM::emitExpression(std::unique_ptr<ASTNode> node, std::ostringstream &out) {
+        switch (node->type) {
+            case NodeType::IntegerLiteral:
+                return generateIntegerLiteral(std::move(node), out);
+            case NodeType::FloatLiteral:
+                return generateFloatLiteral(std::move(node), out);
+            case NodeType::StringLiteral:
+                return generateStringLiteral(std::move(node), out);
+            case NodeType::BooleanLiteral:
+                return generateBooleanLiteral(std::move(node), out);
+            case NodeType::VariableAccess:
+                return generateVariableAccess(std::move(node), out);
+            case NodeType::BinaryOp:
+                return generateBinaryOperation(std::move(node), out);
+            case NodeType::UnaryOp:
+                return generateUnaryOperation(std::move(node), out);
+            case NodeType::FunctionCall:
+                return generateFunctionCall(std::move(node), out);
+            default:
+                throw std::runtime_error("Unknown statement encountered.");
         }
     }
-    void CodeGenLLVM::emitEpilogue(std::shared_ptr<ScopeContext> scope, std::ostringstream &out, bool clearRax)
-    {
+
+    void CodeGenLLVM::emitEpilogue(std::shared_ptr<ScopeContext> scope, std::ostringstream &out, bool clearRax) {
         out << "    ; Block ends\n";
     }
-    void CodeGenLLVM::emitPrologue(std::shared_ptr<ScopeContext> scope, std::ostringstream &out)
-    {
-    }
-    void CodeGenLLVM::generateStatement(std::unique_ptr<ASTNode> statement, std::ostringstream &out)
-    {
-        switch (statement->type)
-        {
-        case NodeType::VariableReassignment:
-        {
-            generateVariableReassignment(std::move(statement), out);
-            out << "\n";
-            break;
-        }
-        case NodeType::VariableDeclaration:
-        {
-            generateVariableDeclaration(std::move(statement), out);
-            out << "\n";
-            break;
-        }
-        case NodeType::IfStatement:
-        {
-            generateIfStatement(std::move(statement), out);
-            out << "\n";
-            break;
-        }
-        case NodeType::WhileLoop:
-        {
-            generateWhileLoop(std::move(statement), out);
-            out << "\n";
-            break;
-        }
-        case NodeType::ForLoop:
-        {
-            generateForLoop(std::move(statement), out);
-            out << "\n";
-            break;
-        }
-        case NodeType::BreakStatement:
-        {
-            if (loopLabelStack.empty())
-                throw std::runtime_error("'break' emitted outside a loop");
-            out << "    br label %" << loopLabelStack.back().second << "\n\n";
-            break;
-        }
-        case NodeType::ContinueStatement:
-        {
-            if (loopLabelStack.empty())
-                throw std::runtime_error("'continue' emitted outside a loop");
-            out << "    br label %" << loopLabelStack.back().first << "\n\n";
-            break;
-        }
-        case NodeType::UnaryOp:
-        {
-            std::string op = statement->value;
-            std::string reg = emitExpression(std::move(statement), out);
-            out << "\n";
-            break;
-        }
-        case NodeType::BinaryOp:
-        {
-            std::string reg = emitExpression(std::move(statement), out); // I am doing this just so the increments/decrements work in x + y-- -> this itself must not have any result, but y-- should still be effective.
-            out << "\n";
-            break;
-        }
-        case NodeType::FunctionCall:
-        {
-            std::string reg = generateFunctionCall(std::move(statement), out);
-            out << "\n";
-            break;
-        }
-        case NodeType::Function:
-        {
-            generateFunctionDeclaration(std::move(statement), out);
-            out << "\n";
-            break;
-        }
-        case NodeType::ExternFunction:
-        {
-            generateExternFunctionDeclaration(std::move(statement), out);
-            out << "\n";
-            break;
-        }
-        case NodeType::ReturnStatement:
-        {
-            generateReturnstatement(std::move(statement), out);
-            out << "\n";
-            break;
-        }
-        default:
-            statement->print(std::cout, 0);
-            throw std::runtime_error("Unknown statement encountered.");
+
+    void CodeGenLLVM::emitPrologue(std::shared_ptr<ScopeContext> scope, std::ostringstream &out) {}
+
+    void CodeGenLLVM::generateStatement(std::unique_ptr<ASTNode> statement, std::ostringstream &out) {
+        switch (statement->type) {
+            case NodeType::VariableReassignment: {
+                generateVariableReassignment(std::move(statement), out);
+                out << "\n";
+                break;
+            }
+            case NodeType::VariableDeclaration: {
+                generateVariableDeclaration(std::move(statement), out);
+                out << "\n";
+                break;
+            }
+            case NodeType::IfStatement: {
+                generateIfStatement(std::move(statement), out);
+                out << "\n";
+                break;
+            }
+            case NodeType::WhileLoop: {
+                generateWhileLoop(std::move(statement), out);
+                out << "\n";
+                break;
+            }
+            case NodeType::ForLoop: {
+                generateForLoop(std::move(statement), out);
+                out << "\n";
+                break;
+            }
+            case NodeType::BreakStatement: {
+                if (loopLabelStack.empty())
+                    throw std::runtime_error("'break' emitted outside a loop");
+                out << "    br label %" << loopLabelStack.back().second << "\n\n";
+                break;
+            }
+            case NodeType::ContinueStatement: {
+                if (loopLabelStack.empty())
+                    throw std::runtime_error("'continue' emitted outside a loop");
+                out << "    br label %" << loopLabelStack.back().first << "\n\n";
+                break;
+            }
+            case NodeType::UnaryOp: {
+                std::string op = statement->value;
+                std::string reg = emitExpression(std::move(statement), out);
+                out << "\n";
+                break;
+            }
+            case NodeType::BinaryOp: {
+                std::string reg =
+                    emitExpression(std::move(statement),
+                                   out);  // I am doing this just so the increments/decrements work in x + y-- -> this
+                                          // itself must not have any result, but y-- should still be effective.
+                out << "\n";
+                break;
+            }
+            case NodeType::FunctionCall: {
+                std::string reg = generateFunctionCall(std::move(statement), out);
+                out << "\n";
+                break;
+            }
+            case NodeType::Function: {
+                generateFunctionDeclaration(std::move(statement), out);
+                out << "\n";
+                break;
+            }
+            case NodeType::ExternFunction: {
+                generateExternFunctionDeclaration(std::move(statement), out);
+                out << "\n";
+                break;
+            }
+            case NodeType::ReturnStatement: {
+                generateReturnstatement(std::move(statement), out);
+                out << "\n";
+                break;
+            }
+            default:
+                statement->print(std::cout, 0);
+                throw std::runtime_error("Unknown statement encountered.");
         }
     }
-    void CodeGenLLVM::generateVariableReassignment(std::unique_ptr<ASTNode> node, std::ostringstream &out)
-    {
+
+    void CodeGenLLVM::generateVariableReassignment(std::unique_ptr<ASTNode> node, std::ostringstream &out) {
         auto &scope = *node->scope;
         auto name = node->value;
         TypeInfo ti = scope.lookupType(scope.lookupVariable(name).type);
@@ -553,51 +494,40 @@ namespace zust
         std::string castedVal = castValue(val, tr, ti, out);
 
         // 3) Emit the store to the correct location
-        std::string ty = ti.isFloat
-                             ? (ti.bits == 32 ? "float" : "double")
-                             : "i" + std::to_string(ti.bits);
+        std::string ty = ti.isFloat ? (ti.bits == 32 ? "float" : "double") : "i" + std::to_string(ti.bits);
 
-        if (isGlobal)
-        {
+        if (isGlobal) {
             out << "  store " << ty << " " << castedVal << ", " << ty << "* @" << name << "\n";
-        }
-        else
-        {
+        } else {
             out << "  store " << ty << " " << castedVal << ", " << ty << "* %" << node->scope->getMapping(name) << "\n";
         }
     }
-    void CodeGenLLVM::generateVariableDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out)
-    {
+
+    void CodeGenLLVM::generateVariableDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out) {
         bool isGlobal = node->scope->isGlobalVariable(node->value);
         TypeInfo ti = node->scope->lookupType(node->scope->lookupVariable(node->value).type);
-        std::string ty = ti.isFloat
-                             ? (ti.bits == 32 ? "float" : "double")
-                             : "i" + std::to_string(ti.bits);
+        std::string ty = ti.isFloat ? (ti.bits == 32 ? "float" : "double") : "i" + std::to_string(ti.bits);
 
-        if (!isGlobal)
-        {
+        if (!isGlobal) {
             out << "  %" << node->scope->getMapping(node->value) << " = alloca " << ty << "\n";
         }
 
-        if (node->children.size() >= 2)
-        {
+        if (node->children.size() >= 2) {
             auto val = emitExpression(std::move(node->children.back()), out);
             TypeInfo tr = regType[val];
 
             std::string castedVal = castValue(val, tr, ti, out);
 
-            if (isGlobal)
-            {
+            if (isGlobal) {
                 out << "  store " << ty << " " << castedVal << ", " << ty << "* @" << node->value << "\n";
-            }
-            else
-            {
-                out << "  store " << ty << " " << castedVal << ", " << ty << "* %" << node->scope->getMapping(node->value) << "\n";
+            } else {
+                out << "  store " << ty << " " << castedVal << ", " << ty << "* %"
+                    << node->scope->getMapping(node->value) << "\n";
             }
         }
     }
-    void CodeGenLLVM::generateIfStatement(std::unique_ptr<ASTNode> statement, std::ostringstream &out)
-    {
+
+    void CodeGenLLVM::generateIfStatement(std::unique_ptr<ASTNode> statement, std::ostringstream &out) {
         int id = blockLabelCount++;
         std::string thenLbl = "if.then" + std::to_string(id);
         std::string elseLbl = "if.else" + std::to_string(id);
@@ -607,15 +537,10 @@ namespace zust
         TypeInfo condTi = regType[condVal];
 
         std::string condBool = fresh();
-        out << "    " << condBool
-            << " = trunc i" << condTi.bits
-            << " " << condVal << " to i1\n";
+        out << "    " << condBool << " = trunc i" << condTi.bits << " " << condVal << " to i1\n";
 
-        out << "    br i1 " << condBool
-            << ", label %" << thenLbl
-            << ", label %"
-            << (statement->getElseBranch() ? elseLbl : endLbl)
-            << "\n\n";
+        out << "    br i1 " << condBool << ", label %" << thenLbl << ", label %"
+            << (statement->getElseBranch() ? elseLbl : endLbl) << "\n\n";
 
         out << thenLbl << ":\n";
         {
@@ -629,14 +554,11 @@ namespace zust
         out << "    br label %" << endLbl << "\n\n";
 
         ASTNode *branch = statement->getElseBranch();
-        if (branch)
-        {
+        if (branch) {
             out << elseLbl << ":\n";
 
-            while (branch)
-            {
-                if (branch->type == NodeType::ElseIfStatement)
-                {
+            while (branch) {
+                if (branch->type == NodeType::ElseIfStatement) {
                     int elifId = blockLabelCount++;
                     std::string elifThen = "elif.then" + std::to_string(elifId);
                     std::string elifNext = "elif.next" + std::to_string(elifId);
@@ -644,13 +566,8 @@ namespace zust
                     auto elifCond = emitExpression(std::move(branch->children[0]), out);
                     TypeInfo elifTi = regType[elifCond];
                     std::string elifBool = fresh();
-                    out << "    " << elifBool
-                        << " = trunc i" << elifTi.bits
-                        << " " << elifCond << " to i1\n";
-                    out << "    br i1 " << elifBool
-                        << ", label %" << elifThen
-                        << ", label %" << elifNext
-                        << "\n\n";
+                    out << "    " << elifBool << " = trunc i" << elifTi.bits << " " << elifCond << " to i1\n";
+                    out << "    br i1 " << elifBool << ", label %" << elifThen << ", label %" << elifNext << "\n\n";
 
                     out << elifThen << ":\n";
                     {
@@ -664,13 +581,10 @@ namespace zust
                     out << "    br label %" << endLbl << "\n\n";
                     out << elifNext << ":\n";
                     branch = branch->getElseBranch();
-                    if (!branch)
-                    {
+                    if (!branch) {
                         out << "    br label %" << endLbl << "\n\n";
                     }
-                }
-                else if (branch->type == NodeType::ElseStatement)
-                {
+                } else if (branch->type == NodeType::ElseStatement) {
                     auto elseBlock = std::move(branch->children[0]);
                     auto elseChildren = std::move(elseBlock->children);
                     emitPrologue(elseBlock->scope, out);
@@ -679,9 +593,7 @@ namespace zust
                     emitEpilogue(elseBlock->scope, out);
                     out << "    br label %" << endLbl << "\n\n";
                     branch = nullptr;
-                }
-                else
-                {
+                } else {
                     throw std::runtime_error("Unexpected node type in else chain");
                 }
             }
@@ -690,8 +602,8 @@ namespace zust
         // 5) end label
         out << endLbl << ":\n";
     }
-    void CodeGenLLVM::generateForLoop(std::unique_ptr<ASTNode> node, std::ostringstream &out)
-    {
+
+    void CodeGenLLVM::generateForLoop(std::unique_ptr<ASTNode> node, std::ostringstream &out) {
         int id = blockLabelCount++;
         std::string initLbl = "for.init" + std::to_string(id);
         std::string condLbl = "for.cond" + std::to_string(id);
@@ -746,8 +658,7 @@ namespace zust
         loopLabelStack.pop_back();
     }
 
-    void CodeGenLLVM::generateWhileLoop(std::unique_ptr<ASTNode> node, std::ostringstream &out)
-    {
+    void CodeGenLLVM::generateWhileLoop(std::unique_ptr<ASTNode> node, std::ostringstream &out) {
         int id = blockLabelCount++;
         std::string condLbl = "while.cond" + std::to_string(id);
         std::string bodyLbl = "while.body" + std::to_string(id);
@@ -785,23 +696,20 @@ namespace zust
         out << endLbl << ":\n";
         loopLabelStack.pop_back();
     }
-    void CodeGenLLVM::generate(std::unique_ptr<ASTNode> program)
-    {
+
+    void CodeGenLLVM::generate(std::unique_ptr<ASTNode> program) {
         outGlobalStream << "; ModuleID = 'zust'\n"
                         << "source_filename = \"zust\"\n\n";
 
         // Globals
-        for (auto &stmt : program->children)
-        {
-            if (stmt->type == NodeType::VariableDeclaration)
-            {
+        for (auto &stmt : program->children) {
+            if (stmt->type == NodeType::VariableDeclaration) {
                 const auto &name = stmt->value;
                 auto vi = stmt->scope->lookupVariable(name);
                 TypeInfo ti = stmt->scope->lookupType(vi.type);
                 std::string ty = llvmTypeName(ti.name);
                 outGlobalStream << "@" << name << " = global " << ty
-                                << (ti.isFloat ? " 0.0" : (ti.name == "string" ? " null" : " 0"))
-                                << "\n";
+                                << (ti.isFloat ? " 0.0" : (ti.name == "string" ? " null" : " 0")) << "\n";
             }
         }
         outGlobalStream << "\n";
@@ -809,18 +717,13 @@ namespace zust
         // Split main and decls
         std::unique_ptr<ASTNode> mainFunction;
         std::vector<std::unique_ptr<ASTNode>> declarationsAndReassignments;
-        for (auto &stmt : program->children)
-        {
-            if (stmt->type == NodeType::Function && stmt->value == "main")
-            {
+        for (auto &stmt : program->children) {
+            if (stmt->type == NodeType::Function && stmt->value == "main") {
                 mainFunction = std::move(stmt);
-            }
-            else if (stmt->type == NodeType::VariableDeclaration || stmt->type == NodeType::VariableReassignment || (stmt->type == NodeType::UnaryOp and (stmt->value == "++" || stmt->value == "--")))
-            {
+            } else if (stmt->type == NodeType::VariableDeclaration || stmt->type == NodeType::VariableReassignment ||
+                       (stmt->type == NodeType::UnaryOp and (stmt->value == "++" || stmt->value == "--"))) {
                 declarationsAndReassignments.push_back(std::move(stmt));
-            }
-            else
-            {
+            } else {
                 generateStatement(std::move(stmt), outStream);
             }
         }
@@ -828,8 +731,7 @@ namespace zust
         // Emit main
         outStream << "define i32 @main() {\n";
         // Decls in main
-        for (auto &s : declarationsAndReassignments)
-        {
+        for (auto &s : declarationsAndReassignments) {
             generateStatement(std::move(s), outStream);
         }
 
@@ -838,12 +740,10 @@ namespace zust
         outStream << "  ret i32 0\n";
         outStream << "}\n";
 
-        outfinal << outGlobalStream.str() << "\n"
-                 << outStream.str() << "\n";
+        outfinal << outGlobalStream.str() << "\n" << outStream.str() << "\n";
     }
 
-    std::string CodeGenLLVM::generateFunctionCall(std::unique_ptr<ASTNode> node, std::ostringstream &out)
-    {
+    std::string CodeGenLLVM::generateFunctionCall(std::unique_ptr<ASTNode> node, std::ostringstream &out) {
         // Lookup function metadata
         auto fnInfo = node->scope->lookupFunction(node->value);
         const std::string &funcName = fnInfo.isExtern ? node->value : fnInfo.label;
@@ -852,8 +752,7 @@ namespace zust
 
         // Emit each argument, casting to expected type
         std::vector<std::pair<std::string, std::string>> argList;
-        for (size_t i = 0; i < args.size(); ++i)
-        {
+        for (size_t i = 0; i < args.size(); ++i) {
             // Evaluate expression
             std::string src = emitExpression(std::move(args[i]), out);
 
@@ -863,16 +762,11 @@ namespace zust
             TypeInfo passed = regType.at(src);
             bool passedIsFloat = passed.isFloat;
             TypeInfo expect;
-            if (i < paramTypes.size())
-            {
+            if (i < paramTypes.size()) {
                 expect = node->scope->lookupType(paramTypes[i].type);
-            }
-            else if (fnInfo.isVariadic)
-            {
+            } else if (fnInfo.isVariadic) {
                 expect = node->scope->lookupType(passedIsFloat ? "double" : "int64_t");
-            }
-            else
-            {
+            } else {
                 throw std::runtime_error("Too many arguments for function '" + node->value + "'");
             }
 
@@ -881,8 +775,7 @@ namespace zust
 
             // Determine LLVM type
             std::string ty = llvmTypeName(expect.name);
-            if (expect.isPointer)
-            {
+            if (expect.isPointer) {
                 std::string tmpPtr = fresh();
                 out << "  " << tmpPtr << " = inttoptr i64 " << cvt << " to " << llvmTypeName(expect.name) << "\n";
                 cvt = tmpPtr;
@@ -897,25 +790,20 @@ namespace zust
         bool isVariadic = fnInfo.isVariadic;
 
         std::string callRes;
-        if (retTy != "void")
-        {
+        if (retTy != "void") {
             callRes = fresh();
             out << "  " << callRes << " = ";
-        }
-        else
-        {
+        } else {
             out << "  ";
         }
 
         // Emit call
         out << "call " << retTy;
-        if (isVariadic && !argList.empty())
-        {
+        if (isVariadic && !argList.empty()) {
             out << " (" << argList[0].first << ", ...)";
         }
         out << " @" << funcName << "(";
-        for (size_t i = 0; i < argList.size(); ++i)
-        {
+        for (size_t i = 0; i < argList.size(); ++i) {
             if (i)
                 out << ", ";
             out << argList[i].first << " " << argList[i].second;
@@ -926,12 +814,12 @@ namespace zust
 
         return callRes;
     }
-    void CodeGenLLVM::generateFunctionDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out, bool force)
-    {
+
+    void CodeGenLLVM::generateFunctionDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out, bool force) {
         const std::string &name = node->value;
         bool isMain = (name == "main");
         if (isMain && !force)
-            return; // skip main if not forced
+            return;  // skip main if not forced
         node->print(std::cout, 0);
         auto fnInfo = node->scope->lookupFunction(name);
         auto bodyNode = node->getFunctionBody();
@@ -942,8 +830,7 @@ namespace zust
         std::string retTy = llvmTypeName(rti.name);
         out << "define " << retTy << " @" << fnInfo.label << "(";
         // Parameters
-        for (size_t i = 0; i < fnInfo.paramTypes.size(); ++i)
-        {
+        for (size_t i = 0; i < fnInfo.paramTypes.size(); ++i) {
             const auto &p = fnInfo.paramTypes[i];
             TypeInfo pti = node->scope->lookupType(p.type);
             out << llvmTypeName(pti.name) << " %" << bodyNode->scope->getMapping(p.name);
@@ -958,63 +845,49 @@ namespace zust
         // TODO: We were here last night, now we take one day break.
 
         // Map arguments into LLVM locals
-        for (const auto &p : fnInfo.paramTypes)
-        {
+        for (const auto &p : fnInfo.paramTypes) {
             TypeInfo pti = node->scope->lookupType(p.type);
             std::string allocaReg = fresh() + "___arg___";
-            out << "  " << allocaReg << " = alloca "
-                << llvmTypeName(pti.name) << "\n";
-            out << "  store " << llvmTypeName(pti.name)
-                << " %" << bodyNode->scope->getMapping(p.name)
-                << ", " << llvmTypeName(pti.name)
-                << "* " << allocaReg << "\n";
-            funcScope->setMapping(p.name, allocaReg.substr(1)); // or pass without '%' if your getMapping adds it
+            out << "  " << allocaReg << " = alloca " << llvmTypeName(pti.name) << "\n";
+            out << "  store " << llvmTypeName(pti.name) << " %" << bodyNode->scope->getMapping(p.name) << ", "
+                << llvmTypeName(pti.name) << "* " << allocaReg << "\n";
+            funcScope->setMapping(p.name, allocaReg.substr(1));  // or pass without '%' if your getMapping adds it
         }
 
         // Function body
         std::ostringstream body;
         std::vector<std::unique_ptr<ASTNode>> nested;
-        for (auto &stmt : bodyNode->children)
-        {
-            if (stmt->type == NodeType::Function)
-            {
+        for (auto &stmt : bodyNode->children) {
+            if (stmt->type == NodeType::Function) {
                 nested.push_back(std::move(stmt));
-            }
-            else
-            {
+            } else {
                 generateStatement(std::move(stmt), body);
             }
         }
         out << body.str();
 
         // Return or void
-        if (retTy != "void")
-        {
-        }
-        else
-        {
+        if (retTy != "void") {
+        } else {
             out << "  ret void\n";
         }
         out << "}\n\n";
 
         // Nested functions
-        for (auto &nf : nested)
-        {
+        for (auto &nf : nested) {
             generateFunctionDeclaration(std::move(nf), out, false);
         }
     }
-    void CodeGenLLVM::generateExternFunctionDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out)
-    {
+
+    void CodeGenLLVM::generateExternFunctionDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out) {
         auto fnInfo = node->scope->lookupFunction(node->value);
         // Build a `declare` line:
         //   declare <retTy> @<label>(<argTys>)
         TypeInfo rti = node->scope->lookupType(fnInfo.returnType);
         std::string retTy = llvmTypeName(rti.name);
 
-        outGlobalStream << "declare " << retTy
-                        << " @" << node->value << "(";
-        for (size_t i = 0; i < fnInfo.paramTypes.size(); ++i)
-        {
+        outGlobalStream << "declare " << retTy << " @" << node->value << "(";
+        for (size_t i = 0; i < fnInfo.paramTypes.size(); ++i) {
             const auto &p = fnInfo.paramTypes[i];
             TypeInfo pti = node->scope->lookupType(p.type);
             outGlobalStream << llvmTypeName(pti.name);
@@ -1023,11 +896,10 @@ namespace zust
         }
         outGlobalStream << ")\n";
     }
-    void CodeGenLLVM::generateReturnstatement(std::unique_ptr<ASTNode> node, std::ostringstream &out)
-    {
+
+    void CodeGenLLVM::generateReturnstatement(std::unique_ptr<ASTNode> node, std::ostringstream &out) {
         // If there's no child, it's a void return
-        if (node->children.empty())
-        {
+        if (node->children.empty()) {
             out << "  ret void\n";
             return;
         }
@@ -1045,4 +917,4 @@ namespace zust
         std::string llvmTy = llvmTypeName(expected.name);
         out << "  ret " << llvmTy << " " << casted << "\n";
     }
-} // namespace zust
+}  // namespace zust

@@ -1,0 +1,25 @@
+// Test calling multiple functions in sequence
+extern fn printf(fmt: string, ...) -> int32_t;
+
+fn get_five() -> int64_t {
+    return 5;
+}
+
+fn double_it(x: int64_t) -> int64_t {
+    return x * 2;
+}
+
+fn add_seven(x: int64_t) -> int64_t {
+    return x + 7;
+}
+
+fn main() {
+    let five: int64_t = get_five();
+    printf("%d\n", five);              // 5
+    
+    let doubled: int64_t = double_it(five);
+    printf("%d\n", doubled);           // 10
+    
+    let result: int64_t = add_seven(doubled);
+    printf("%d\n", result);            // 17
+}

@@ -1,0 +1,39 @@
+// Test function composition and chaining
+extern fn printf(fmt: string, ...) -> int32_t;
+
+fn double_value(x: int64_t) -> int64_t {
+    return x * 2;
+}
+
+fn add_ten(x: int64_t) -> int64_t {
+    return x + 10;
+}
+
+fn cube(x: int64_t) -> int64_t {
+    return x * x * x;
+}
+
+fn absolute(x: int64_t) -> int64_t {
+    if (x < 0) {
+        return x * -1;
+    }
+    return x;
+}
+
+fn main() {
+    let result1: int64_t = double_value(5);
+    printf("%d\n", result1);  // 10
+    
+    let result2: int64_t = add_ten(result1);
+    printf("%d\n", result2);  // 20
+    
+    let result3: int64_t = cube(3);
+    printf("%d\n", result3);  // 27
+    
+    let result4: int64_t = absolute(-15);
+    printf("%d\n", result4);  // 15
+    
+    // Chained calls
+    let chained: int64_t = add_ten(double_value(5));
+    printf("%d\n", chained);  // 20
+}

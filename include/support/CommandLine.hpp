@@ -2,25 +2,16 @@
 #include <string>
 #include <vector>
 
-namespace zust
-{
+namespace zust {
 
-    enum class CodegenOutputFormat
-    {
-        Default,
-        X86_64_MSWIN,
-        X86_64_LINUX,
-        LLVM_IR
-    };
+    enum class CodegenOutputFormat { Default, X86_64_MSWIN, X86_64_LINUX, LLVM_IR };
 
-    struct CliError
-    {
+    struct CliError {
         bool isError = false;
         std::string message;
     };
 
-    class CommandLine
-    {
+    class CommandLine {
     public:
         CommandLine(int argc, char *argv[]);
 
@@ -54,4 +45,4 @@ namespace zust
         CodegenOutputFormat format = CodegenOutputFormat::Default;
     };
 
-} // namespace zust
+}  // namespace zust

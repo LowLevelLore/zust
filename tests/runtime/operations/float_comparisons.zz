@@ -1,0 +1,20 @@
+// Regression: floating-point compares must use the unsigned setcc forms after
+// ucomis{s,d}, which clears OF/SF. With the signed forms '<' is unsatisfiable
+// and '>' degrades into a bare "operands differ" test.
+extern fn printf(fmt: string, ...) -> int32_t;
+
+fn main() {
+    let lo: double = 2.0;
+    let hi: double = 5.0;
+    let eq: double = 2.0;
+
+    //                        <  >  <= >= == !=
+    printf("%d%d%d%d%d%d\n", lo < hi, lo > hi, lo <= hi, lo >= hi, lo == hi, lo != hi);
+    printf("%d%d%d%d%d%d\n", lo < eq, lo > eq, lo <= eq, lo >= eq, lo == eq, lo != eq);
+    printf("%d%d%d%d%d%d\n", hi < lo, hi > lo, hi <= lo, hi >= lo, hi == lo, hi != lo);
+
+    // Mixed widths: the narrower operand is promoted to double.
+    let f: float = 3.5;
+    let d: double = 5.2;
+    printf("%d%d%d%d\n", f < d, f > d, d < f, d > f);
+}

@@ -1,0 +1,25 @@
+// Test different increment patterns in loops
+extern fn printf(fmt: string, ...) -> int32_t;
+
+fn main() {
+    // Increment by 1
+    let result1: int64_t = 0;
+    for(let i: int64_t = 0; i < 3; i = i + 1;) {
+        result1 = result1 + i;
+    }
+    printf("%d\n", result1);  // 0+1+2 = 3
+    
+    // Increment by 5
+    let result2: int64_t = 0;
+    for(let i: int64_t = 0; i < 20; i = i + 5;) {
+        result2 = result1 + 1;
+    }
+    printf("%d\n", result2);  // 3+1 = 4
+    
+    // Decrement
+    let result3: int64_t = 0;
+    for(let i: int64_t = 10; i > 0; i = i - 2;) {
+        result3 = result3 + 1;
+    }
+    printf("%d\n", result3);  // 5 iterations
+}

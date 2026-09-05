@@ -1,0 +1,69 @@
+// Test boolean logical operators: &&, ||, !
+extern fn printf(fmt: string, ...) -> int32_t;
+
+fn print_bool(x: boolean) -> none {
+    if(x == 1){
+        printf("true\n");
+    }else{
+        printf("false\n");
+    }
+}
+
+let a: int64_t = 10;
+let b: int64_t = 20;
+let c: int64_t = 15;
+
+fn main() {
+    // AND operator
+    let cmp_ab: boolean = a < b;
+    let cmp_bc: boolean = b > c;
+    let and1: boolean = cmp_ab && cmp_bc;
+    
+    let cmp_ab2: boolean = a > b;
+    let and2: boolean = cmp_ab2 && cmp_bc;
+    
+    let cmp_ca: boolean = c < a;
+    let and3: boolean = cmp_ab && cmp_ca;
+    
+    // OR operator
+    let cmp_ab3: boolean = a < b;
+    let cmp_ab4: boolean = a > b;
+    let or1: boolean = cmp_ab3 || cmp_ab4;
+    
+    let cmp_ab5: boolean = a > b;
+    let cmp_ab6: boolean = a > b;
+    let or2: boolean = cmp_ab5 || cmp_ab6;
+    
+    let cmp_ab7: boolean = a > b;
+    let cmp_ca2: boolean = c > a;
+    let or3: boolean = cmp_ab7 || cmp_ca2;
+    
+    // NOT operator
+    let cmp_ab8: boolean = a < b;
+    let not1: boolean = !cmp_ab8;
+    
+    let cmp_ab9: boolean = a > b;
+    let not2: boolean = !cmp_ab9;
+    
+    // Complex combinations
+    let cmp_ab10: boolean = a < b;
+    let cmp_bc2: boolean = b > c;
+    let cmp_ab11: boolean = a > b;
+    let complex1: boolean = cmp_ab10 && cmp_bc2 || cmp_ab11;
+    
+    let cmp_ab12: boolean = a > b;
+    let cmp_ca3: boolean = c > a;
+    let cmp_ab13: boolean = a < b;
+    let complex2: boolean = cmp_ab12 || cmp_ca3 && cmp_ab13;
+    
+    print_bool(and1);
+    print_bool(and2);
+    print_bool(and3);
+    print_bool(or1);
+    print_bool(or2);
+    print_bool(or3);
+    print_bool(not1);
+    print_bool(not2);
+    print_bool(complex1);
+    print_bool(complex2);
+}

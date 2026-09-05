@@ -1,0 +1,34 @@
+// Test comparison operators
+extern fn printf(fmt: string, ...) -> int32_t;
+
+fn print_bool(x: boolean) -> none {
+    if(x == 1){
+        printf("true\n");
+    }else{
+        printf("false\n");
+    }
+}
+
+fn main() {
+    let a: int64_t = 5;
+    let b: int64_t = 10;
+    let c: int64_t = 5;
+    
+    // Equality
+    print_bool(a == c);     // true
+    print_bool(a == b);     // false
+    print_bool(a != b);     // true
+    print_bool(a != c);     // false
+    
+    // Less/Greater
+    print_bool(a < b);      // true
+    print_bool(b > a);      // true
+    print_bool(a > b);      // false
+    print_bool(b < a);      // false
+    
+    // Less/Greater or equal
+    print_bool(a <= c);     // true
+    print_bool(a <= b);     // true
+    print_bool(b >= a);     // true
+    print_bool(c >= a);     // true
+}

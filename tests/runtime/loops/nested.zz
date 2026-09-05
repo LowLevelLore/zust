@@ -1,0 +1,37 @@
+// Test nested loops with break and continue
+extern fn printf(fmt: string, ...) -> int32_t;
+
+fn main() {
+    let sum: int32_t = 0;
+    
+    // Nested loop with continue and break
+    for(let i: int32_t = 0; i < 5; i = i + 1;) {
+        for(let j: int32_t = 0; j < 5; j = j + 1;) {
+            if (j == 2) {
+                continue;  // Skip j=2
+            }
+            if (j == 4) {
+                break;     // Exit inner loop at j=4
+            }
+            sum = sum + 1;
+        }
+    }
+    
+    printf("%d\n", sum);  // Should be 15: 5 iterations * 3 valid j values
+    
+    // Nested while loops
+    let a: int32_t = 0;
+    let b: int32_t = 0;
+    let total: int32_t = 0;
+    
+    while(a < 3) {
+        b = 0;
+        while(b < 3) {
+            total = total + 1;
+            b = b + 1;
+        }
+        a = a + 1;
+    }
+    
+    printf("%d\n", total);  // Should be 9: 3*3
+}

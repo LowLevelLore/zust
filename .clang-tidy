@@ -1,0 +1,32 @@
+---
+# Focused on real bugs and lifetime issues, not style — .clang-format owns style.
+Checks: >
+  bugprone-*,
+  clang-analyzer-*,
+  cppcoreguidelines-slicing,
+  cppcoreguidelines-pro-type-member-init,
+  misc-*,
+  modernize-use-nullptr,
+  modernize-use-override,
+  modernize-use-emplace,
+  modernize-loop-convert,
+  performance-*,
+  readability-braces-around-statements,
+  readability-misleading-indentation,
+  readability-redundant-*,
+  -bugprone-easily-swappable-parameters,
+  -misc-non-private-member-variables-in-classes,
+  -misc-no-recursion,
+  -readability-redundant-access-specifiers
+
+WarningsAsErrors: 'bugprone-use-after-move,bugprone-dangling-handle,clang-analyzer-cplusplus.NewDelete*'
+HeaderFilterRegex: '(include|src)/.*\.(hpp|h)$'
+FormatStyle: file
+
+CheckOptions:
+  - key:   readability-identifier-naming.ClassCase
+    value: CamelCase
+  - key:   readability-identifier-naming.FunctionCase
+    value: camelBack
+  - key:   readability-identifier-naming.PrivateMemberSuffix
+    value: _

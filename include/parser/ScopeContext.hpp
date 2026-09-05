@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <optional>
@@ -64,12 +65,9 @@ namespace zust {
 
     inline std::string TypeInfo::to_string() const {
         std::string ret =
-            "TypeInfo( .name: " + name + ", .bits: " + std::to_string(bits) +
-            ", .align: " + std::to_string(align) +
-            ", .isFloat: " + (isFloat ? "true" : "false") +
-            ", .isSigned: " + (isSigned ? "true" : "false") +
-            ", .isBoolean: " + (isBoolean ? "true" : "false") +
-            ", .isString: " + (isString ? "true" : "false") +
+            "TypeInfo( .name: " + name + ", .bits: " + std::to_string(bits) + ", .align: " + std::to_string(align) +
+            ", .isFloat: " + (isFloat ? "true" : "false") + ", .isSigned: " + (isSigned ? "true" : "false") +
+            ", .isBoolean: " + (isBoolean ? "true" : "false") + ", .isString: " + (isString ? "true" : "false") +
             ", .isPointer: " + (isPointer ? "true" : "false") +
             ", .isUserDefined: " + (isUserDefined ? "true" : "false") +
             ", .isFunction: " + (isFunction ? "true" : "false") + " )";
@@ -80,9 +78,9 @@ namespace zust {
 
     class ScopeContext : public std::enable_shared_from_this<ScopeContext> {
     public:
-        ScopeContext(std::string name,
-                     std::shared_ptr<ScopeContext> parent = nullptr)
+        ScopeContext(std::string name, std::shared_ptr<ScopeContext> parent = nullptr)
             : name_(std::move(name)), parent_(std::move(parent)) {}
+
         virtual ~ScopeContext() = default;
         virtual std::string kind() const = 0;
         bool defineVariable(const std::string &name, const VariableInfo &info);
@@ -91,15 +89,16 @@ namespace zust {
         VariableInfo lookupVariable(const std::string &name) const;
         FunctionInfo lookupFunction(const std::string &name) const;
         TypeInfo lookupType(const std::string &name) const;
-        std::optional<VariableInfo>
-        lookupVariableInCurrentContext(const std::string &name) const;
-        virtual std::int64_t allocateStack(const std::string &varName,
-                                           const TypeInfo &type);
+        std::optional<VariableInfo> lookupVariableInCurrentContext(const std::string &name) const;
+        virtual std::int64_t allocateStack(const std::string &varName, const TypeInfo &type);
         std::int64_t getVariableOffset(const std::string &name) const;
         bool isGlobalScope() const;
         bool isGlobalVariable(const std::string &name) const;
+
         std::shared_ptr<ScopeContext> parent() const { return parent_; }
+
         const std::string &name() const { return name_; }
+
         std::string getMapping(std::string name);
         void setMapping(const std::string &name, const std::string &llvmName);
         virtual void printScope(std::ostream &out, int indent = 0) const;
@@ -119,20 +118,19 @@ namespace zust {
 
     class FunctionScope : public ScopeContext {
     public:
-        FunctionScope(std::string name,
-                      std::shared_ptr<ScopeContext> parent = nullptr);
+        FunctionScope(std::string name, std::shared_ptr<ScopeContext> parent = nullptr);
         ~FunctionScope() override;
         void printScope(std::ostream &out, int indent = 0) const override;
+
         inline std::string kind() const override { return "Function"; }
-        std::int64_t allocateStack(const std::string &varName,
-                                   const TypeInfo &type) override;
+
+        std::int64_t allocateStack(const std::string &varName, const TypeInfo &type) override;
         std::int64_t getStackOffset() const;
-        void setCanary(std::uint64_t canary_) {
-            this->canary = canary_;
-        }
-        std::uint64_t getCanary() {
-            return this->canary;
-        }
+
+        void setCanary(std::uint64_t canary_) { this->canary = canary_; }
+
+        std::uint64_t getCanary() { return this->canary; }
+
         std::string allocateSpillSlot(std::int64_t size, CodegenOutputFormat format);
         std::int64_t getSpillSize() const;
         void freeSpillSlot(const std::string &slot, std::int64_t size);
@@ -142,19 +140,19 @@ namespace zust {
         std::uint64_t canary;
         std::int64_t nextSpillOffset_ = 0;
         std::vector<std::pair<std::int64_t, std::int64_t>> freeSpillSlots_;
-        inline static std::int64_t alignSize(const TypeInfo &type) {
-            return std::max<std::uint32_t>(type.align, 8);
-        }
+
+        inline static std::int64_t alignSize(const TypeInfo &type) { return std::max<std::uint32_t>(type.align, 8); }
     };
+
     class BlockScope : public ScopeContext {
     public:
-        BlockScope(std::string name, std::shared_ptr<FunctionScope> funcScope,
-                   std::shared_ptr<ScopeContext> parent);
+        BlockScope(std::string name, std::shared_ptr<FunctionScope> funcScope, std::shared_ptr<ScopeContext> parent);
         ~BlockScope() override;
         void printScope(std::ostream &out, int indent = 0) const override;
+
         inline std::string kind() const override { return "Block"; }
-        std::int64_t allocateStack(const std::string &varName,
-                                   const TypeInfo &type) override;
+
+        std::int64_t allocateStack(const std::string &varName, const TypeInfo &type) override;
 
     private:
         std::shared_ptr<FunctionScope> funcScope_;

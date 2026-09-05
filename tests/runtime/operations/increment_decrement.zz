@@ -1,0 +1,18 @@
+// Test post-increment and post-decrement operators
+extern fn printf(fmt: string, ...) -> int32_t;
+
+fn main() {
+    let x: int64_t = 10;
+    printf("%d\n", x);
+    x++;
+    printf("%d\n", x);
+    x++;
+    printf("%d\n", x);
+    
+    let y: int64_t = 20;
+    printf("%d\n", y);
+    y--;
+    printf("%d\n", y);
+    y--;
+    printf("%d\n", y);
+}

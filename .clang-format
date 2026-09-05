@@ -1,0 +1,47 @@
+---
+Language: Cpp
+BasedOnStyle: Google
+Standard: c++20
+
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 120
+
+AccessModifierOffset: -4
+IndentCaseLabels: true
+NamespaceIndentation: All
+FixNamespaceComments: true
+CompactNamespaces: false
+
+BreakBeforeBraces: Attach
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Empty
+
+PointerAlignment: Right
+ReferenceAlignment: Right
+DerivePointerAlignment: false
+
+AlignAfterOpenBracket: Align
+AlignConsecutiveAssignments: false
+AlignTrailingComments: true
+BinPackArguments: true
+BinPackParameters: true
+Cpp11BracedListStyle: true
+
+SortIncludes: CaseSensitive
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex:  '^<[a-z_]+>$'
+    Priority: 1
+  - Regex:  '^<.*\.h(pp)?>$'
+    Priority: 2
+  - Regex:  '^".*"$'
+    Priority: 3
+
+SeparateDefinitionBlocks: Always
+KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 1

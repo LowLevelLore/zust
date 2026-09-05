@@ -4,12 +4,9 @@
 
 #include "../common/Errors.hpp"
 
-namespace zust
-{
-    struct Token
-    {
-        enum class Kind
-        {
+namespace zust {
+    struct Token {
+        enum class Kind {
             Let,
             Identifier,
             Colon,
@@ -45,90 +42,85 @@ namespace zust
         size_t line;
         size_t column;
 
-        std::string to_string() const
-        {
-            return "Token { kind = " + kindToString(kind) +
-                   ", text = \"" + text +
-                   "\", line = " + std::to_string(line) +
-                   ", column = " + std::to_string(column) + " }";
+        std::string to_string() const {
+            return "Token { kind = " + kindToString(kind) + ", text = \"" + text +
+                   "\", line = " + std::to_string(line) + ", column = " + std::to_string(column) + " }";
         }
 
     private:
-        static std::string kindToString(Kind k)
-        {
-            switch (k)
-            {
-            case Kind::Equal:
-                return "Equal";
-            case Kind::Colon:
-                return "Colon";
-            case Kind::Let:
-                return "Let";
-            case Kind::Identifier:
-                return "Identifier";
-            case Kind::IntegerLiteral:
-                return "IntegerLiteral";
-            case Kind::FloatLiteral:
-                return "FloatLiteral";
-            case Kind::StringLiteral:
-                return "StringLiteral";
-            case Kind::Symbol:
-                return "Symbol";
-            case Kind::EndOfFile:
-                return "EndOfFile";
-            case Kind::SemiColon:
-                return "SemiColon";
-            case Kind::Unknown:
-                return "Unknown";
-            case Kind::BoolLiteral:
-                return "Boolean";
-            case Kind::If:
-                return "If";
-            case Kind::ElseIf:
-                return "ElseIf";
-            case Kind::Else:
-                return "Else";
-            case Kind::LeftBrace:
-                return "LeftBrace";
-            case Kind::RightBrace:
-                return "RightBrace";
-            case Kind::RightParen:
-                return "RightParen";
-            case Kind::LeftParen:
-                return "LeftParen";
-            case Kind::Arrow:
-                return "Arrow";
-            case Kind::Comma:
-                return "Comma";
-            case Kind::Function:
-                return "Function";
-            case Kind::Return:
-                return "Return";
-            case Kind::Dot:
-                return "Dot";
-            case Kind::Ellipsis:
-                return "Ellipsis";
-            case Kind::For:
-                return "For";
-            case Kind::While:
-                return "While";
-            case Kind::Break:
-                return "Break";
-            case Kind::Continue:
-                return "Continue";
-            default:
-                return "Invalid";
+        static std::string kindToString(Kind k) {
+            switch (k) {
+                case Kind::Equal:
+                    return "Equal";
+                case Kind::Colon:
+                    return "Colon";
+                case Kind::Let:
+                    return "Let";
+                case Kind::Identifier:
+                    return "Identifier";
+                case Kind::IntegerLiteral:
+                    return "IntegerLiteral";
+                case Kind::FloatLiteral:
+                    return "FloatLiteral";
+                case Kind::StringLiteral:
+                    return "StringLiteral";
+                case Kind::Symbol:
+                    return "Symbol";
+                case Kind::EndOfFile:
+                    return "EndOfFile";
+                case Kind::SemiColon:
+                    return "SemiColon";
+                case Kind::Unknown:
+                    return "Unknown";
+                case Kind::BoolLiteral:
+                    return "Boolean";
+                case Kind::If:
+                    return "If";
+                case Kind::ElseIf:
+                    return "ElseIf";
+                case Kind::Else:
+                    return "Else";
+                case Kind::LeftBrace:
+                    return "LeftBrace";
+                case Kind::RightBrace:
+                    return "RightBrace";
+                case Kind::RightParen:
+                    return "RightParen";
+                case Kind::LeftParen:
+                    return "LeftParen";
+                case Kind::Arrow:
+                    return "Arrow";
+                case Kind::Comma:
+                    return "Comma";
+                case Kind::Function:
+                    return "Function";
+                case Kind::Return:
+                    return "Return";
+                case Kind::Dot:
+                    return "Dot";
+                case Kind::Ellipsis:
+                    return "Ellipsis";
+                case Kind::For:
+                    return "For";
+                case Kind::While:
+                    return "While";
+                case Kind::Break:
+                    return "Break";
+                case Kind::Continue:
+                    return "Continue";
+                default:
+                    return "Invalid";
             }
         }
     };
 
-    inline std::ostream &operator<<(std::ostream &os, const Token &token)
-    {
+    inline std::ostream &operator<<(std::ostream &os, const Token &token) {
         return os << token.to_string();
     }
+
     using Error = zust::Error;
-    class Lexer
-    {
+
+    class Lexer {
     public:
         explicit Lexer(const std::string &source);
 
@@ -151,4 +143,4 @@ namespace zust
         Token scanSymbol();
     };
 
-} // namespace zust
+}  // namespace zust

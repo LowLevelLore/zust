@@ -1,0 +1,30 @@
+// Test type boundaries and edge cases
+extern fn printf(fmt: string, ...) -> int32_t;
+
+fn main() {
+    // Test boundary values
+    let max_u8: uint8_t = 255;
+    let min_u8: uint8_t = 0;
+    
+    printf("%d\n", max_u8);
+    printf("%d\n", min_u8);
+    
+    // Test zero handling
+    let zero: int64_t = 0;
+    let result: int64_t = zero + 100;
+    printf("%d\n", result);
+    
+    // Test negative numbers
+    let neg: int64_t = -42;
+    printf("%d\n", neg);
+    
+    let pos: int64_t = 42;
+    printf("%d\n", pos);
+    
+    // Test mixed signs
+    let sum: int64_t = pos + neg;  // 42 + (-42) = 0
+    printf("%d\n", sum);
+    
+    let diff: int64_t = neg - pos;  // -42 - 42 = -84
+    printf("%d\n", diff);
+}

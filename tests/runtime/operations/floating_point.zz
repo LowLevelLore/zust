@@ -1,0 +1,24 @@
+// Test floating point arithmetic precision
+extern fn printf(fmt: string, ...) -> int32_t;
+
+fn main() {
+    let a: float = 0.1;
+    let b: float = 0.2;
+    let c: float = 0.3;
+    
+    printf("%f\n", a);
+    printf("%f\n", b);
+    printf("%f\n", c);
+    
+    let sum: float = a + b;
+    printf("%f\n", sum);
+    
+    let product: float = a * b;
+    printf("%f\n", product);
+    
+    // Double precision
+    let d1: double = 1.23456789;
+    let d2: double = 9.87654321;
+    printf("%f\n", d1);
+    printf("%f\n", d2);
+}

@@ -12,22 +12,29 @@
 namespace zust {
 
     // Tips for noobs: CALLER saved are saved by the caller, CALLEE saved are restored by the function/routine
-    // So CALLER Union CALLEE should be equal to the set of all the registers, so the current state will never be corrupted.
+    // So CALLER Union CALLEE should be equal to the set of all the registers, so the current state will never be
+    // corrupted.
 
     // Time wasted here: 3days and still counting.. And I am still unemployed.
 
     // GPRs on LINUX (SysV ABI)
-    static const std::vector<std::string> SCRATCH_GPR_LINUX = {"rax", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11"};
+    static const std::vector<std::string> SCRATCH_GPR_LINUX = {"rax", "rcx", "rdx", "rsi", "rdi",
+                                                               "r8",  "r9",  "r10", "r11"};
     static const std::vector<std::string> ARG_GPR_LINUX = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
-    static const std::vector<std::string> CALLER_GPR_LINUX = {"rax", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11"};
+    static const std::vector<std::string> CALLER_GPR_LINUX = {"rax", "rcx", "rdx", "rsi", "rdi",
+                                                              "r8",  "r9",  "r10", "r11"};
     static const std::vector<std::string> CALLEE_GPR_LINUX = {"rbx", "r12", "r13", "r14", "r15"};
     // XMMs on LINUX (SysV ABI)
-    static const std::vector<std::string> SCRATCH_XMM_LINUX = {"xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7",
-                                                               "xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15"};
-    static const std::vector<std::string> ARG_XMM_LINUX = {"xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7"};
-    static const std::vector<std::string> CALLER_XMM_LINUX = {"xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7",
-                                                              "xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15"};  // Will be used freely by function
-    static const std::vector<std::string> CALLEE_XMM_LINUX = {/* None */};                                                            // Why would you do this linus ?                                                                                                                         // The function is responsible to restore the state
+    static const std::vector<std::string> SCRATCH_XMM_LINUX = {"xmm0",  "xmm1",  "xmm2",  "xmm3", "xmm4",  "xmm5",
+                                                               "xmm6",  "xmm7",  "xmm8",  "xmm9", "xmm10", "xmm11",
+                                                               "xmm12", "xmm13", "xmm14", "xmm15"};
+    static const std::vector<std::string> ARG_XMM_LINUX = {"xmm0", "xmm1", "xmm2", "xmm3",
+                                                           "xmm4", "xmm5", "xmm6", "xmm7"};
+    static const std::vector<std::string> CALLER_XMM_LINUX = {
+        "xmm0", "xmm1", "xmm2",  "xmm3",  "xmm4",  "xmm5",  "xmm6",  "xmm7",
+        "xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15"};  // Will be used freely by function
+    static const std::vector<std::string> CALLEE_XMM_LINUX = {
+        /* None */};  // Why would you do this linus ? // The function is responsible to restore the state
     // GPRs on WINDOWS (MSVC)
     static const std::vector<std::string> SCRATCH_GPR_MSVC = {"rax", "rcx", "rdx", "r8", "r9", "r10", "r11"};
     static const std::vector<std::string> ARG_GPR_MSVC = {"rcx", "rdx", "r8", "r9"};
@@ -37,7 +44,8 @@ namespace zust {
     static const std::vector<std::string> SCRATCH_XMM_MSVC = {"xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5"};
     static const std::vector<std::string> ARG_XMM_MSVC = {"xmm0", "xmm1", "xmm2", "xmm3"};
     static const std::vector<std::string> CALLER_XMM_MSVC = {"xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5"};
-    static const std::vector<std::string> CALLEE_XMM_MSVC = {"xmm6", "xmm7", "xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15"};
+    static const std::vector<std::string> CALLEE_XMM_MSVC = {"xmm6",  "xmm7",  "xmm8",  "xmm9",  "xmm10",
+                                                             "xmm11", "xmm12", "xmm13", "xmm14", "xmm15"};
 
     class RegisterAllocator {
         struct SpillInfo {
@@ -84,10 +92,12 @@ namespace zust {
         void unSpill(const std::string &reg, zust::CodegenOutputFormat format, std::ostream &out);
         void touch(const std::string &reg);
         void touchXMM(const std::string &reg);
-        void emitSpillRestore(const std::string &reg, const std::string &slot, bool isXMM, zust::CodegenOutputFormat format, std::ostream &out);
+        void emitSpillRestore(const std::string &reg, const std::string &slot, bool isXMM,
+                              zust::CodegenOutputFormat format, std::ostream &out);
 
     private:
-        RegisterAllocator(std::vector<std::string> regs, std::vector<std::string> XMMregs, std::vector<std::string> argumentRegs, std::vector<std::string> argumentXMMRegs);
+        RegisterAllocator(std::vector<std::string> regs, std::vector<std::string> XMMregs,
+                          std::vector<std::string> argumentRegs, std::vector<std::string> argumentXMMRegs);
         std::vector<std::string> available;
         std::unordered_set<std::string> inUse;
 
@@ -104,4 +114,4 @@ namespace zust {
         const std::vector<std::string> availableArgumentRegs;
         const std::vector<std::string> availableArgumentRegsXMM;
     };
-}
+}  // namespace zust
