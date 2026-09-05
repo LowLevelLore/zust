@@ -1,0 +1,167 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "zpiler: configure (Linux/Mac)",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "-S", ".",
+                "-B", "build",
+                "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
+            ],
+            "group": "build",
+            "problemMatcher": [],
+            "linux": { "options": {} },
+            "osx": { "options": {} },
+            "windows": {
+                "command": "cmake",
+                "args": [
+                    "-S", ".",
+                    "-B", "build",
+                    "-G", "MinGW Makefiles",
+                    "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
+                ]
+            }
+        },
+        {
+            "label": "zpiler: build",
+            "type": "shell",
+            "command": "cmake",
+            "args": ["--build", "build", "-j"],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": ["$gcc"]
+        },
+        {
+            "label": "zpiler: tests (native target)",
+            "type": "shell",
+            "command": "python",
+            "args": ["-m", "pytest", "-q"],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "dependsOn": ["zpiler: build"],
+            "problemMatcher": []
+        },
+        {
+            "label": "zpiler: tests (windows target)",
+            "type": "shell",
+            "command": "python",
+            "args": ["-m", "pytest", "-q"],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": { "TARGET": "windows" }
+            },
+            "group": "test",
+            "dependsOn": ["zpiler: build"],
+            "problemMatcher": []
+        },
+        {
+            "label": "zpiler: tests (linux target)",
+            "type": "shell",
+            "command": "python",
+            "args": ["-m", "pytest", "-q"],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": { "TARGET": "linux" }
+            },
+            "group": "test",
+            "dependsOn": ["zpiler: build"],
+            "problemMatcher": []
+        },
+        {
+            "label": "zpiler: tests (llvm target)",
+            "type": "shell",
+            "command": "python",
+            "args": ["-m", "pytest", "-q"],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": { "TARGET": "llvm" }
+            },
+            "group": "test",
+            "dependsOn": ["zpiler: build"],
+            "problemMatcher": []
+        },
+        {
+            "label": "zpiler: tests (all targets)",
+            "type": "shell",
+            "command": "python",
+            "args": ["-m", "pytest", "-q"],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": { "TARGET": "linux,windows,llvm" }
+            },
+            "group": "test",
+            "dependsOn": ["zpiler: build"],
+            "problemMatcher": []
+        },
+        {
+            "label": "zpiler: test current file (-k filename)",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "-m", "pytest", "-q",
+                "-k", "${fileBasenameNoExtension}"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "dependsOn": ["zpiler: build"],
+            "problemMatcher": [],
+            "detail": "Runs any pytest case whose id contains the currently open file's basename (works with a .zz file open)."
+        },
+        {
+            "label": "zpiler: test by name (prompt)",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "-m", "pytest", "-q",
+                "-k", "${input:testFilter}"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": { "TARGET": "${input:testTarget}" }
+            },
+            "group": "test",
+            "dependsOn": ["zpiler: build"],
+            "problemMatcher": []
+        },
+        {
+            "label": "zpiler: bless goldens (current file)",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "-m", "pytest", "-q",
+                "--bless",
+                "-k", "${fileBasenameNoExtension}"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        }
+    ],
+    "inputs": [
+        {
+            "id": "testFilter",
+            "type": "promptString",
+            "description": "pytest -k filter (test name substring)",
+            "default": ""
+        },
+        {
+            "id": "testTarget",
+            "type": "pickString",
+            "description": "TARGET backend",
+            "options": ["linux", "windows", "llvm", "linux,windows,llvm"],
+            "default": "windows"
+        }
+    ]
+}

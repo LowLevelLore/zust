@@ -394,6 +394,7 @@ namespace zust {
             TypeInfo boolType = node->scope->lookupType("boolean");
             std::string r_bool = allocateOrSpill(false, node->scope, out);
             out << "    movzx " << r_bool << ", al\n";
+            noteType(r_bool, boolType);
             alloc.free(rr);
             alloc.free(rl);
             return r_bool;

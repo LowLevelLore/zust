@@ -1,0 +1,144 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "zpiler: debug current .zz (native)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/zpiler",
+            "args": [
+                "--format",
+                "${input:zpilerFormat}",
+                "-o",
+                "${workspaceFolder}/build/out.${input:asmExt}",
+                "${file}"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "windows": {
+                "program": "${workspaceFolder}/build/zpiler.exe",
+                "MIMode": "gdb",
+                "miDebuggerPath": "C:/Strawberry/c/bin/gdb.exe"
+            },
+            "linux": {
+                "program": "${workspaceFolder}/build/zpiler",
+                "MIMode": "gdb"
+            },
+            "osx": {
+                "program": "${workspaceFolder}/build/zpiler",
+                "MIMode": "lldb"
+            },
+            "preLaunchTask": "zpiler: build"
+        },
+        {
+            "name": "pytest: run current test file",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "-q",
+                "-k",
+                "${fileBasenameNoExtension}"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "preLaunchTask": "zpiler: build"
+        },
+        {
+            "name": "pytest: run all (native target)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": ["-q"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "preLaunchTask": "zpiler: build"
+        },
+        {
+            "name": "pytest: run all (windows target)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": ["-q"],
+            "env": { "TARGET": "windows" },
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "preLaunchTask": "zpiler: build"
+        },
+        {
+            "name": "pytest: run all (linux target)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": ["-q"],
+            "env": { "TARGET": "linux" },
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "preLaunchTask": "zpiler: build"
+        },
+        {
+            "name": "pytest: run all (llvm target)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": ["-q"],
+            "env": { "TARGET": "llvm" },
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "preLaunchTask": "zpiler: build"
+        },
+        {
+            "name": "pytest: run by name (prompt)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "-q",
+                "-k",
+                "${input:testFilter}"
+            ],
+            "env": { "TARGET": "${input:testTarget}" },
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "preLaunchTask": "zpiler: build"
+        }
+    ],
+    "inputs": [
+        {
+            "id": "zpilerFormat",
+            "type": "pickString",
+            "description": "Backend format for zpiler",
+            "options": ["x86_64-linux", "x86_64-mswin", "llvm-ir"],
+            "default": "x86_64-linux"
+        },
+        {
+            "id": "asmExt",
+            "type": "pickString",
+            "description": "Output extension",
+            "options": ["s", "asm", "ll"],
+            "default": "s"
+        },
+        {
+            "id": "testFilter",
+            "type": "promptString",
+            "description": "pytest -k filter (test name substring)",
+            "default": ""
+        },
+        {
+            "id": "testTarget",
+            "type": "pickString",
+            "description": "TARGET backend",
+            "options": ["linux", "windows", "llvm", "linux,windows,llvm"],
+            "default": "windows"
+        }
+    ]
+}

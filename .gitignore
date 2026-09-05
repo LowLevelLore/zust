@@ -35,7 +35,6 @@ __pycache__/
 htmlcov/
 
 # --- Editors / tooling ---
-.vscode/
 .idea/
 *.swp
 .cache/
