@@ -262,12 +262,10 @@ namespace zust {
             std::string qualifier = ptrQualifier(sz);
 
             if (isGlobal) {
-                out << "    " << instr << " " << r_xmm << ", " << qualifier << "[" << name << "]"
-                    << "\n";
+                out << "    " << instr << " " << r_xmm << ", " << qualifier << "[" << name << "]" << "\n";
             } else {
                 int64_t off = std::abs(scope.getVariableOffset(name));
-                out << "    " << instr << " " << r_xmm << ", " << qualifier << "[rbp - " << off << "]"
-                    << "\n";
+                out << "    " << instr << " " << r_xmm << ", " << qualifier << "[rbp - " << off << "]" << "\n";
             }
 
             noteType(r_xmm, ti);
@@ -278,14 +276,10 @@ namespace zust {
             std::string qualifier = ptrQualifier(sz);
 
             if (isGlobal) {
-                out << "    "
-                    << "mov " << adj << ", " << qualifier << "[" << name << "]"
-                    << "\n";
+                out << "    " << "mov " << adj << ", " << qualifier << "[" << name << "]" << "\n";
             } else {
                 int64_t off = std::abs(scope.getVariableOffset(name));
-                out << "    "
-                    << "mov " << adj << ", " << qualifier << "[rbp - " << off << "]"
-                    << "\n";
+                out << "    " << "mov " << adj << ", " << qualifier << "[rbp - " << off << "]" << "\n";
             }
 
             noteType(r, ti);
@@ -1273,8 +1267,8 @@ namespace zust {
                 paramInit << "    " << movInst << " QWORD PTR [rbp-" << slotOff << "], " << ARG_GPR_MS[gpIdx++] << "\n";
             } else if (isFlt && xmmIdx < ARG_XMM_MS.size()) {
                 // xmm reg → local slot
-                paramInit << "    " << "movdqu"
-                          << " XMMWORD PTR [rbp-" << slotOff << "], " << ARG_XMM_MS[xmmIdx++] << "\n";
+                paramInit << "    " << "movdqu" << " XMMWORD PTR [rbp-" << slotOff << "], " << ARG_XMM_MS[xmmIdx++]
+                          << "\n";
             } else {
                 // spilled on caller’s stack at [rbp+16 + stackArgOffset]
                 int64_t callerDisp = 16 + stackArgOffset;

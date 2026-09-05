@@ -1095,8 +1095,8 @@ namespace zust {
             } else {
                 // spilled argument on caller's stack
                 uint64_t callerDisp = 16 + stackArgOffset;
-                body << "    " << movInst << " " << callerDisp << "(%rbp)"
-                     << ", " << std::to_string(slotOff) << "( %rbp)\n";
+                body << "    " << movInst << " " << callerDisp << "(%rbp)" << ", " << std::to_string(slotOff)
+                     << "( %rbp)\n";
                 stackArgOffset += 8;
             }
         }
