@@ -181,7 +181,7 @@ Build in this order — each step is independently testable
       `TypeChecker::promoteType`, over `TypeId`. *Exit:* a generated 13×13 table
       test comparing the new function against the old one before the old one is
       deleted.
-- [ ] **2.3 [S] — the landmine item.** Sema over function bodies, with the
+- [x] **2.3 [S] — the landmine item.** Sema over function bodies, with the
       exemptions above. Land alone, on the legacy backends, before ZIR consumes
       anything. *Exit:* all 40 cases still compile unchanged.
 - [ ] **2.4 [S]** Definite-return analysis, **warning-only** in this rewrite (an

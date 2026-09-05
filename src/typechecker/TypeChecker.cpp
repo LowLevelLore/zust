@@ -76,7 +76,16 @@ namespace zust {
                 const std::vector<zust::ParamInfo> &functionParams = functionInfo.paramTypes;
                 const std::vector<std::unique_ptr<ASTNode>> &functionArguments = node->children[0]->children;
 
-                if (functionArguments.size() != functionParams.size()) {
+                // Variadic call tails are exempt from arity and per-argument
+                // type checking (docs/PRD-ZIR.md "the landmine"): a variadic
+                // function may be called with more arguments than it
+                // declares, and this checker has no way to know what type
+                // each trailing argument "should" be. Still enforce the
+                // minimum -- a variadic function can't be called with fewer
+                // arguments than its declared (non-variadic) parameters.
+                bool arityOk = functionInfo.isVariadic ? functionArguments.size() >= functionParams.size()
+                                                       : functionArguments.size() == functionParams.size();
+                if (!arityOk) {
                     logError(Error{ErrorType::Type, "Function '" + node->value + "' expects " +
                                                         std::to_string(functionParams.size()) + " arguments, got " +
                                                         std::to_string(functionArguments.size()) + "."});
@@ -84,7 +93,16 @@ namespace zust {
                     return "";
                 }
 
+                // Type-check only the declared (non-variadic) parameters;
+                // still walk every argument expression (via checkNode) so
+                // side effects of type-checking within variadic tail
+                // arguments (e.g. catching an undefined variable) still
+                // happen, just without comparing their type to anything.
                 for (size_t i = 0; i < functionArguments.size(); ++i) {
+                    if (i >= functionParams.size()) {
+                        checkNode(functionArguments[i].get());
+                        continue;
+                    }
                     std::string argType = checkNode(functionArguments[i].get());
                     std::string paramType = functionParams[i].type;
 
@@ -130,11 +148,31 @@ namespace zust {
                                                         node->value + "'."});
                     shouldCodegen_ = false;
                 }
+                // Wave 2.3 (docs/PRD-ZIR.md "the landmine"): this case used to
+                // stop here, so a function's body was never type-checked at
+                // all. Every statement/expression case in this switch already
+                // handles what a body needs correctly (confirmed by reading
+                // each one) -- the only change needed was this recursive
+                // call.
+                checkNode(node->getFunctionBody());
                 return "";
             }
 
             case NodeType::ReturnStatement: {
-                std::string expectedRet = scope->returnType;
+                // A `return` nested inside an if/for/while has `scope` set to
+                // that construct's own BlockScope, whose `returnType` member
+                // defaults to "none" (ScopeContext's base default) and is
+                // never itself populated -- only the FunctionScope's is, in
+                // makeFunctionDeclaration. Reading `scope->returnType`
+                // directly was therefore only ever correct for a
+                // return statement at a function's top level; walking up to
+                // the enclosing FunctionScope is what makes it correct at
+                // any nesting depth. This was unreachable before Wave 2.3
+                // (function bodies were never type-checked at all), so it's
+                // a real pre-existing scope bug this surfaced, not a new
+                // exemption -- fixed here rather than papered over.
+                auto funcScope = scope->findEnclosingFunctionScope();
+                std::string expectedRet = funcScope ? funcScope->returnType : scope->returnType;
                 std::string actualRet = "none";
                 if (!node->children.empty()) {
                     actualRet = checkNode(node->children[0].get());
@@ -254,6 +292,16 @@ namespace zust {
 
                     // same exact non‑numeric types → OK
                     if (lhs == rhs && !isNumeric(lhs))
+                        return "boolean";
+
+                    // boolean vs numeric → OK (docs/PRD-ZIR.md "the
+                    // landmine": `x == 1` where `x: boolean` is exactly the
+                    // pattern every print_bool()-style helper across the
+                    // test suite uses; the native backends already compare
+                    // it as a plain numeric value regardless of the
+                    // "boolean" label, so this checker treats it the same
+                    // way rather than rejecting programs that already work)
+                    if ((lhs == "boolean" && isNumeric(rhs)) || (rhs == "boolean" && isNumeric(lhs)))
                         return "boolean";
 
                     logError({ErrorType::Type, "Comparison '" + op +
