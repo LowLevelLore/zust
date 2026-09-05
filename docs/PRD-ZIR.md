@@ -161,10 +161,10 @@ Build in this order — each step is independently testable
       come from the layout, never hardcoded on the type — `docs/IR-DESIGN.md`
       calls out today's hardcoded `size_t = 64` as the mistake not to repeat).
       *Exit:* unit test — structurally identical types intern to equal `TypeId`.
-- [ ] **1.2 [S]** `Module`/`Function`/`BasicBlock`/`Instruction` arenas +
+- [x] **1.2 [S]** `Module`/`Function`/`BasicBlock`/`Instruction` arenas +
       `Builder`. `ValueId`/`BlockId`/`InstId`/`TypeId` are `uint32` indices; block
       arguments, not phi nodes. *Exit:* a hand-built module round-trips.
-- [ ] **1.3 [S]** `Printer` — textual form per `docs/IR-DESIGN.md`. *Exit:* the
+- [x] **1.3 [S]** `Printer` — textual form per `docs/IR-DESIGN.md`. *Exit:* the
       spec's `@factorial` example prints byte-for-byte.
 - [ ] **1.4 [S]** `.zir` `TextParser`. *Exit:* print→parse→print is a fixed point
       on every fixture in `tests/zir/roundtrip/`.
