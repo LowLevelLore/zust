@@ -8,8 +8,6 @@
 #include <unordered_map>
 #include <vector>
 
-#include "support/CommandLine.hpp"
-
 namespace zust {
     struct VariableInfo {
         std::string type;
@@ -131,9 +129,13 @@ namespace zust {
 
         std::uint64_t getCanary() { return this->canary; }
 
-        std::string allocateSpillSlot(std::int64_t size, CodegenOutputFormat format);
+        // Returns a raw, rbp-relative stack offset for a spill slot of the given
+        // size (always negative). This class knows nothing about assembly
+        // syntax; formatting the offset into a target-specific operand string
+        // ("-24(%rbp)" vs "[rbp - 24]") is the backend's job.
+        std::int64_t allocateSpillSlot(std::int64_t size);
         std::int64_t getSpillSize() const;
-        void freeSpillSlot(const std::string &slot, std::int64_t size);
+        void freeSpillSlot(std::int64_t offset, std::int64_t size);
 
     private:
         std::int64_t stackOffset_;

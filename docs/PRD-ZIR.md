@@ -134,7 +134,7 @@ goldens do NOT exercise but a naive rewrite would still change). Get these into
 
 ## Wave 0 — prerequisites (serial, no behavior change)
 
-- [ ] **0.1 [S]** Evict target knowledge from non-codegen layers (ROADMAP M2.5-1).
+- [x] **0.1 [S]** Evict target knowledge from non-codegen layers (ROADMAP M2.5-1).
       `FunctionScope::allocateSpillSlot` returns a plain offset; backends format
       it. `RegisterAllocator::emitSpillRestore`/`unSpill` stop emitting assembly
       text. *Exit:* `grep -rn "CodegenOutputFormat" src/parser

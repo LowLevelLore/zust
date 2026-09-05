@@ -1,6 +1,17 @@
 #include "all.hpp"
 
 namespace zust {
+    namespace {
+        // MASM spill-slot operand. Combines the spill-region offset with the
+        // function's local-variable region size (getStackOffset()) to get the
+        // true rbp-relative displacement, matching the layout that
+        // FunctionScope::getSpillSize()/getStackOffset() assume when computing
+        // total frame size.
+        std::string spillOperand(std::int64_t offset, std::int64_t stackOffset) {
+            return "[rbp - " + std::to_string(std::abs(stackOffset + offset)) + "]";
+        }
+    }  // namespace
+
     std::string CodeGenWindows::castValue(const std::string &val, const TypeInfo &fromType, const TypeInfo &toType,
                                           const std::shared_ptr<ScopeContext> currentScope, std::ostringstream &out) {
         restoreIfSpilled(val, currentScope, out);
@@ -100,13 +111,14 @@ namespace zust {
         if (victim.empty())
             throw std::runtime_error("No available registers and no victim found");
 
-        std::string spillSlot = funcScope->allocateSpillSlot(isXMM ? 16 : 8, CodegenOutputFormat::X86_64_MSWIN);
+        std::int64_t spillOffset = funcScope->allocateSpillSlot(isXMM ? 16 : 8);
+        std::string spillSlot = spillOperand(spillOffset, funcScope->getStackOffset());
 
         if (isXMM) {
-            alloc.markSpilledXMM(victim, spillSlot);
+            alloc.markSpilledXMM(victim, spillOffset);
             out << "    movdqu " << victim << ", XMMWORD PTR " << spillSlot << "    ; Spill XMM\n";
         } else {
-            alloc.markSpilled(victim, spillSlot);
+            alloc.markSpilled(victim, spillOffset);
             out << "    mov " << victim << ", QWORD PTR " << spillSlot << "    ; Spill GPR\n";
         }
 
@@ -118,18 +130,21 @@ namespace zust {
         if (!alloc.isSpilled(reg))
             return;
 
-        std::string slot = alloc.spillSlotFor(reg);
+        std::int64_t offset = alloc.spillSlotFor(reg);
+        auto result_scope = scope->findEnclosingFunctionScope();
+        std::shared_ptr<FunctionScope> funcScope =
+            result_scope ? std::static_pointer_cast<FunctionScope>(result_scope) : nullptr;
+        std::string slot = spillOperand(offset, funcScope ? funcScope->getStackOffset() : 0);
 
         if (reg.rfind("xm", 0) == 0) {
-            alloc.unSpillXMM(reg, CodegenOutputFormat::X86_64_MSWIN, out);
+            out << "    movdqu " << reg << ", XMMWORD PTR " << slot << "\n";
         } else {
-            alloc.unSpill(reg, CodegenOutputFormat::X86_64_MSWIN, out);
+            out << "    mov " << reg << ", QWORD PTR " << slot << "\n";
         }
+        alloc.clearSpilled(reg);
 
-        auto result_scope = scope->findEnclosingFunctionScope();
-        if (result_scope) {
-            auto funcScope = std::static_pointer_cast<FunctionScope>(result_scope);
-            funcScope->freeSpillSlot(slot, reg.rfind("xm", 0) == 0 ? 16 : 8);
+        if (funcScope) {
+            funcScope->freeSpillSlot(offset, reg.rfind("xm", 0) == 0 ? 16 : 8);
         }
     }
 
@@ -1076,8 +1091,9 @@ namespace zust {
         for (auto &reg : CALLER_XMM_MSVC) {
             if (alloc.isInUseXMM(reg)) {
                 auto funcScope = std::static_pointer_cast<FunctionScope>(node->scope->findEnclosingFunctionScope());
-                std::string slot = funcScope->allocateSpillSlot(16, CodegenOutputFormat::X86_64_MSWIN);
-                alloc.markSpilledXMM(reg, slot);
+                std::int64_t spillOffset = funcScope->allocateSpillSlot(16);
+                std::string slot = spillOperand(spillOffset, funcScope->getStackOffset());
+                alloc.markSpilledXMM(reg, spillOffset);
                 out << "    movdqu  " << reg << ", XMMWORD PTR " << slot << "    ; spill caller XMM\n";
                 savedXMM.emplace_back(reg, slot);
             }
@@ -1132,8 +1148,9 @@ namespace zust {
                 std::string dst = ARG_GPR_MSVC[gpCount];
                 if (alloc.isInUseArgument(dst)) {
                     auto funcScope = std::static_pointer_cast<FunctionScope>(node->scope->findEnclosingFunctionScope());
-                    std::string slot = funcScope->allocateSpillSlot(8, CodegenOutputFormat::X86_64_MSWIN);
-                    alloc.markSpilled(dst, slot);
+                    std::int64_t spillOffset = funcScope->allocateSpillSlot(8);
+                    std::string slot = spillOperand(spillOffset, funcScope->getStackOffset());
+                    alloc.markSpilled(dst, spillOffset);
                     spilledArgs.push_back(dst);
                     out << "    mov     QWORD PTR " << slot << ", " << dst << "    ; spill arg GPR\n";
                 } else {
@@ -1148,8 +1165,9 @@ namespace zust {
                 std::string dst = ARG_XMM_MSVC[xmmCount];
                 if (alloc.isInUseArgumentXMM(dst)) {
                     auto funcScope = std::static_pointer_cast<FunctionScope>(node->scope->findEnclosingFunctionScope());
-                    std::string slot = funcScope->allocateSpillSlot(16, CodegenOutputFormat::X86_64_MSWIN);
-                    alloc.markSpilledXMM(dst, slot);
+                    std::int64_t spillOffset = funcScope->allocateSpillSlot(16);
+                    std::string slot = spillOperand(spillOffset, funcScope->getStackOffset());
+                    alloc.markSpilledXMM(dst, spillOffset);
                     spilledArgs.push_back(dst);
                     out << "    movdqu  " << dst << ", XMMWORD PTR " << slot << "    ; spill arg XMM\n";
                 } else {

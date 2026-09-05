@@ -1,13 +1,12 @@
 #pragma once
 
+#include <cstdint>
 #include <list>
 #include <optional>
 #include <stdexcept>
 #include <string>
 #include <unordered_set>
 #include <vector>
-
-#include "support/CommandLine.hpp"
 
 namespace zust {
 
@@ -49,7 +48,7 @@ namespace zust {
 
     class RegisterAllocator {
         struct SpillInfo {
-            std::string spillSlot;  // e.g. -16(%rbp) or [rbp - 16]
+            std::int64_t offset;  // raw, rbp-relative; target-agnostic
             bool isXMM;
         };
 
@@ -84,16 +83,17 @@ namespace zust {
 
         std::string pickVictimXMM();
         std::string pickVictim();
-        void markSpilledXMM(const std::string &reg, const std::string &spillSlot);
-        void markSpilled(const std::string &reg, const std::string &spillSlot);
+        void markSpilledXMM(const std::string &reg, std::int64_t offset);
+        void markSpilled(const std::string &reg, std::int64_t offset);
         bool isSpilled(const std::string &reg) const;
-        std::string spillSlotFor(const std::string &reg) const;
-        void unSpillXMM(const std::string &reg, zust::CodegenOutputFormat format, std::ostream &out);
-        void unSpill(const std::string &reg, zust::CodegenOutputFormat format, std::ostream &out);
+        std::int64_t spillSlotFor(const std::string &reg) const;
+        // Drops the bookkeeping entry for a spilled register. Emitting the
+        // actual restore instruction (and formatting the offset into a
+        // target-specific operand) is the backend's job — this class carries
+        // no assembly syntax.
+        void clearSpilled(const std::string &reg);
         void touch(const std::string &reg);
         void touchXMM(const std::string &reg);
-        void emitSpillRestore(const std::string &reg, const std::string &slot, bool isXMM,
-                              zust::CodegenOutputFormat format, std::ostream &out);
 
     private:
         RegisterAllocator(std::vector<std::string> regs, std::vector<std::string> XMMregs,

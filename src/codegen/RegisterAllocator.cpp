@@ -155,57 +155,30 @@ namespace zust {
         return lruRegs.front();
     }
 
-    void RegisterAllocator::markSpilledXMM(const std::string &reg, const std::string &spillSlot) {
-        spilledRegs[reg] = {spillSlot, true};
+    void RegisterAllocator::markSpilledXMM(const std::string &reg, std::int64_t offset) {
+        spilledRegs[reg] = {offset, true};
     }
 
-    void RegisterAllocator::markSpilled(const std::string &reg, const std::string &spillSlot) {
-        spilledRegs[reg] = {spillSlot, false};
+    void RegisterAllocator::markSpilled(const std::string &reg, std::int64_t offset) {
+        spilledRegs[reg] = {offset, false};
     }
 
     bool RegisterAllocator::isSpilled(const std::string &reg) const {
         return spilledRegs.find(reg) != spilledRegs.end();
     }
 
-    std::string RegisterAllocator::spillSlotFor(const std::string &reg) const {
+    std::int64_t RegisterAllocator::spillSlotFor(const std::string &reg) const {
         auto it = spilledRegs.find(reg);
         if (it == spilledRegs.end())
             throw std::runtime_error("Register not spilled: " + reg);
-        return it->second.spillSlot;
+        return it->second.offset;
     }
 
-    void RegisterAllocator::unSpillXMM(const std::string &reg, zust::CodegenOutputFormat format, std::ostream &out) {
+    void RegisterAllocator::clearSpilled(const std::string &reg) {
         auto it = spilledRegs.find(reg);
         if (it == spilledRegs.end())
-            throw std::runtime_error("XMM reg not spilled: " + reg);
-
-        emitSpillRestore(reg, it->second.spillSlot, true, format, out);
+            throw std::runtime_error("Register not spilled: " + reg);
         spilledRegs.erase(it);
-    }
-
-    void RegisterAllocator::unSpill(const std::string &reg, zust::CodegenOutputFormat format, std::ostream &out) {
-        auto it = spilledRegs.find(reg);
-        if (it == spilledRegs.end())
-            throw std::runtime_error("GPR reg not spilled: " + reg);
-
-        emitSpillRestore(reg, it->second.spillSlot, false, format, out);
-        spilledRegs.erase(it);
-    }
-
-    void RegisterAllocator::emitSpillRestore(const std::string &reg, const std::string &slot, bool isXMM,
-                                             zust::CodegenOutputFormat format, std::ostream &out) {
-        if (format == CodegenOutputFormat::X86_64_LINUX) {
-            if (isXMM)
-                out << "    movdqu " << slot << ", %" << reg << "\n";
-            else
-                out << "    mov " << slot << ", %" << reg << "\n";
-        } else if (format == CodegenOutputFormat::X86_64_MSWIN) {
-            if (isXMM) {
-                out << "    movdqu " << reg << ", XMMWORD PTR " << slot << "\n";
-            } else {
-                out << "    mov " << reg << ", QWORD PTR " << slot << "\n";
-            }
-        }
     }
 
     void RegisterAllocator::touch(const std::string &reg) {
