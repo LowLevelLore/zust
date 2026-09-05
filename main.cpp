@@ -47,6 +47,22 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
+    // Resolve and validate the target before doing any compilation work or
+    // touching the output file: an unknown --format should be rejected
+    // immediately, not after parsing/type-checking the input and potentially
+    // truncating/creating the output file.
+    std::string targetName = cli.getFormat();
+    if (targetName.empty() || targetName == "default") {
+        targetName = BackendRegistry::hostDefaultName();
+    }
+
+    std::unique_ptr<Backend> backend = registry.create(targetName);
+    if (!backend) {
+        logError(Error(ErrorType::Generic, "Unrecognized format: " + targetName));
+        std::cerr << "Run with --formats to see the available targets.\n";
+        return 1;
+    }
+
     const std::string inputFile = cli.getInputFile();
 
     if (!inputFile.ends_with(".zz")) {
@@ -113,18 +129,6 @@ int main(int argc, char *argv[]) {
             std::exit(1);
         }
         outstream = &ofs;  // now point at the file
-    }
-
-    std::string targetName = cli.getFormat();
-    if (targetName.empty() || targetName == "default") {
-        targetName = BackendRegistry::hostDefaultName();
-    }
-
-    std::unique_ptr<Backend> backend = registry.create(targetName);
-    if (!backend) {
-        logError(Error(ErrorType::Generic, "Unrecognized format: " + targetName));
-        std::cerr << "Run with --formats to see the available targets.\n";
-        return 1;
     }
 
     try {
