@@ -116,7 +116,7 @@ namespace zust {
         const std::string &name, std::unique_ptr<ASTNode> typeAnnotation, std::unique_ptr<ASTNode> initializer,
         const std::shared_ptr<ScopeContext> scope, Span span) {
         auto node = std::make_unique<ASTNode>(NodeType::VariableDeclaration, name, scope, span);
-        bool result = scope.get()->defineVariable(name, {typeAnnotation.get()->value});
+        bool result = scope.get()->defineVariable(name, VariableInfo{.type = typeAnnotation.get()->value, .symbolId = {}});
         if (result) {
             if (typeAnnotation)
                 node->addChild(std::move(typeAnnotation));
@@ -221,7 +221,8 @@ namespace zust {
                                                  .name = name,
                                                  .label = "",
                                                  .isExtern = true,
-                                                 .isVariadic = isVariadic});
+                                                 .isVariadic = isVariadic,
+                                                 .symbolId = {}});
         return node;
     }
 
@@ -237,7 +238,7 @@ namespace zust {
         node->children.push_back(std::move(returnType_));
         body->scope->returnType = returnType;
         for (ParamInfo pi : params) {
-            body->scope->defineVariable(pi.name, VariableInfo{.type = pi.type});
+            body->scope->defineVariable(pi.name, VariableInfo{.type = pi.type, .symbolId = {}});
         }
         node->children.push_back(std::move(body));
         scope->defineFunction(name, FunctionInfo{.paramTypes = params,
@@ -245,7 +246,8 @@ namespace zust {
                                                  .name = name,
                                                  .label = "",
                                                  .isExtern = false,
-                                                 .isVariadic = isVariadic});
+                                                 .isVariadic = isVariadic,
+                                                 .symbolId = {}});
         return node;
     }
 

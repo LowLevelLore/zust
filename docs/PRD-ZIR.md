@@ -173,7 +173,7 @@ Build in this order — each step is independently testable
 
 ## Wave 2 — Sema (parallel with Wave 1)
 
-- [ ] **2.1 [S]** Resolver: names → `SymbolId`. Parser stops calling
+- [x] **2.1 [S]** Resolver: names → `SymbolId`. Parser stops calling
       `ScopeContext::defineVariable → allocateStack` — no more frame slots at
       parse time. *Exit:* every reference has a `SymbolId`; legacy backends keep
       working via a temporary `SymbolId → offset` shim.

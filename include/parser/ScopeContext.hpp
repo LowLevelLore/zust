@@ -8,9 +8,15 @@
 #include <unordered_map>
 #include <vector>
 
+#include "parser/SymbolId.hpp"
+
 namespace zust {
     struct VariableInfo {
         std::string type;
+        // Assigned once, at definition, by ScopeContext::defineVariable.
+        // Stable identity for this declaration, independent of its (possibly
+        // shadowed, non-unique) name -- see SymbolId.hpp.
+        SymbolId symbolId;
     };
 
     struct TypeInfo {
@@ -47,6 +53,8 @@ namespace zust {
         std::string label;
         bool isExtern;
         bool isVariadic;
+        // Assigned once, at definition, by ScopeContext::defineFunction.
+        SymbolId symbolId;
         std::string to_string() const;
     };
 
@@ -88,7 +96,22 @@ namespace zust {
         FunctionInfo lookupFunction(const std::string &name) const;
         TypeInfo lookupType(const std::string &name) const;
         std::optional<VariableInfo> lookupVariableInCurrentContext(const std::string &name) const;
-        virtual std::int64_t allocateStack(const std::string &varName, const TypeInfo &type);
+        // Hands out (but does not record) a stack slot -- see the comment on
+        // FunctionScope::allocateStack for why recording is the caller's
+        // job. `const` because callers only ever need this as an
+        // implementation detail of the lazy allocation getVariableOffset
+        // performs on a `const ScopeContext&` (offsetTable_ is `mutable`).
+        virtual std::int64_t allocateStack(const std::string &varName, const TypeInfo &type) const;
+        // Returns this variable's stack offset, computing and caching it on
+        // first request (frame slots are no longer assigned at parse time --
+        // ScopeContext::defineVariable only assigns a SymbolId now). Every
+        // caller's observable behavior is unchanged: same signature, same
+        // eventual value, just computed lazily instead of eagerly. This is
+        // safe because every codegen backend that reads a function's total
+        // frame size (FunctionScope::getStackOffset) does so only after
+        // generating the whole body into a buffer first -- by then every
+        // local's offset has already been requested at least once, the same
+        // pattern spill-slot allocation (always lazy) already relied on.
         std::int64_t getVariableOffset(const std::string &name) const;
         bool isGlobalScope() const;
         bool isGlobalVariable(const std::string &name) const;
@@ -110,7 +133,11 @@ namespace zust {
         std::unordered_map<std::string, VariableInfo> vars_;
         std::unordered_map<std::string, FunctionInfo> funcs_;
         std::unordered_map<std::string, TypeInfo> types_;
-        std::unordered_map<std::string, std::int64_t> offsetTable_;
+        // Keyed by SymbolId, not name: frame layout is a property of a
+        // declaration's identity, and computed lazily (see
+        // getVariableOffset), so this is `mutable` -- a `const` lookup may
+        // still need to populate it on first access.
+        mutable std::unordered_map<SymbolId, std::int64_t> offsetTable_;
         std::unordered_map<std::string, std::string> variable_name_mappings;
     };
 
@@ -122,7 +149,7 @@ namespace zust {
 
         inline std::string kind() const override { return "Function"; }
 
-        std::int64_t allocateStack(const std::string &varName, const TypeInfo &type) override;
+        std::int64_t allocateStack(const std::string &varName, const TypeInfo &type) const override;
         std::int64_t getStackOffset() const;
 
         void setCanary(std::uint64_t canary_) { this->canary = canary_; }
@@ -138,7 +165,10 @@ namespace zust {
         void freeSpillSlot(std::int64_t offset, std::int64_t size);
 
     private:
-        std::int64_t stackOffset_;
+        // `mutable`: allocateStack is const (see ScopeContext::allocateStack)
+        // so that getVariableOffset's lazy allocation works on a `const
+        // ScopeContext&`; the actual bump-allocation still mutates this.
+        mutable std::int64_t stackOffset_;
         std::uint64_t canary;
         std::int64_t nextSpillOffset_ = 0;
         std::vector<std::pair<std::int64_t, std::int64_t>> freeSpillSlots_;
@@ -154,7 +184,7 @@ namespace zust {
 
         inline std::string kind() const override { return "Block"; }
 
-        std::int64_t allocateStack(const std::string &varName, const TypeInfo &type) override;
+        std::int64_t allocateStack(const std::string &varName, const TypeInfo &type) const override;
 
     private:
         std::shared_ptr<FunctionScope> funcScope_;
@@ -167,7 +197,7 @@ namespace zust {
 
         std::string kind() const override { return "Namespace"; }
 
-        std::int64_t allocateStack(const std::string &, const TypeInfo &) override {
+        std::int64_t allocateStack(const std::string &, const TypeInfo &) const override {
             // namespaces don’t allocate stack space
             throw std::runtime_error("Namespaces cannot define stack variables");
         }

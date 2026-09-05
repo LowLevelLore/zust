@@ -15,6 +15,12 @@ namespace zust {
         // harmless here only because this was the one .cpp file that ever
         // called into it, but still a footgun worth removing).
         NameMapper GLOBAL_NAME_MAPPER;
+
+        // One counter for the whole compilation, same reasoning as the name
+        // mapper above: every SymbolId must be unique across the entire
+        // program, not just within one scope.
+        std::uint32_t nextSymbolIdValue = 0;
+        SymbolId allocateSymbolId() { return SymbolId{nextSymbolIdValue++}; }
     }  // namespace
 
     bool ScopeContext::defineVariable(const std::string &name, const VariableInfo &info) {
@@ -23,7 +29,9 @@ namespace zust {
                 return false;
             }
             TypeInfo ti = lookupType(info.type);
-            vars_[name] = info;
+            VariableInfo recorded = info;
+            recorded.symbolId = allocateSymbolId();
+            vars_[name] = recorded;
             variable_name_mappings[name] = GLOBAL_NAME_MAPPER.mapVariable(name, name_);
             return true;
         } else {
@@ -31,9 +39,12 @@ namespace zust {
                 return false;
             }
             TypeInfo ti = lookupType(info.type);
-            std::int64_t offset = allocateStack(name, ti);
-            vars_[name] = info;
-            offsetTable_[name] = offset;
+            // Frame slots are no longer assigned here -- allocateStack runs
+            // lazily, on first call to getVariableOffset (see that method).
+            // Only the symbol identity is assigned at definition time.
+            VariableInfo recorded = info;
+            recorded.symbolId = allocateSymbolId();
+            vars_[name] = recorded;
             variable_name_mappings[name] = GLOBAL_NAME_MAPPER.mapVariable(name, name_);
             return true;
         }
@@ -43,6 +54,7 @@ namespace zust {
         if (!info.isExtern) {
             info.label = GLOBAL_NAME_MAPPER.mapFunction(name, name_);
         }
+        info.symbolId = allocateSymbolId();
         funcs_[name] = info;
     }
 
@@ -95,14 +107,29 @@ namespace zust {
         return std::nullopt;
     }
 
-    std::int64_t ScopeContext::allocateStack(const std::string & /*varName*/, const TypeInfo & /*type*/) {
+    std::int64_t ScopeContext::allocateStack(const std::string & /*varName*/, const TypeInfo & /*type*/) const {
         throw std::runtime_error("allocateStack not implemented for scope: " + kind());
     }
 
     std::int64_t ScopeContext::getVariableOffset(const std::string &name) const {
-        auto it = offsetTable_.find(name);
-        if (it != offsetTable_.end()) {
-            return it->second;
+        // Is this variable actually defined in *this* scope? If so, this is
+        // the scope responsible for its offset -- allocate lazily on first
+        // request and cache it, exactly mirroring what defineVariable used
+        // to do eagerly (see the M0-1 shadowing-fix comment on
+        // FunctionScope::allocateStack: recording must happen in the
+        // defining scope, never in the enclosing function scope, or a
+        // shadowed outer variable's slot gets clobbered).
+        auto varIt = vars_.find(name);
+        if (varIt != vars_.end()) {
+            SymbolId id = varIt->second.symbolId;
+            auto offIt = offsetTable_.find(id);
+            if (offIt != offsetTable_.end()) {
+                return offIt->second;
+            }
+            TypeInfo ti = lookupType(varIt->second.type);
+            std::int64_t offset = allocateStack(name, ti);
+            offsetTable_[id] = offset;
+            return offset;
         }
         if (parent_) {
             if (this->kind() == "Function" && parent_->kind() == "Function" && parent_->parent_) {
@@ -197,7 +224,7 @@ namespace zust {
 
     FunctionScope::~FunctionScope() = default;
 
-    std::int64_t FunctionScope::allocateStack(const std::string & /*varName*/, const TypeInfo &type) {
+    std::int64_t FunctionScope::allocateStack(const std::string & /*varName*/, const TypeInfo &type) const {
         // Only hand out the slot; recording it belongs to the scope that is
         // *defining* the variable (see ScopeContext::defineVariable). A block
         // scope allocates out of its enclosing function's frame, so recording
@@ -244,7 +271,7 @@ namespace zust {
 
     BlockScope::~BlockScope() = default;
 
-    std::int64_t BlockScope::allocateStack(const std::string &varName, const TypeInfo &type) {
+    std::int64_t BlockScope::allocateStack(const std::string &varName, const TypeInfo &type) const {
         return funcScope_->allocateStack(varName, type);
     }
 
