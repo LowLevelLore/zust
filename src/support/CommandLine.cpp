@@ -54,6 +54,14 @@ namespace zust {
                 format = argv[i];
             } else if (std::strncmp(arg, "--emit=", 7) == 0) {
                 emit = arg + 7;
+            } else if (std::strcmp(arg, "-O0") == 0) {
+                optLevel = 0;
+            } else if (std::strcmp(arg, "-O1") == 0 || std::strcmp(arg, "-O") == 0) {
+                optLevel = 1;
+            } else if (std::strcmp(arg, "-O2") == 0) {
+                optLevel = 2;
+            } else if (std::strcmp(arg, "-O3") == 0) {
+                optLevel = 3;
             } else {
                 // treat as input file
                 if (!inputFile.empty()) {
@@ -111,6 +119,10 @@ namespace zust {
         return verbosity;
     }
 
+    int CommandLine::getOptLevel() const noexcept {
+        return optLevel;
+    }
+
     void CommandLine::printUsage(const std::string &programName) {
         std::cout << "\nUSAGE: " << programName << " [FLAGS] [OPTIONS] <path to file to compile>\n"
                   << "Flags:\n"
@@ -122,6 +134,8 @@ namespace zust {
                   << "    `-o`, `--output`  :: Set the output filepath.\n"
                   << "    `-f`, `--format`  :: Set the output format.\n"
                   << "    `--emit=zir`      :: Print the lowered ZIR module instead of running codegen.\n"
+                  << "    `-O0`/`-O1`/`-O2`/`-O3` :: Optimization level (default -O0). Ignored by backends "
+                     "with no pipeline of their own yet.\n"
                   << "Anything else is treated as the input file path.\n";
     }
 

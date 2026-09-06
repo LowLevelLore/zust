@@ -15,8 +15,10 @@
 #include "support/CommandLine.hpp"
 #include "support/File.hpp"
 #include "typechecker/TypeChecker.hpp"
+#include "zir/PassManager.hpp"
 #include "zir/Printer.hpp"
 #include "zir/Verifier.hpp"
+#include "zir/passes/Pipeline.hpp"
 #include "zirgen/ZirGen.hpp"
 
 using namespace zust;
@@ -162,12 +164,23 @@ int main(int argc, char *argv[]) {
         std::optional<zir::Module> mod = lowerAndVerify(*program, inputFile);
         if (!mod)
             return 1;
+        zir::AnalysisManager am;
+        zir::PassManager pm = zir::buildPipeline(cli.getOptLevel(), *mod);
+        pm.run(*mod, am);
+        std::vector<zir::VerifierFailure> failures = zir::Verifier::verify(*mod);
+        if (!failures.empty()) {
+            for (const zir::VerifierFailure &f : failures) {
+                std::cerr << "ZIR verification failed after optimization [" << zir::toString(f.check) << "] in @"
+                          << f.function << ": " << f.detail << "\n";
+            }
+            return 1;
+        }
         zir::Printer::print(*mod, *outstream);
         return 0;
     }
 
     try {
-        backend->emit(std::move(program), *outstream);
+        backend->emit(std::move(program), *outstream, cli.getOptLevel());
     } catch (std::exception const &exc) {
         std::cerr << "ERROR: " << exc.what() << "\n";
         return 1;

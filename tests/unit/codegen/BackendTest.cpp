@@ -13,7 +13,7 @@ namespace {
 
         const TargetInfo &info() const override { return info_; }
 
-        void emit(std::unique_ptr<ASTNode>, std::ostream &) override {}
+        void emit(std::unique_ptr<ASTNode>, std::ostream &, int) override {}
 
     private:
         TargetInfo info_;

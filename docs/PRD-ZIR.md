@@ -210,9 +210,9 @@ what stands in for the ZIR interpreter this rewrite deliberately skips.
       untouched.
 - [x] **4.2 [V]** Flip the default; delete `CodeGenLLVM.cpp`. *Exit:* green with
       no flag.
-- [ ] **4.3 [S]** `PassManager` + `AnalysisManager` + `DominatorTree`. `-O0` =
+- [x] **4.3 [S]** `PassManager` + `AnalysisManager` + `DominatorTree`. `-O0` =
       lower + verify only. *Exit:* `-O0` output identical to 4.2's.
-- [ ] **4.4 [S]** `-O1`: `mem2reg`, `constfold`, `simplifycfg`, `dce`. Each pass
+- [x] **4.4 [S]** `-O1`: `mem2reg`, `constfold`, `simplifycfg`, `dce`. Each pass
       lands with its own `tests/zir/<pass>/` unit tests; a pass returns `true`
       **only** when it changed something (the manager iterates to fixpoint — an
       always-`true` pass hangs the compiler). *Exit:* `TARGET=llvm` green at

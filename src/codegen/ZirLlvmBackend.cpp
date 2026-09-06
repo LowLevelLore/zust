@@ -5,6 +5,7 @@
 #include <iomanip>
 #include <sstream>
 #include <stdexcept>
+#include <unordered_map>
 #include <vector>
 
 namespace zust {
@@ -158,6 +159,13 @@ namespace zust {
         public:
             FunctionEmitter(const Module &m, const Function &fn, std::ostream &out) : m_(m), fn_(fn), out_(out) {
                 valueText_.assign(fn_.valueCount(), "");
+                for (std::size_t bi = 0; bi < fn_.blockCount(); ++bi) {
+                    for (InstId iid : fn_.block(BlockId(static_cast<BlockId::Value>(bi))).insts()) {
+                        const Instruction &inst = fn_.inst(iid);
+                        if (inst.result.isValid())
+                            defSite_[inst.result.value()] = iid;
+                    }
+                }
             }
 
             void emitDefinition() {
@@ -180,19 +188,9 @@ namespace zust {
                 for (std::size_t bi = 0; bi < fn_.blockCount(); ++bi) {
                     BlockId bid(static_cast<BlockId::Value>(bi));
                     const BasicBlock &block = fn_.block(bid);
-                    if (bid != fn_.entry() && !block.params().empty()) {
-                        // ZirGen (this project's only ZIR producer so far)
-                        // never puts params on anything but the entry block
-                        // -- every merge point instead reads/writes an
-                        // alloca. Supporting real phi-node lowering here
-                        // would be untested dead code until a producer
-                        // actually needs it, so this fails loudly instead of
-                        // guessing at a translation nothing exercises.
-                        throw std::runtime_error(
-                            "ZirLlvmBackend: block arguments on a non-entry block are not yet "
-                            "supported (would need real phi-node lowering)");
-                    }
                     out_ << block.label() << ":\n";
+                    if (bid != fn_.entry())
+                        for (ValueId param : block.params()) emitPhi(bid, param);
                     for (InstId iid : block.insts()) emitInstruction(fn_.inst(iid));
                     emitTerminator(block.term());
                 }
@@ -230,21 +228,72 @@ namespace zust {
                 return name;
             }
 
+            std::string constText(const Instruction &inst) const {
+                if (m_.types().get(inst.type).kind == TypeKind::Float)
+                    return hexFloatLiteral(inst.type, m_.types(), inst.constant.bits);
+                // The type's own bit width masks the stored pattern --
+                // ConstValue::bits is a uint64_t regardless of the
+                // constant's actual width.
+                std::uint32_t bits = m_.types().get(inst.type).bits;
+                std::uint64_t mask = bits >= 64 ? ~std::uint64_t{0} : ((std::uint64_t{1} << bits) - 1);
+                return std::to_string(inst.constant.bits & mask);
+            }
+
+            // A phi's incoming value can legitimately be something this
+            // emitter has not visited yet (a loop back edge from a block
+            // that comes later in block order) -- LLVM textual IR allows
+            // exactly this forward reference in a phi's incoming list, so
+            // this resolves what the name *will* be rather than requiring
+            // it to already exist. A not-yet-visited Const/GlobalAddr is
+            // resolved immediately (and cached) since those never get a
+            // real register name at all; anything else always ends up
+            // named "%v<id>" by freshName, so predicting that name here is
+            // exact, not a guess.
+            std::string phiIncomingRef(ValueId v) {
+                if (!valueText_[v.value()].empty())
+                    return valueText_[v.value()];
+                auto it = defSite_.find(v.value());
+                if (it != defSite_.end()) {
+                    const Instruction &def = fn_.inst(it->second);
+                    if (def.op == Opcode::Const) {
+                        valueText_[v.value()] = constText(def);
+                        return valueText_[v.value()];
+                    }
+                    if (def.op == Opcode::GlobalAddr) {
+                        valueText_[v.value()] = "@" + m_.global(def.global).name;
+                        return valueText_[v.value()];
+                    }
+                }
+                return "%v" + std::to_string(v.value());
+            }
+
+            void emitPhi(BlockId target, ValueId param) {
+                std::string name = "%v" + std::to_string(param.value());
+                valueText_[param.value()] = name;
+
+                const std::vector<ValueId> &params = fn_.block(target).params();
+                std::size_t idx = 0;
+                while (idx < params.size() && params[idx] != param) ++idx;
+
+                out_ << "  " << name << " = phi " << llvmType(m_.types(), fn_.typeOf(param));
+                bool first = true;
+                for (std::size_t bi = 0; bi < fn_.blockCount(); ++bi) {
+                    BlockId pred(static_cast<BlockId::Value>(bi));
+                    for (const BlockRef &ref : fn_.block(pred).term().targets) {
+                        if (ref.block != target || idx >= ref.args.size())
+                            continue;
+                        out_ << (first ? " " : ", ") << "[ " << phiIncomingRef(ref.args[idx]) << ", %"
+                             << fn_.block(pred).label() << " ]";
+                        first = false;
+                    }
+                }
+                out_ << "\n";
+            }
+
             void emitInstruction(const Instruction &inst) {
                 switch (inst.op) {
                     case Opcode::Const: {
-                        std::string text;
-                        if (m_.types().get(inst.type).kind == TypeKind::Float) {
-                            text = hexFloatLiteral(inst.type, m_.types(), inst.constant.bits);
-                        } else {
-                            // The type's own bit width masks the stored
-                            // pattern -- ConstValue::bits is a uint64_t
-                            // regardless of the constant's actual width.
-                            std::uint32_t bits = m_.types().get(inst.type).bits;
-                            std::uint64_t mask = bits >= 64 ? ~std::uint64_t{0} : ((std::uint64_t{1} << bits) - 1);
-                            text = std::to_string(inst.constant.bits & mask);
-                        }
-                        valueText_[inst.result.value()] = text;
+                        valueText_[inst.result.value()] = constText(inst);
                         return;
                     }
                     case Opcode::GlobalAddr:
@@ -497,6 +546,7 @@ namespace zust {
             const Function &fn_;
             std::ostream &out_;
             std::vector<std::string> valueText_;
+            std::unordered_map<ValueId::Value, InstId> defSite_;
         };
 
     }  // namespace
