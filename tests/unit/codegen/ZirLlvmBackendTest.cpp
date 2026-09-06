@@ -17,11 +17,13 @@ using namespace zust::zir;
 
 namespace {
     // Drives a small .zz snippet all the way to the emitted .ll text, the
-    // same pipeline `--zir-codegen` wires up in main.cpp. No `clang`/`llc`
-    // dependency here on purpose -- these tests check the emitted text is
-    // structurally what it should be; whether that text actually assembles
-    // and links is what tests/test_pipeline.py's `ZPILER_EXTRA_ARGS=--zir-codegen`
-    // run (docs/PRD-ZIR.md Wave 4.1's real exit criterion) checks for real.
+    // same pipeline the registered "llvm-ir" backend now always runs
+    // (docs/PRD-ZIR.md Wave 4.2's "flip the default", src/codegen/
+    // RegisterBackends.cpp). No `clang`/`llc` dependency here on purpose --
+    // these tests check the emitted text is structurally what it should be;
+    // whether that text actually assembles and links is what
+    // tests/test_pipeline.py's `TARGET=llvm pytest -q` run (Wave 4.1's
+    // original exit criterion, now the plain default) checks for real.
     std::string emitLlvm(const std::string &source) {
         Lexer lexer(source);
         Parser parser(lexer);

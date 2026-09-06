@@ -208,7 +208,7 @@ what stands in for the ZIR interpreter this rewrite deliberately skips.
 - [x] **4.1 [V]** `LlvmBackend`: ZIR → textual `.ll`, behind `--zir-codegen`.
       *Exit:* `TARGET=llvm pytest -q` green (40/40) with the flag; goldens
       untouched.
-- [ ] **4.2 [V]** Flip the default; delete `CodeGenLLVM.cpp`. *Exit:* green with
+- [x] **4.2 [V]** Flip the default; delete `CodeGenLLVM.cpp`. *Exit:* green with
       no flag.
 - [ ] **4.3 [S]** `PassManager` + `AnalysisManager` + `DominatorTree`. `-O0` =
       lower + verify only. *Exit:* `-O0` output identical to 4.2's.

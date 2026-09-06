@@ -27,8 +27,6 @@ namespace zust {
                 formatsFlag = true;
             } else if (std::strcmp(arg, "--json") == 0) {
                 jsonFlag = true;
-            } else if (std::strcmp(arg, "--zir-codegen") == 0) {
-                zirCodegenFlag = true;
             } else if (std::strcmp(arg, "-v") == 0 || std::strcmp(arg, "--verbose") == 0) {
                 verbosity = 1;
             } else if (std::strcmp(arg, "-o") == 0 || std::strcmp(arg, "--output") == 0) {
@@ -109,10 +107,6 @@ namespace zust {
         return emit;
     }
 
-    bool CommandLine::wantsZirCodegen() const noexcept {
-        return zirCodegenFlag;
-    }
-
     int CommandLine::getVerbosity() const noexcept {
         return verbosity;
     }
@@ -128,8 +122,6 @@ namespace zust {
                   << "    `-o`, `--output`  :: Set the output filepath.\n"
                   << "    `-f`, `--format`  :: Set the output format.\n"
                   << "    `--emit=zir`      :: Print the lowered ZIR module instead of running codegen.\n"
-                  << "    `--zir-codegen`   :: With `--format llvm-ir`, lower through ZIR instead of the "
-                     "legacy AST backend.\n"
                   << "Anything else is treated as the input file path.\n";
     }
 

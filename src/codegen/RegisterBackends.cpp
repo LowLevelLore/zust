@@ -1,10 +1,17 @@
 // The one file a new backend's registration touches outside its own
-// directory (docs/BACKENDS.md §A.4). Each backend here is a thin adapter over
-// the existing AST-consuming CodeGen* classes -- Wave 4+ of docs/PRD-ZIR.md
-// replaces these bodies with real ZIR-consuming backends one at a time
-// without anything outside this file changing.
+// directory (docs/BACKENDS.md §A.4). Each backend here is a thin adapter --
+// Linux and Windows still wrap the legacy AST-consuming CodeGen* classes;
+// llvm-ir was the first to move (docs/PRD-ZIR.md Wave 4.2) to a real
+// ZIR-consuming backend, wrapping ZirGen + ZirLlvmBackend instead. Backend
+// itself still takes the whole AST either way (that interface migration is
+// later Wave 4+/6 work) -- only what each adapter does with it has changed.
+#include <sstream>
+
 #include "codegen/Backend.hpp"
 #include "codegen/CodeGen.hpp"
+#include "codegen/ZirLlvmBackend.hpp"
+#include "zir/Verifier.hpp"
+#include "zirgen/ZirGen.hpp"
 
 namespace zust {
     namespace {
@@ -53,9 +60,24 @@ namespace zust {
         public:
             const TargetInfo &info() const override { return kInfo; }
 
+            // docs/PRD-ZIR.md Wave 4.2 "flip the default": this used to wrap
+            // the AST-consuming CodeGenLLVM (deleted this wave, having lived
+            // behind --zir-codegen since Wave 4.1 proved ZirLlvmBackend out).
+            // The program is already fully type-checked by the time main.cpp
+            // reaches here, same precondition CodeGenLLVM relied on.
             void emit(std::unique_ptr<ASTNode> program, std::ostream &out) override {
-                CodeGenLLVM cg(out);
-                cg.generate(std::move(program));
+                ZirGen zirGen;
+                zir::Module mod = zirGen.lower(*program, "zust");
+                std::vector<zir::VerifierFailure> failures = zir::Verifier::verify(mod);
+                if (!failures.empty()) {
+                    std::ostringstream msg;
+                    for (const zir::VerifierFailure &f : failures) {
+                        msg << "ZIR verification failed [" << zir::toString(f.check) << "] in @" << f.function
+                            << ": " << f.detail << "\n";
+                    }
+                    throw std::runtime_error(msg.str());
+                }
+                ZirLlvmBackend::emit(mod, out);
             }
 
             static const TargetInfo kInfo;

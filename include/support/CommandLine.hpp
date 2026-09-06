@@ -34,12 +34,6 @@ namespace zust {
         // (via ZirGen + zir::Printer) instead of running a codegen backend --
         // see docs/PRD-ZIR.md Wave 3.1's exit criterion.
         std::string getEmit() const noexcept;
-        // docs/PRD-ZIR.md Wave 4.1: routes `--format llvm-ir` through
-        // ZirGen + ZirLlvmBackend instead of the legacy AST-consuming
-        // LlvmBackend registered in the BackendRegistry. A no-op for every
-        // other format. Temporary -- Wave 4.2 ("flip the default") deletes
-        // this flag along with the legacy backend it bypasses.
-        bool wantsZirCodegen() const noexcept;
         int getVerbosity() const noexcept;
         bool printAST() const noexcept;
         static void printUsage(const std::string &programName);
@@ -54,7 +48,6 @@ namespace zust {
         bool printAST_ = false;
         bool formatsFlag = false;
         bool jsonFlag = false;
-        bool zirCodegenFlag = false;
         int verbosity = 1;
 
         std::string inputFile;

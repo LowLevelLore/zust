@@ -4,14 +4,14 @@
 
 #include "zir/Module.hpp"
 
-// ZIR -> textual LLVM IR (docs/PRD-ZIR.md Wave 4.1). Distinct from the
-// legacy, AST-consuming `LlvmBackend` registered in
-// src/codegen/RegisterBackends.cpp -- this one is not registered in the
-// BackendRegistry yet (that interface still takes a whole AST; Wave 4.2's
-// "flip the default" is what migrates it). For now this is a parallel path
-// main.cpp reaches only behind `--zir-codegen`, matching the PRD's "first
-// consumer... behind --zir-codegen" framing exactly: it exists to prove ZIR
-// out end to end, not to replace the registered backend yet.
+// ZIR -> textual LLVM IR (docs/PRD-ZIR.md Wave 4.1). Wrapped by the
+// registered "llvm-ir" `LlvmBackend` adapter in
+// src/codegen/RegisterBackends.cpp, which lowers the AST it's handed
+// through ZirGen and a Verifier check before calling this -- `Backend`
+// itself still takes a whole AST (that interface migration is later Wave
+// 4+/6 work); only what the llvm-ir adapter does with it changed in Wave
+// 4.2 ("flip the default"), which deleted the AST-consuming `CodeGenLLVM`
+// this replaced.
 //
 // Emits modern opaque-pointer IR ("ptr" everywhere, never a typed "i8*") --
 // ZIR pointers are already opaque (zir::Types.hpp), so this is the natural

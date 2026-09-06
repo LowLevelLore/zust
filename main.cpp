@@ -15,7 +15,6 @@
 #include "support/CommandLine.hpp"
 #include "support/File.hpp"
 #include "typechecker/TypeChecker.hpp"
-#include "codegen/ZirLlvmBackend.hpp"
 #include "zir/Printer.hpp"
 #include "zir/Verifier.hpp"
 #include "zirgen/ZirGen.hpp"
@@ -23,10 +22,9 @@
 using namespace zust;
 
 namespace {
-    // Shared by `--emit=zir` and `--zir-codegen` (docs/PRD-ZIR.md Wave 3/4):
-    // both need a verified ZIR module before doing anything target-specific
-    // with it. Returns nullopt (having already reported the problem) on a
-    // lowering exception or a verifier failure.
+    // Used by `--emit=zir` (docs/PRD-ZIR.md Wave 3) to get a verified ZIR
+    // module before printing it. Returns nullopt (having already reported
+    // the problem) on a lowering exception or a verifier failure.
     std::optional<zir::Module> lowerAndVerify(const ASTNode &program, const std::string &sourceName) {
         try {
             ZirGen zirGen;
@@ -165,23 +163,6 @@ int main(int argc, char *argv[]) {
         if (!mod)
             return 1;
         zir::Printer::print(*mod, *outstream);
-        return 0;
-    }
-
-    // Wave 4.1: `--zir-codegen` routes `--format llvm-ir` through ZirGen +
-    // ZirLlvmBackend instead of the legacy AST-consuming LlvmBackend the
-    // BackendRegistry just resolved above. Every other format ignores the
-    // flag -- Wave 5/6's native backends aren't ZIR consumers yet.
-    if (cli.wantsZirCodegen() && targetName == "llvm-ir") {
-        std::optional<zir::Module> mod = lowerAndVerify(*program, inputFile);
-        if (!mod)
-            return 1;
-        try {
-            ZirLlvmBackend::emit(*mod, *outstream);
-        } catch (std::exception const &exc) {
-            std::cerr << "ERROR: " << exc.what() << "\n";
-            return 1;
-        }
         return 0;
     }
 

@@ -226,46 +226,9 @@ namespace zust {
         void generate(std::unique_ptr<ASTNode> program) override;
     };
 
-    class CodeGenLLVM : public CodeGen {
-    private:
-        std::unordered_map<std::string, std::string> stringLiterals;
-
-        void generateStatement(std::unique_ptr<ASTNode> statement, std::ostringstream &out) override;
-        std::string emitExpression(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
-
-        void emitEpilogue(std::shared_ptr<ScopeContext> scope, std::ostringstream &out, bool clearRax = false) override;
-        void emitPrologue(std::shared_ptr<ScopeContext> scope, std::ostringstream &out) override;
-
-        std::string generateIntegerLiteral(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
-        std::string generateFloatLiteral(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
-        std::string generateStringLiteral(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
-        std::string generateBooleanLiteral(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
-        std::string generateVariableAccess(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
-
-        void generateVariableReassignment(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
-        void generateVariableDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
-        void generateIfStatement(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
-        void generateForLoop(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
-        void generateWhileLoop(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
-
-        std::string generateBinaryOperation(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
-        std::string generateUnaryOperation(std::unique_ptr<ASTNode> node, std::ostringstream &out) override;
-        std::string castValue(const std::string &val, const TypeInfo &fromType, const TypeInfo &toType,
-                              std::ostringstream &out);
-
-        std::string generateFunctionCall(std::unique_ptr<ASTNode> node,
-                                         std::ostringstream &out) override;  // Expression
-        void generateFunctionDeclaration(std::unique_ptr<ASTNode> node, std::ostringstream &out,
-                                         bool force = false) override;  // Statement
-        void generateExternFunctionDeclaration(std::unique_ptr<ASTNode> node,
-                                               std::ostringstream &out) override;              // Statement
-        void generateReturnstatement(std::unique_ptr<ASTNode> node, std::ostringstream &out);  // Statement
-
-    public:
-        ~CodeGenLLVM() override = default;
-
-        CodeGenLLVM(std::ostream &outstream) : CodeGen(RegisterAllocator(), outstream) {}
-
-        void generate(std::unique_ptr<ASTNode> program) override;
-    };
+    // The AST-consuming LLVM backend lived here through docs/PRD-ZIR.md Wave
+    // 4.1 (behind --zir-codegen, alongside the new ZIR-consuming
+    // ZirLlvmBackend). Wave 4.2 "flip the default" deleted it along with
+    // src/codegen/CodeGenLLVM.cpp -- the "llvm-ir" format now always goes
+    // through ZirGen + ZirLlvmBackend (see src/codegen/RegisterBackends.cpp).
 }  // namespace zust
