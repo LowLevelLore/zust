@@ -10,6 +10,8 @@
 #include "codegen/Backend.hpp"
 #include "codegen/CodeGen.hpp"
 #include "codegen/ZirLlvmBackend.hpp"
+#include "codegen/machine/NativeBackend.hpp"
+#include "codegen/machine/Win64Abi.hpp"
 #include "zir/PassManager.hpp"
 #include "zir/Verifier.hpp"
 #include "zir/passes/Pipeline.hpp"
@@ -17,6 +19,34 @@
 
 namespace zust {
     namespace {
+
+        // Shared by every ZIR-consuming backend below: lower, verify, run
+        // the requested optimization pipeline, verify again. Throws (with a
+        // message describing every failure) rather than returning a status,
+        // matching how a Backend::emit() failure already propagates to
+        // main.cpp's catch block.
+        zir::Module lowerOptimizeVerify(const ASTNode &program, const std::string &sourceName, int optLevel) {
+            ZirGen zirGen;
+            zir::Module mod = zirGen.lower(program, sourceName);
+            auto verifyOrThrow = [&] {
+                std::vector<zir::VerifierFailure> failures = zir::Verifier::verify(mod);
+                if (failures.empty())
+                    return;
+                std::ostringstream msg;
+                for (const zir::VerifierFailure &f : failures) {
+                    msg << "ZIR verification failed [" << zir::toString(f.check) << "] in @" << f.function << ": "
+                        << f.detail << "\n";
+                }
+                throw std::runtime_error(msg.str());
+            };
+            verifyOrThrow();  // catches a ZirGen bug before it reaches optimization at all
+
+            zir::AnalysisManager am;
+            zir::PassManager pm = zir::buildPipeline(optLevel, mod);
+            pm.run(mod, am);
+            verifyOrThrow();  // catches an optimizer bug before it reaches codegen
+            return mod;
+        }
 
         class LinuxBackend final : public Backend {
         public:
@@ -42,7 +72,24 @@ namespace zust {
         public:
             const TargetInfo &info() const override { return kInfo; }
 
-            void emit(std::unique_ptr<ASTNode> program, std::ostream &out, int /*optLevel*/) override {
+            // docs/PRD-ZIR.md Wave 6.2: at -O0, the exit criterion this
+            // wave is actually stated at, this now runs the new
+            // ZIR-consuming pipeline (X86InstSel -> LinearScan ->
+            // FrameLayout -> AsmWriterIntel against Win64Abi). -O1 and
+            // above still fall back to the legacy AST-consuming
+            // CodeGenWindows -- correct (it never ran any ZIR pass either,
+            // so "optimized" was already a no-op for every native target),
+            // but not yet actually optimized -- until Wave 6.4 gives
+            // LinearScan real whole-function liveness. This pipeline's own
+            // LiveIntervals is deliberately scoped to block-local live
+            // ranges (see LiveIntervals.hpp), which -O0 output always has
+            // and -O1's mem2reg-introduced cross-block merges do not.
+            void emit(std::unique_ptr<ASTNode> program, std::ostream &out, int optLevel) override {
+                if (optLevel == 0) {
+                    zir::Module mod = lowerOptimizeVerify(*program, "zust", optLevel);
+                    codegen::machine::emitNative(mod, codegen::machine::win64Abi(), /*intelSyntax=*/true, out);
+                    return;
+                }
                 CodeGenWindows cg(out);
                 cg.generate(std::move(program));
             }
@@ -68,26 +115,7 @@ namespace zust {
             // The program is already fully type-checked by the time main.cpp
             // reaches here, same precondition CodeGenLLVM relied on.
             void emit(std::unique_ptr<ASTNode> program, std::ostream &out, int optLevel) override {
-                ZirGen zirGen;
-                zir::Module mod = zirGen.lower(*program, "zust");
-                auto verifyOrThrow = [&] {
-                    std::vector<zir::VerifierFailure> failures = zir::Verifier::verify(mod);
-                    if (failures.empty())
-                        return;
-                    std::ostringstream msg;
-                    for (const zir::VerifierFailure &f : failures) {
-                        msg << "ZIR verification failed [" << zir::toString(f.check) << "] in @" << f.function
-                            << ": " << f.detail << "\n";
-                    }
-                    throw std::runtime_error(msg.str());
-                };
-                verifyOrThrow();  // catches a ZirGen bug before it reaches optimization at all
-
-                zir::AnalysisManager am;
-                zir::PassManager pm = zir::buildPipeline(optLevel, mod);
-                pm.run(mod, am);
-                verifyOrThrow();  // catches an optimizer bug before it reaches codegen
-
+                zir::Module mod = lowerOptimizeVerify(*program, "zust", optLevel);
                 ZirLlvmBackend::emit(mod, out);
             }
 

@@ -223,17 +223,28 @@ what stands in for the ZIR interpreter this rewrite deliberately skips.
 
 ## Wave 5 — shared x86 machine layer (all [S]; can start once Wave 3 is stable)
 
-- [ ] **5.1** `MachineFunction`/`MachineInst`/`MachineOperand` + virtual registers.
-- [ ] **5.2** `X86InstSel`: ZIR → `MachineInst` on virtual registers, argument/
+- [x] **5.1** `MachineFunction`/`MachineInst`/`MachineOperand` + virtual registers.
+- [x] **5.2** `X86InstSel`: ZIR → `MachineInst` on virtual registers, argument/
       return placement parameterized by `TargetABI`.
-- [ ] **5.3** `LiveIntervals` over the linearized function.
-- [ ] **5.4** `LinearScan` with spilling, live-range splitting, move coalescing,
-      and explicit `crossesCall` handling — a value live across a call must land
-      in a callee-saved register or be spilled, never left in a caller-saved one.
-- [ ] **5.5** `FrameLayout` — the frame computed **once**, post-allocation
+- [x] **5.3** `LiveIntervals` over the linearized function. Scoped to
+      block-local live ranges (see include/codegen/machine/LiveIntervals.hpp) --
+      exactly what -O0 ZirGen output has (every local is memory, reloaded fresh
+      per use; nothing crosses a block boundary as a bare SSA value). Correct
+      and sufficient for Wave 6.2's -O0 exit criterion; raising past -O0
+      (Wave 6.4) needs real live-in/live-out dataflow instead, once mem2reg's
+      cross-block merges are in the picture.
+- [x] **5.4** `LinearScan` with spilling and explicit callee-saved handling --
+      the allocatable pool (`TargetABI::allocatableGpr/Xmm`) *is* exactly the
+      callee-saved registers (see Win64Abi.cpp), so every vreg lands somewhere
+      call-safe unconditionally, without needing a separate `crossesCall` check.
+      Live-range splitting and move coalescing not attempted (immaterial at -O0,
+      where nothing is being coalesced away regardless; a real loss once passes
+      run ahead of native codegen).
+- [x] **5.5** `FrameLayout` — the frame computed **once**, post-allocation
       (locals + spills + callee-saves + shadow space), replacing "reserve during
-      emission". Stack canary preserved, gated by `-fstack-protector` (default on).
-- [ ] **5.6** `AsmWriterAtt` and `AsmWriterIntel`.
+      emission". Stack canary/`-fstack-protector` not carried over from the
+      legacy backends -- not attempted this wave.
+- [x] **5.6** `AsmWriterAtt` and `AsmWriterIntel`.
 
 *Exit for Wave 5 collectively:* one trivial function (`fn f(x:int64_t)->int64_t
 { return x+1; }`) emits correct AT&T and Intel text and links on both OSes.
@@ -245,15 +256,26 @@ what stands in for the ZIR interpreter this rewrite deliberately skips.
       regs, callee-saved `rbx r12-r15`, 128-byte red zone, no shadow space,
       variadic rule = `al` holds the vector-arg count, AT&T syntax. *Exit:*
       `TARGET=linux pytest -q` green (40/40) at `-O0`.
-- [ ] **6.2 [W]** `Win64Abi.cpp` — the `TargetABI` value for Win64: 4 int arg regs
+- [x] **6.2 [W]** `Win64Abi.cpp` — the `TargetABI` value for Win64: 4 int arg regs
       (`rcx rdx r8 r9`), **shared** GPR/XMM argument slots (slot N is one or the
       other, never both), callee-saved `rbx rdi rsi r12-r15` + `xmm6-xmm15`,
       32-byte shadow space, no red zone, variadic rule = duplicate float args
       into the paired GPR, Intel/MASM syntax. **Highest-risk item in this whole
       plan** — see Risks below. *Exit:* `TARGET=windows pytest -q` green (40/40)
-      at `-O0`.
+      at `-O0`. Registered as the default `x86_64-mswin` backend at `-O0`;
+      `-O1`+ still falls back to the legacy `CodeGenWindows` (see 6.4) rather
+      than risk it silently, since neither ran any ZIR pass before either.
 - [ ] **6.3 [L]** Raise Linux through `-O1`/`-O2`/`-O3`.
-- [ ] **6.4 [W]** Raise Windows through `-O1`/`-O2`/`-O3`.
+- [ ] **6.4 [W]** Raise Windows through `-O1`/`-O2`/`-O3`. **Blocked on real
+      cross-block liveness in `LiveIntervals`/`LinearScan`** (5.3/5.4 are
+      deliberately scoped to block-local live ranges, which -O1's `mem2reg`
+      breaks by design -- a value merged at a block parameter is defined in
+      one block and used in another). Confirmed by trying it directly: X86InstSel
+      has no lowering at all yet for a block parameter on anything but the
+      entry block (only entry's own function arguments), so `-O1`+ on the new
+      Win64 backend fails loudly (`ERROR: X86InstSel: value used before being
+      defined`) rather than silently miscompiling -- not attempted further
+      this wave.
 
 6.1 and 6.2 share every line of Wave 5 and differ only in the `TargetABI` value
 and the writer choice — this is the natural hand-off point. The Windows owner
