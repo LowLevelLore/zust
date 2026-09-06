@@ -262,20 +262,38 @@ what stands in for the ZIR interpreter this rewrite deliberately skips.
       32-byte shadow space, no red zone, variadic rule = duplicate float args
       into the paired GPR, Intel/MASM syntax. **Highest-risk item in this whole
       plan** — see Risks below. *Exit:* `TARGET=windows pytest -q` green (40/40)
-      at `-O0`. Registered as the default `x86_64-mswin` backend at `-O0`;
-      `-O1`+ still falls back to the legacy `CodeGenWindows` (see 6.4) rather
-      than risk it silently, since neither ran any ZIR pass before either.
+      at `-O0`. Registered as the default `x86_64-mswin` backend at every
+      optimization level (see 6.4 for how `-O1`+ was made sound).
 - [ ] **6.3 [L]** Raise Linux through `-O1`/`-O2`/`-O3`.
-- [ ] **6.4 [W]** Raise Windows through `-O1`/`-O2`/`-O3`. **Blocked on real
-      cross-block liveness in `LiveIntervals`/`LinearScan`** (5.3/5.4 are
-      deliberately scoped to block-local live ranges, which -O1's `mem2reg`
-      breaks by design -- a value merged at a block parameter is defined in
-      one block and used in another). Confirmed by trying it directly: X86InstSel
-      has no lowering at all yet for a block parameter on anything but the
-      entry block (only entry's own function arguments), so `-O1`+ on the new
-      Win64 backend fails loudly (`ERROR: X86InstSel: value used before being
-      defined`) rather than silently miscompiling -- not attempted further
-      this wave.
+- [x] **6.4 [W]** Raise Windows through `-O1`/`-O2`/`-O3`. `LiveIntervals`/
+      `LinearScan` (5.3/5.4) are still deliberately scoped to block-local live
+      ranges — that didn't change — but `-O1`'s `mem2reg` breaks the assumption
+      that made it sound (every -O0 local reloads fresh from memory, so no
+      bare SSA value ever crossed a block boundary) in two ways, not just the
+      one first suspected: an explicit merge at a block parameter (defined in
+      one block, used in another), *and* — far more commonly — a plain
+      dominance-only cross-block use with no merge at all, e.g. a function
+      parameter that's never reassigned, read from a later block it simply
+      dominates. Fix: `X86InstSel::computeCrossBlockValues()` is a whole-
+      function pre-pass computing every value's defining block and flagging
+      any value read outside it; every such value (plus every non-entry block
+      parameter, unconditionally) gets a dedicated frame slot instead of ever
+      needing a vreg live across a block boundary — written once right after
+      its definition (or, for a block parameter, by every predecessor edge
+      that branches to it, via `storeBranchArgs`/`edgeLabel`'s trampoline
+      blocks), and reloaded fresh on every read from a different block. A
+      read from the *same* block that defines the value still uses its live
+      vreg directly (cheaper, and still sound since per-block LinearScan never
+      sees it cross a boundary). This is a deliberate trade — mem2reg's
+      register-residency win is given up for exactly the values that need to
+      survive a block boundary, in exchange for never touching
+      LiveIntervals/LinearScan's block-local scope at all. Root-caused via a
+      real miscompile (not guessed): `functions/recursive.zz`'s `is_even`
+      parameter `n`, read in two blocks with no merge involved, got corrupted
+      by each block's independent register allocation reusing the same
+      physical register inconsistently. *Exit:* `TARGET=windows pytest -q`
+      green (40/40) at `-O0`, `-O1`, `-O2`, and `-O3`, verified on both MinGW
+      g++ and MSVC 19.50.
 
 6.1 and 6.2 share every line of Wave 5 and differ only in the `TargetABI` value
 and the writer choice — this is the natural hand-off point. The Windows owner

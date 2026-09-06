@@ -72,26 +72,22 @@ namespace zust {
         public:
             const TargetInfo &info() const override { return kInfo; }
 
-            // docs/PRD-ZIR.md Wave 6.2: at -O0, the exit criterion this
-            // wave is actually stated at, this now runs the new
-            // ZIR-consuming pipeline (X86InstSel -> LinearScan ->
-            // FrameLayout -> AsmWriterIntel against Win64Abi). -O1 and
-            // above still fall back to the legacy AST-consuming
-            // CodeGenWindows -- correct (it never ran any ZIR pass either,
-            // so "optimized" was already a no-op for every native target),
-            // but not yet actually optimized -- until Wave 6.4 gives
-            // LinearScan real whole-function liveness. This pipeline's own
-            // LiveIntervals is deliberately scoped to block-local live
-            // ranges (see LiveIntervals.hpp), which -O0 output always has
-            // and -O1's mem2reg-introduced cross-block merges do not.
+            // docs/PRD-ZIR.md Wave 6.2/6.4: runs the ZIR-consuming pipeline
+            // (X86InstSel -> LinearScan -> FrameLayout -> AsmWriterIntel
+            // against Win64Abi) at every optimization level. LiveIntervals/
+            // LinearScan's own scope is still block-local (see
+            // LiveIntervals.hpp), but Wave 6.4 made that sound past -O0
+            // too: X86InstSel now gives every value actually used outside
+            // the block that defines it (any non-entry block parameter
+            // unconditionally, plus whatever computeCrossBlockValues()
+            // flags -- what Wave 4.4's Mem2Reg introduces at -O1+, both as
+            // explicit block-parameter merges and as plain dominance with
+            // no merge at all) its own dedicated frame slot instead of
+            // ever needing a vreg live across a block boundary -- see
+            // X86InstSel.hpp's class comment.
             void emit(std::unique_ptr<ASTNode> program, std::ostream &out, int optLevel) override {
-                if (optLevel == 0) {
-                    zir::Module mod = lowerOptimizeVerify(*program, "zust", optLevel);
-                    codegen::machine::emitNative(mod, codegen::machine::win64Abi(), /*intelSyntax=*/true, out);
-                    return;
-                }
-                CodeGenWindows cg(out);
-                cg.generate(std::move(program));
+                zir::Module mod = lowerOptimizeVerify(*program, "zust", optLevel);
+                codegen::machine::emitNative(mod, codegen::machine::win64Abi(), /*intelSyntax=*/true, out);
             }
 
             static const TargetInfo kInfo;

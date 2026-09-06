@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <deque>
 #include <string>
 #include <vector>
 
@@ -225,7 +226,13 @@ namespace zust::codegen::machine {
         std::string name;
         bool isExternDecl = false;
         bool isVariadic = false;
-        std::vector<MachineBasicBlock> blocks;
+        // A deque, not a vector: X86InstSel (Wave 6.4) appends trampoline
+        // blocks for a conditional branch whose target carries arguments
+        // *while already holding a raw pointer at the block currently
+        // being selected* -- a deque's append never invalidates references
+        // to existing elements (only a vector's would), so that pointer
+        // stays valid without needing to re-look-it-up after every append.
+        std::deque<MachineBasicBlock> blocks;
 
         std::uint32_t vregCount = 0;
         std::vector<RegClass> vregClass;

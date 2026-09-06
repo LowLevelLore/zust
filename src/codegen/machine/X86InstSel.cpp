@@ -118,12 +118,160 @@ namespace zust::codegen::machine {
     }
 
     MachineOperand X86InstSel::regOperand(ValueId v) {
-        // Already selected (the common case: almost every value is defined
-        // by a real instruction before it's used).
-        if (hasVReg_[v.value()])
+        auto sit = slot_.find(v.value());
+        bool sameBlockAsDef = sit != slot_.end() && defBlockOf_[v.value()] >= 0 &&
+                              static_cast<std::size_t>(defBlockOf_[v.value()]) == curBlock_;
+
+        // Already selected *and* still in the block that defines it: the
+        // live vreg is both cheaper and still sound (per-block LinearScan
+        // never needs to see this value cross a block boundary at all).
+        // Any other read of a slotted value -- a non-entry block parameter
+        // (never gets a vreg to begin with), or a cross-block value read
+        // from anywhere but its own defining block -- always reloads fresh
+        // from the slot instead; see the class comment for why a cached
+        // vreg can't be trusted once a block boundary is crossed.
+        if (hasVReg_[v.value()] && (sit == slot_.end() || sameBlockAsDef))
             return MachineOperand::vregOp(vregOf_[v.value()], mf_->vregClass[vregOf_[v.value()]],
                                           mf_->vregWidth[vregOf_[v.value()]]);
+
+        if (sit != slot_.end()) {
+            TypeId ty = fn_->typeOf(v);
+            std::uint32_t width = widthOf(ty);
+            RegClass rc = classOf(ty);
+            std::uint32_t vr = mf_->newVReg(rc, width);
+            MachineInst mi;
+            mi.mnemonic = rc == RegClass::XMM ? (width == 32 ? "movss" : "movsd") : "mov";
+            mi.operands = {MachineOperand::vregOp(vr, rc, width), MachineOperand::frame(sit->second, width, rc)};
+            mi.defIndices = {0};
+            emit(std::move(mi));
+            return MachineOperand::vregOp(vr, rc, width);
+        }
+
         return MachineOperand::vregOp(vregFor(v), RegClass::GPR, 64);
+    }
+
+    void X86InstSel::computeCrossBlockValues() {
+        defBlockOf_.assign(fn_->valueCount(), -1);
+        crossBlock_.clear();
+
+        for (std::size_t bi = 0; bi < fn_->blockCount(); ++bi) {
+            BlockId b(static_cast<BlockId::Value>(bi));
+            for (ValueId param : fn_->block(b).params()) defBlockOf_[param.value()] = static_cast<std::int32_t>(bi);
+            for (InstId iid : fn_->block(b).insts()) {
+                const Instruction &inst = fn_->inst(iid);
+                if (inst.result.isValid())
+                    defBlockOf_[inst.result.value()] = static_cast<std::int32_t>(bi);
+            }
+        }
+
+        auto markUse = [&](ValueId v, std::size_t useBlock) {
+            if (!v.isValid())
+                return;
+            std::int32_t db = defBlockOf_[v.value()];
+            if (db < 0)
+                return;  // not a def this pass tracks (e.g. never read as an operand at all)
+            if (static_cast<std::size_t>(db) != useBlock)
+                crossBlock_.insert(v.value());
+        };
+
+        for (std::size_t bi = 0; bi < fn_->blockCount(); ++bi) {
+            BlockId b(static_cast<BlockId::Value>(bi));
+            for (InstId iid : fn_->block(b).insts()) {
+                const Instruction &inst = fn_->inst(iid);
+                for (ValueId op : inst.operands) markUse(op, bi);
+            }
+            const Terminator &t = fn_->block(b).term();
+            switch (t.kind) {
+                case TermKind::Br:
+                    for (ValueId a : t.targets[0].args) markUse(a, bi);
+                    break;
+                case TermKind::CondBr:
+                    markUse(t.cond, bi);
+                    for (const auto &target : t.targets)
+                        for (ValueId a : target.args) markUse(a, bi);
+                    break;
+                case TermKind::Ret:
+                    markUse(t.retValue, bi);
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+
+    void X86InstSel::allocateNonEntryParamSlots() {
+        for (std::size_t bi = 0; bi < fn_->blockCount(); ++bi) {
+            BlockId b(static_cast<BlockId::Value>(bi));
+            if (b == fn_->entry())
+                continue;
+            for (ValueId param : fn_->block(b).params()) {
+                TypeId ty = fn_->typeOf(param);
+                std::uint32_t sizeBytes = widthOf(ty) <= 8 ? 1 : widthOf(ty) / 8;
+                std::int32_t slot = mf_->newFrameSlot(sizeBytes, sizeBytes, /*isSpill=*/false, fn_->nameOf(param));
+                slot_[param.value()] = slot;
+            }
+        }
+    }
+
+    void X86InstSel::maybeStoreCrossBlockResult(ValueId result) {
+        if (!result.isValid() || !hasVReg_[result.value()] || !crossBlock_.count(result.value()) ||
+            slot_.count(result.value()))
+            return;
+        TypeId ty = fn_->typeOf(result);
+        std::uint32_t width = widthOf(ty);
+        RegClass rc = classOf(ty);
+        std::uint32_t sizeBytes = width <= 8 ? 1 : width / 8;
+        std::int32_t slot = mf_->newFrameSlot(sizeBytes, sizeBytes, /*isSpill=*/false, fn_->nameOf(result));
+        slot_[result.value()] = slot;
+        MachineInst mi;
+        mi.mnemonic = rc == RegClass::XMM ? (width == 32 ? "movss" : "movsd") : "mov";
+        mi.operands = {MachineOperand::frame(slot, width, rc),
+                       MachineOperand::vregOp(vregOf_[result.value()], rc, width)};
+        emit(std::move(mi));
+    }
+
+    std::string X86InstSel::edgeLabel(BlockId target, const std::vector<ValueId> &args) {
+        if (args.empty())
+            return blockLabel(target);
+
+        std::string label = sanitizeSymbol(blockLabelPrefix_ + "edge" + std::to_string(edgeCounter_++));
+        mf_->blocks.push_back(MachineBasicBlock{label, {}});
+        MachineBasicBlock *saved = cur_;
+        cur_ = &mf_->blocks.back();  // safe: MachineFunction::blocks is a deque, push_back never invalidates `saved`
+        // This trampoline is its own physical MachineBasicBlock, distinct
+        // from the real ZIR block currently being selected -- LinearScan
+        // sees it as such, so a cross-block value's fast "still in its
+        // defining block" path in regOperand must not fire in here even
+        // when curBlock_ still nominally names that ZIR block. A sentinel
+        // no real block index ever equals forces every value regOperand
+        // reads here through the slot-reload path instead.
+        std::size_t savedBlock = curBlock_;
+        curBlock_ = fn_->blockCount();
+        storeBranchArgs(target, args);
+        MachineInst jmp;
+        jmp.mnemonic = "jmp";
+        jmp.operands = {MachineOperand::block(blockLabel(target))};
+        emit(std::move(jmp));
+        curBlock_ = savedBlock;
+        cur_ = saved;
+        return label;
+    }
+
+    void X86InstSel::storeBranchArgs(BlockId target, const std::vector<ValueId> &args) {
+        const std::vector<ValueId> &params = fn_->block(target).params();
+        for (std::size_t i = 0; i < args.size() && i < params.size(); ++i) {
+            auto pit = slot_.find(params[i].value());
+            if (pit == slot_.end())
+                continue;  // target is entry -- can't happen (nothing branches into entry), guarded anyway
+            TypeId ty = fn_->typeOf(params[i]);
+            std::uint32_t width = widthOf(ty);
+            RegClass rc = classOf(ty);
+            MachineOperand val = regOperand(args[i]);
+            MachineInst mi;
+            mi.mnemonic = rc == RegClass::XMM ? (width == 32 ? "movss" : "movsd") : "mov";
+            mi.operands = {MachineOperand::frame(pit->second, width, rc), val};
+            emit(std::move(mi));
+        }
     }
 
     std::string X86InstSel::blockLabel(BlockId b) const {
@@ -162,16 +310,26 @@ namespace zust::codegen::machine {
         hasVReg_.assign(fn.valueCount(), false);
         vregOf_.assign(fn.valueCount(), 0);
         provenance_.clear();
+        slot_.clear();
         blockLabelPrefix_ = "L" + fn.name() + "_";
 
         for (std::size_t bi = 0; bi < fn.blockCount(); ++bi) {
             mf.blocks.push_back(MachineBasicBlock{blockLabel(BlockId(static_cast<BlockId::Value>(bi))), {}});
         }
 
+        // Whole-function pre-passes, before any block gets selected -- a
+        // predecessor earlier in block order than a value's use (the
+        // common case for a loop back-edge, or any forward branch) still
+        // needs to know up front whether that value will need a slot.
+        computeCrossBlockValues();
+        allocateNonEntryParamSlots();
+
+        curBlock_ = fn.entry().value();
         cur_ = &mf.blocks[fn.entry().value()];
         selectEntryParamCopyIn();
 
         for (std::size_t bi = 0; bi < fn.blockCount(); ++bi) {
+            curBlock_ = bi;
             cur_ = &mf.blocks[bi];
             selectBlock(BlockId(static_cast<BlockId::Value>(bi)));
         }
@@ -218,11 +376,16 @@ namespace zust::codegen::machine {
                 mi.defIndices = {0};
                 emit(std::move(mi));
             }
+            maybeStoreCrossBlockResult(p);
         }
     }
 
     void X86InstSel::selectBlock(BlockId b) {
-        for (InstId iid : fn_->block(b).insts()) selectInst(fn_->inst(iid));
+        for (InstId iid : fn_->block(b).insts()) {
+            const Instruction &inst = fn_->inst(iid);
+            selectInst(inst);
+            maybeStoreCrossBlockResult(inst.result);
+        }
         selectTerminator(fn_->block(b).term());
     }
 
@@ -807,6 +970,9 @@ namespace zust::codegen::machine {
     void X86InstSel::selectTerminator(const Terminator &t) {
         switch (t.kind) {
             case TermKind::Br: {
+                // Unconditional -- nothing else could run instead, so any
+                // argument stores just happen directly before the jump.
+                storeBranchArgs(t.targets[0].block, t.targets[0].args);
                 MachineInst mi;
                 mi.mnemonic = "jmp";
                 mi.operands = {MachineOperand::block(blockLabel(t.targets[0].block))};
@@ -822,14 +988,23 @@ namespace zust::codegen::machine {
                 cmp.operands = {cond8, MachineOperand::imm(0, 8)};
                 emit(std::move(cmp));
 
+                // Either edge might carry arguments to a merge point
+                // (Wave 4.4's Mem2Reg can put them on a condbr's own
+                // targets, e.g. a loop's `end` block if it's also reached
+                // by a `break`) -- neither can be stored unconditionally
+                // here, since only one edge is actually taken. edgeLabel
+                // gives each its own trampoline when it needs one.
+                std::string thenLabel = edgeLabel(t.targets[0].block, t.targets[0].args);
+                std::string elseLabel = edgeLabel(t.targets[1].block, t.targets[1].args);
+
                 MachineInst jne;
                 jne.mnemonic = "jne";
-                jne.operands = {MachineOperand::block(blockLabel(t.targets[0].block))};
+                jne.operands = {MachineOperand::block(thenLabel)};
                 emit(std::move(jne));
 
                 MachineInst jmp;
                 jmp.mnemonic = "jmp";
-                jmp.operands = {MachineOperand::block(blockLabel(t.targets[1].block))};
+                jmp.operands = {MachineOperand::block(elseLabel)};
                 emit(std::move(jmp));
                 return;
             }
