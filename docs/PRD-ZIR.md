@@ -217,7 +217,7 @@ what stands in for the ZIR interpreter this rewrite deliberately skips.
       **only** when it changed something (the manager iterates to fixpoint — an
       always-`true` pass hangs the compiler). *Exit:* `TARGET=llvm` green at
       `-O0` and `-O1`; verifier clean after every pass on all 40.
-- [ ] **4.5 [S]** `-O2` (+`sccp`, `gvn`, `instcombine`, `tailcall`) and `-O3`
+- [x] **4.5 [S]** `-O2` (+`sccp`, `gvn`, `instcombine`, `tailcall`) and `-O3`
       (+`inline`, `licm`, loop unroll). *Exit:* `TARGET=llvm` green at all four
       levels.
 

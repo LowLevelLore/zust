@@ -75,6 +75,14 @@ namespace zust::zir {
                 BlockId b = aTerm.targets[0].block;
                 if (b == a)
                     continue;  // a single-block infinite loop -- nothing to merge
+                if (b == fn.entry())
+                    // entry has an invisible predecessor no internal CFG
+                    // edge can see -- the function's own external callers
+                    // (and, since TailCall, a self-recursive tail call
+                    // branching back to it too). Its predecessor count
+                    // inside this CFG is never the whole truth, so it can
+                    // never be a merge *target* -- entry must stay entry.
+                    continue;
                 if (dt.predecessors(b).size() != 1)
                     continue;  // b has another edge into it; merging would drop it
 

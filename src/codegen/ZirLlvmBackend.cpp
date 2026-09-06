@@ -211,16 +211,42 @@ namespace zust {
             }
 
         private:
-            std::string ref(ValueId v) const {
-                const std::string &text = valueText_[v.value()];
-                if (text.empty())
-                    throw std::runtime_error("ZirLlvmBackend: value used before it was defined");
-                return text;
+            // A use can legitimately name something this emitter has not
+            // visited yet -- not just in a phi's incoming list, but any
+            // ordinary operand too, now that a pass (docs/PRD-ZIR.md Wave
+            // 4.5's TailCall) can introduce a block whose block-index
+            // happens to land after blocks that use its values (splitting
+            // entry into a trivial forwarder plus a new loop-header block
+            // appended at the end of the arena). LLVM textual IR resolves
+            // any value by its name wherever it's used, independent of
+            // which block comes first on the page, so this predicts the
+            // name/text a not-yet-visited value will have instead of
+            // requiring it to already exist. A Const/GlobalAddr is resolved
+            // immediately (and cached) since those never get a real
+            // register name at all; anything else always ends up named
+            // "%v<id>" by freshName, so predicting that name here is exact,
+            // not a guess.
+            std::string ref(ValueId v) {
+                if (!valueText_[v.value()].empty())
+                    return valueText_[v.value()];
+                auto it = defSite_.find(v.value());
+                if (it != defSite_.end()) {
+                    const Instruction &def = fn_.inst(it->second);
+                    if (def.op == Opcode::Const) {
+                        valueText_[v.value()] = constText(def);
+                        return valueText_[v.value()];
+                    }
+                    if (def.op == Opcode::GlobalAddr) {
+                        valueText_[v.value()] = "@" + m_.global(def.global).name;
+                        return valueText_[v.value()];
+                    }
+                }
+                return "%v" + std::to_string(v.value());
             }
 
             // "<ty> <valuetext>" -- the operand form almost every
             // instruction wants.
-            std::string typedRef(ValueId v) const { return llvmType(m_.types(), fn_.typeOf(v)) + " " + ref(v); }
+            std::string typedRef(ValueId v) { return llvmType(m_.types(), fn_.typeOf(v)) + " " + ref(v); }
 
             std::string freshName(ValueId result) {
                 std::string name = "%v" + std::to_string(result.value());
@@ -239,34 +265,6 @@ namespace zust {
                 return std::to_string(inst.constant.bits & mask);
             }
 
-            // A phi's incoming value can legitimately be something this
-            // emitter has not visited yet (a loop back edge from a block
-            // that comes later in block order) -- LLVM textual IR allows
-            // exactly this forward reference in a phi's incoming list, so
-            // this resolves what the name *will* be rather than requiring
-            // it to already exist. A not-yet-visited Const/GlobalAddr is
-            // resolved immediately (and cached) since those never get a
-            // real register name at all; anything else always ends up
-            // named "%v<id>" by freshName, so predicting that name here is
-            // exact, not a guess.
-            std::string phiIncomingRef(ValueId v) {
-                if (!valueText_[v.value()].empty())
-                    return valueText_[v.value()];
-                auto it = defSite_.find(v.value());
-                if (it != defSite_.end()) {
-                    const Instruction &def = fn_.inst(it->second);
-                    if (def.op == Opcode::Const) {
-                        valueText_[v.value()] = constText(def);
-                        return valueText_[v.value()];
-                    }
-                    if (def.op == Opcode::GlobalAddr) {
-                        valueText_[v.value()] = "@" + m_.global(def.global).name;
-                        return valueText_[v.value()];
-                    }
-                }
-                return "%v" + std::to_string(v.value());
-            }
-
             void emitPhi(BlockId target, ValueId param) {
                 std::string name = "%v" + std::to_string(param.value());
                 valueText_[param.value()] = name;
@@ -279,10 +277,10 @@ namespace zust {
                 bool first = true;
                 for (std::size_t bi = 0; bi < fn_.blockCount(); ++bi) {
                     BlockId pred(static_cast<BlockId::Value>(bi));
-                    for (const BlockRef &ref : fn_.block(pred).term().targets) {
-                        if (ref.block != target || idx >= ref.args.size())
+                    for (const BlockRef &edge : fn_.block(pred).term().targets) {
+                        if (edge.block != target || idx >= edge.args.size())
                             continue;
-                        out_ << (first ? " " : ", ") << "[ " << phiIncomingRef(ref.args[idx]) << ", %"
+                        out_ << (first ? " " : ", ") << "[ " << ref(edge.args[idx]) << ", %"
                              << fn_.block(pred).label() << " ]";
                         first = false;
                     }
