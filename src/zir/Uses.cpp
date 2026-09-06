@@ -14,7 +14,8 @@ namespace zust::zir {
             const BasicBlock &block = fn.block(bid);
             for (InstId iid : block.insts()) {
                 const Instruction &inst = fn.inst(iid);
-                for (ValueId operand : inst.operands) bump(operand);
+                for (ValueId operand : inst.operands)
+                    bump(operand);
             }
             const Terminator &t = block.term();
             if (t.kind == TermKind::CondBr || t.kind == TermKind::Switch)
@@ -22,7 +23,8 @@ namespace zust::zir {
             if (t.kind == TermKind::Ret)
                 bump(t.retValue);
             for (const BlockRef &ref : t.targets)
-                for (ValueId arg : ref.args) bump(arg);
+                for (ValueId arg : ref.args)
+                    bump(arg);
         }
         return counts;
     }

@@ -206,8 +206,8 @@ namespace zust::zir {
                 case Opcode::FPExt:
                     return floatingPointToBits(toTy.bits, bitsToFloatingPoint(fromTy.bits, a));
                 case Opcode::FPToSI:
-                    return maskTo(toTy.bits,
-                                  static_cast<std::uint64_t>(static_cast<std::int64_t>(bitsToFloatingPoint(fromTy.bits, a))));
+                    return maskTo(toTy.bits, static_cast<std::uint64_t>(
+                                                 static_cast<std::int64_t>(bitsToFloatingPoint(fromTy.bits, a))));
                 case Opcode::FPToUI:
                     return maskTo(toTy.bits, static_cast<std::uint64_t>(bitsToFloatingPoint(fromTy.bits, a)));
                 case Opcode::SIToFP:
@@ -267,14 +267,14 @@ namespace zust::zir {
                         if (inst.operands.size() == 2 && isConst[inst.operands[0].value()] &&
                             isConst[inst.operands[1].value()])
                             folded = foldBinop(inst.op, module_.types().get(inst.type), bits[inst.operands[0].value()],
-                                              bits[inst.operands[1].value()]);
+                                               bits[inst.operands[1].value()]);
                         break;
                     case Opcode::ICmp:
                     case Opcode::FCmp:
                         if (inst.operands.size() == 2 && isConst[inst.operands[0].value()] &&
                             isConst[inst.operands[1].value()])
                             folded = foldCmp(inst.op, inst.pred, module_.types().get(fn.typeOf(inst.operands[0])),
-                                            bits[inst.operands[0].value()], bits[inst.operands[1].value()]);
+                                             bits[inst.operands[0].value()], bits[inst.operands[1].value()]);
                         break;
                     case Opcode::Neg:
                     case Opcode::Not:
@@ -293,7 +293,7 @@ namespace zust::zir {
                     case Opcode::Bitcast:
                         if (inst.operands.size() == 1 && isConst[inst.operands[0].value()])
                             folded = foldCast(inst.op, module_.types().get(fn.typeOf(inst.operands[0])),
-                                             module_.types().get(inst.type), bits[inst.operands[0].value()]);
+                                              module_.types().get(inst.type), bits[inst.operands[0].value()]);
                         break;
                     default:
                         break;

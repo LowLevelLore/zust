@@ -21,6 +21,7 @@ namespace zust::zir {
     class InlinePass : public ModulePass {
     public:
         const char *name() const override { return "inline"; }
+
         bool run(Module &m, AnalysisManager &am) override;
     };
 

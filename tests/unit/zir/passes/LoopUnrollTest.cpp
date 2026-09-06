@@ -49,7 +49,7 @@ fn @f() -> i64 {
 
     std::string printed = Printer::print(m);
     CAPTURE(printed);
-    CHECK(printed.find("condbr") == std::string::npos);  // the loop's own test is gone -- trip count is known
+    CHECK(printed.find("condbr") == std::string::npos);      // the loop's own test is gone -- trip count is known
     CHECK(printed.find("ret i64 %v") != std::string::npos);  // returns a fresh const, not the old %i
 }
 

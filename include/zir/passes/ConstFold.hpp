@@ -17,6 +17,7 @@ namespace zust::zir {
         explicit ConstFoldPass(Module &m) : module_(m) {}
 
         const char *name() const override { return "constfold"; }
+
         bool run(Function &fn, AnalysisManager &am) override;
 
     private:

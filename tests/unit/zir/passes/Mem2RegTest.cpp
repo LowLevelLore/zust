@@ -18,7 +18,8 @@ namespace {
 
     bool runToFixpoint(Mem2RegPass &pass, Function &fn, AnalysisManager &am) {
         bool changedAny = false;
-        while (pass.run(fn, am)) changedAny = true;
+        while (pass.run(fn, am))
+            changedAny = true;
         return changedAny;
     }
 }  // namespace

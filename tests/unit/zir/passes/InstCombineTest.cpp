@@ -35,15 +35,15 @@ fn @f(%x: i64) -> i64 {
     InstCombinePass pass;
     AnalysisManager am;
     bool changedAny = false;
-    while (pass.run(fn, am)) changedAny = true;
+    while (pass.run(fn, am))
+        changedAny = true;
     CHECK(changedAny);
     CHECK(Verifier::verify(m).empty());
 
     // Run DCE too so the final printed form only shows what's left live --
     // easier to assert on than a pile of now-dead bitcasts.
     DCEPass dce;
-    while (dce.run(fn, am)) {
-    }
+    while (dce.run(fn, am)) {}
     std::string printed = Printer::print(m);
     CAPTURE(printed);
     CHECK(printed.find("const i64 0") != std::string::npos);

@@ -23,6 +23,7 @@ namespace zust::zir {
         explicit LoopUnrollPass(Module &m) : module_(m) {}
 
         const char *name() const override { return "loop-unroll"; }
+
         bool run(Function &fn, AnalysisManager &am) override;
 
     private:

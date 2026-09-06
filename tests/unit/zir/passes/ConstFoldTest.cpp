@@ -101,7 +101,8 @@ fn @f() -> u8 {
     ConstFoldPass pass(m);
     AnalysisManager am;
     bool changedAny = false;
-    while (pass.run(fn, am)) changedAny = true;
+    while (pass.run(fn, am))
+        changedAny = true;
     CHECK(changedAny);
 
     CHECK(Verifier::verify(m).empty());

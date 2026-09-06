@@ -134,7 +134,8 @@ namespace zust {
         FunctionInfo info = fnOrExtern->scope->lookupFunction(fnOrExtern->value);
 
         std::vector<TypeId> paramTypes;
-        for (const ParamInfo &p : info.paramTypes) paramTypes.push_back(zirType(p.type));
+        for (const ParamInfo &p : info.paramTypes)
+            paramTypes.push_back(zirType(p.type));
         // `main` is always `-> none` at the language level, but every legacy
         // backend still emits `define i32 @main()` / `ret i32 0` for the
         // process exit code (CodeGenLLVM.cpp:734) -- ZIR's signature matches
@@ -159,7 +160,8 @@ namespace zust {
         }
         if (node->type == NodeType::Function)
             return;  // nested functions get their own entry block; not supported this wave (unused by any test)
-        for (const auto &child : node->children) collectDeclarations(child.get(), out);
+        for (const auto &child : node->children)
+            collectDeclarations(child.get(), out);
     }
 
     void ZirGen::lowerFunctionBody(const ASTNode *fnNode) {
@@ -222,7 +224,8 @@ namespace zust {
         }
 
         if (fnNode->value == "main") {
-            for (const ASTNode *h : hoistedTopLevel_) lowerStatement(h);
+            for (const ASTNode *h : hoistedTopLevel_)
+                lowerStatement(h);
         }
         lowerStatement(body);
 
@@ -247,7 +250,8 @@ namespace zust {
             return;
         switch (node->type) {
             case NodeType::Program:
-                for (const auto &child : node->children) lowerStatement(child.get());
+                for (const auto &child : node->children)
+                    lowerStatement(child.get());
                 return;
             case NodeType::VariableDeclaration:
                 lowerVarDecl(node);
@@ -407,8 +411,8 @@ namespace zust {
     }
 
     void ZirGen::lowerReturn(const ASTNode *node) {
-        bool isVoidReturn =
-            node->children.empty() || (node->children[0]->type == NodeType::Symbol && node->children[0]->value == "none");
+        bool isVoidReturn = node->children.empty() ||
+                            (node->children[0]->type == NodeType::Symbol && node->children[0]->value == "none");
         if (isVoidReturn) {
             // A bare `return;` inside `main` still has to produce `ret i32 0`
             // -- main's ZIR signature is int32 regardless of its "none"
@@ -535,7 +539,7 @@ namespace zust {
 
         if (op == "==" || op == "!=" || op == ">=" || op == ">" || op == "<=" || op == "<") {
             if (isFloat) {
-                CmpPred p = op == "==" ? CmpPred::Oeq
+                CmpPred p = op == "=="   ? CmpPred::Oeq
                             : op == "!=" ? CmpPred::One
                             : op == ">=" ? CmpPred::Oge
                             : op == ">"  ? CmpPred::Ogt
@@ -544,7 +548,7 @@ namespace zust {
                 return builder_->fcmp(p, module_->types().boolType(), l2, r2);
             }
             bool s = ct.isSigned;
-            CmpPred p = op == "==" ? CmpPred::Eq
+            CmpPred p = op == "=="   ? CmpPred::Eq
                         : op == "!=" ? CmpPred::Ne
                         : op == ">=" ? (s ? CmpPred::Sge : CmpPred::Uge)
                         : op == ">"  ? (s ? CmpPred::Sgt : CmpPred::Ugt)
@@ -555,7 +559,10 @@ namespace zust {
 
         if (op == "+" || op == "-" || op == "*" || op == "/") {
             if (isFloat) {
-                Opcode fo = op == "+" ? Opcode::FAdd : op == "-" ? Opcode::FSub : op == "*" ? Opcode::FMul : Opcode::FDiv;
+                Opcode fo = op == "+"   ? Opcode::FAdd
+                            : op == "-" ? Opcode::FSub
+                            : op == "*" ? Opcode::FMul
+                                        : Opcode::FDiv;
                 return builder_->binop(fo, common, l2, r2);
             }
             Opcode io;
@@ -610,7 +617,8 @@ namespace zust {
                 // Variadic tail: promote per the legacy default-promotion
                 // rule (float -> double, everything else -> int64_t).
                 const Type &t = module_->types().get(fromTy);
-                TypeId toTy = t.kind == TypeKind::Float ? module_->types().floatType(64) : module_->types().intType(64, true);
+                TypeId toTy =
+                    t.kind == TypeKind::Float ? module_->types().floatType(64) : module_->types().intType(64, true);
                 val = castTo(val, fromTy, toTy);
             }
             args.push_back(val);
@@ -710,7 +718,9 @@ namespace zust {
         blockTerminated_ = true;
     }
 
-    void ZirGen::emitBrIfNotTerminated(BlockId target) { emitBr(target); }
+    void ZirGen::emitBrIfNotTerminated(BlockId target) {
+        emitBr(target);
+    }
 
     void ZirGen::emitRet(ValueId v) {
         if (blockTerminated_)

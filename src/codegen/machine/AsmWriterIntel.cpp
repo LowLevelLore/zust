@@ -67,7 +67,7 @@ namespace zust::codegen::machine {
                     std::string q = ptrQualifier(op.widthBits, op.regClass);
                     std::string disp = op.memDisp == 0 ? ""
                                                        : (op.memDisp > 0 ? " + " + std::to_string(op.memDisp)
-                                                                        : " - " + std::to_string(-op.memDisp));
+                                                                         : " - " + std::to_string(-op.memDisp));
                     return q + "[" + name + disp + "]";
                 }
                 case OperandKind::Imm:
@@ -119,9 +119,11 @@ namespace zust::codegen::machine {
                 }
             };
             if (saving) {
-                for (std::size_t i = 0; i < mf.calleeSavedUsed.size(); ++i) emitOne(i);
+                for (std::size_t i = 0; i < mf.calleeSavedUsed.size(); ++i)
+                    emitOne(i);
             } else {
-                for (std::size_t i = mf.calleeSavedUsed.size(); i-- > 0;) emitOne(i);
+                for (std::size_t i = mf.calleeSavedUsed.size(); i-- > 0;)
+                    emitOne(i);
             }
         }
 
@@ -188,10 +190,12 @@ namespace zust::codegen::machine {
         }
 
         out << "\n.code\n\n";
-        for (const MachineFunction &mf : externs) out << "EXTERN " << mf.name << ":FAR\n";
+        for (const MachineFunction &mf : externs)
+            out << "EXTERN " << mf.name << ":FAR\n";
         out << "\n";
 
-        for (const MachineFunction &mf : funcs) printFunction(mf, out);
+        for (const MachineFunction &mf : funcs)
+            printFunction(mf, out);
 
         out << "END\n";
     }

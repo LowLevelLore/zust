@@ -25,6 +25,7 @@ namespace zust::zir {
     class Mem2RegPass : public Pass {
     public:
         const char *name() const override { return "mem2reg"; }
+
         bool run(Function &fn, AnalysisManager &am) override;
     };
 

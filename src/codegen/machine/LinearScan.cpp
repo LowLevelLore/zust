@@ -15,7 +15,9 @@ namespace zust::codegen::machine {
             PhysReg reg;
         };
 
-        std::uint32_t bytesFor(std::uint32_t widthBits) { return widthBits <= 8 ? 1 : widthBits / 8; }
+        std::uint32_t bytesFor(std::uint32_t widthBits) {
+            return widthBits <= 8 ? 1 : widthBits / 8;
+        }
 
         // Greedy per-class allocation. Returns two maps: vreg -> assigned
         // physical register (only for vregs that got one), and
@@ -56,15 +58,16 @@ namespace zust::codegen::machine {
                 if (!active.empty() && active[worst].end > interval.end) {
                     PhysReg r = active[worst].reg;
                     std::uint32_t evicted = active[worst].vreg;
-                    spillSlot[evicted] = mf.newFrameSlot(bytesFor(mf.vregWidth[evicted]), bytesFor(mf.vregWidth[evicted]),
-                                                         /*isSpill=*/true);
+                    spillSlot[evicted] =
+                        mf.newFrameSlot(bytesFor(mf.vregWidth[evicted]), bytesFor(mf.vregWidth[evicted]),
+                                        /*isSpill=*/true);
                     assign.erase(evicted);
                     active[worst] = Active{interval.end, interval.vreg, r};
                     assign[interval.vreg] = r;
                 } else {
-                    spillSlot[interval.vreg] = mf.newFrameSlot(bytesFor(mf.vregWidth[interval.vreg]),
-                                                               bytesFor(mf.vregWidth[interval.vreg]),
-                                                               /*isSpill=*/true);
+                    spillSlot[interval.vreg] =
+                        mf.newFrameSlot(bytesFor(mf.vregWidth[interval.vreg]), bytesFor(mf.vregWidth[interval.vreg]),
+                                        /*isSpill=*/true);
                 }
             }
         }
@@ -124,7 +127,8 @@ namespace zust::codegen::machine {
 
                     std::uint32_t width = mf.vregWidth[op.vreg];
                     MachineOperand slot = MachineOperand::frame(sit->second, width, op.regClass);
-                    MachineOperand scratchOp = MachineOperand::pregOp(scratch, op.regClass == RegClass::XMM ? width : 64);
+                    MachineOperand scratchOp =
+                        MachineOperand::pregOp(scratch, op.regClass == RegClass::XMM ? width : 64);
                     if (op.regClass == RegClass::GPR)
                         scratchOp.widthBits = width;
 
@@ -147,9 +151,11 @@ namespace zust::codegen::machine {
                     op = scratchOp;
                 }
 
-                for (MachineInst &r : reloads) result.push_back(std::move(r));
+                for (MachineInst &r : reloads)
+                    result.push_back(std::move(r));
                 result.push_back(std::move(inst));
-                for (MachineInst &s : stores) result.push_back(std::move(s));
+                for (MachineInst &s : stores)
+                    result.push_back(std::move(s));
             }
 
             block.insts = std::move(result);
@@ -157,13 +163,15 @@ namespace zust::codegen::machine {
     }  // namespace
 
     void LinearScan::run(MachineFunction &mf) {
-        for (MachineBasicBlock &block : mf.blocks) allocateBlock(mf, block);
+        for (MachineBasicBlock &block : mf.blocks)
+            allocateBlock(mf, block);
     }
 
     void LinearScan::allocateBlock(MachineFunction &mf, MachineBasicBlock &block) {
         std::vector<LiveInterval> all = LiveIntervals::compute(block);
         std::vector<LiveInterval> gpr, xmm;
-        for (const LiveInterval &iv : all) (mf.vregClass[iv.vreg] == RegClass::GPR ? gpr : xmm).push_back(iv);
+        for (const LiveInterval &iv : all)
+            (mf.vregClass[iv.vreg] == RegClass::GPR ? gpr : xmm).push_back(iv);
 
         std::unordered_map<std::uint32_t, PhysReg> assign;
         std::unordered_map<std::uint32_t, std::int32_t> spillSlot;

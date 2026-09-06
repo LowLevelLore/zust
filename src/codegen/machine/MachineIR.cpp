@@ -4,7 +4,9 @@
 
 namespace zust::codegen::machine {
 
-    bool isXmm(PhysReg r) { return r >= PhysReg::XMM0 && r <= PhysReg::XMM15; }
+    bool isXmm(PhysReg r) {
+        return r >= PhysReg::XMM0 && r <= PhysReg::XMM15;
+    }
 
     namespace {
         // [width64][width32][width16][width8] per GPR, for both syntaxes --
@@ -41,7 +43,7 @@ namespace zust::codegen::machine {
         }
 
         const char *xmmName(PhysReg r) {
-            static const char *table[] = {"xmm0", "xmm1", "xmm2", "xmm3", "xmm4",  "xmm5",  "xmm6",  "xmm7",
+            static const char *table[] = {"xmm0", "xmm1", "xmm2",  "xmm3",  "xmm4",  "xmm5",  "xmm6",  "xmm7",
                                           "xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15"};
             return table[static_cast<std::size_t>(r) - static_cast<std::size_t>(PhysReg::XMM0)];
         }

@@ -5,7 +5,9 @@
 namespace zust::zir {
 
     namespace {
-        bool hasSideEffect(Opcode op) { return op == Opcode::Store || op == Opcode::Call; }
+        bool hasSideEffect(Opcode op) {
+            return op == Opcode::Store || op == Opcode::Call;
+        }
     }  // namespace
 
     bool DCEPass::run(Function &fn, AnalysisManager &) {

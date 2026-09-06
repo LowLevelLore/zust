@@ -52,7 +52,8 @@ fn @f(%v0: i64) -> i64 {
     BlockId elseB = blockNamed(fn, "else");
     BlockId merge = blockNamed(fn, "merge");
 
-    for (BlockId b : {entry, thenB, elseB, merge}) CHECK(dt.isReachable(b));
+    for (BlockId b : {entry, thenB, elseB, merge})
+        CHECK(dt.isReachable(b));
 
     CHECK(dt.dominates(entry, thenB));
     CHECK(dt.dominates(entry, elseB));

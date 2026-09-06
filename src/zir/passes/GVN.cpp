@@ -33,7 +33,8 @@ namespace zust::zir {
             ss << static_cast<int>(inst.op) << ':' << static_cast<int>(inst.pred) << ':' << inst.type.value() << ':'
                << inst.elemType.value() << ':' << inst.global.value() << ':' << inst.callee.value() << ':'
                << inst.constant.bits;
-            for (ValueId v : inst.operands) ss << ':' << v.value();
+            for (ValueId v : inst.operands)
+                ss << ':' << v.value();
             return ss.str();
         }
 
@@ -71,7 +72,8 @@ namespace zust::zir {
                         available[sig] = inst.result;
                     }
                 }
-                for (BlockId c : children[b.value()]) walk(c, available);
+                for (BlockId c : children[b.value()])
+                    walk(c, available);
             };
         walk(fn.entry(), {});
 
@@ -103,13 +105,15 @@ namespace zust::zir {
             BasicBlock &block = fn.block(BlockId(static_cast<BlockId::Value>(bi)));
             for (InstId iid : block.insts()) {
                 Instruction &inst = fn.inst(iid);
-                for (ValueId &operand : inst.operands) subst(operand);
+                for (ValueId &operand : inst.operands)
+                    subst(operand);
             }
             Terminator &t = block.term();
             subst(t.cond);
             subst(t.retValue);
             for (BlockRef &ref : t.targets)
-                for (ValueId &arg : ref.args) subst(arg);
+                for (ValueId &arg : ref.args)
+                    subst(arg);
         }
         return true;
     }

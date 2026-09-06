@@ -50,7 +50,8 @@ fn @f(%x: i64, %y: i64) -> i64 {
     // implementations. Run to a full fixpoint and check the property that
     // actually matters: `%inv` ends up out of `^body` either way.
     bool changedAny = false;
-    while (pass.run(fn, am)) changedAny = true;
+    while (pass.run(fn, am))
+        changedAny = true;
     CHECK(changedAny);
     CHECK(Verifier::verify(m).empty());
 
@@ -95,8 +96,7 @@ fn @f() -> i64 {
     // has no operands at all) and may get hoisted -- what must never
     // happen is `%next`, which depends on the induction variable itself,
     // moving anywhere.
-    while (pass.run(fn, am)) {
-    }
+    while (pass.run(fn, am)) {}
     std::string printed = Printer::print(m);
     CAPTURE(printed);
     auto bodyPos = printed.find("^body");
@@ -135,8 +135,7 @@ fn @f(%x: i64) -> i64 {
     AnalysisManager am;
     // `%one` (loop-invariant, no operands) may legitimately move; the call
     // itself -- despite `%x` also being loop-invariant -- never should.
-    while (pass.run(fn, am)) {
-    }
+    while (pass.run(fn, am)) {}
     std::string printed = Printer::print(m);
     CAPTURE(printed);
     auto bodyPos = printed.find("^body");

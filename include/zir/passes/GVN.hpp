@@ -18,6 +18,7 @@ namespace zust::zir {
     class GVNPass : public Pass {
     public:
         const char *name() const override { return "gvn"; }
+
         bool run(Function &fn, AnalysisManager &am) override;
     };
 

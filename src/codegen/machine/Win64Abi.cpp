@@ -11,10 +11,9 @@ namespace zust::codegen::machine {
             a.sharedArgSlots = true;
 
             a.calleeSavedGpr = {PhysReg::RBX, PhysReg::RDI, PhysReg::RSI, PhysReg::R12,
-                               PhysReg::R13, PhysReg::R14, PhysReg::R15};
-            a.calleeSavedXmm = {PhysReg::XMM6,  PhysReg::XMM7,  PhysReg::XMM8,  PhysReg::XMM9,
-                               PhysReg::XMM10, PhysReg::XMM11, PhysReg::XMM12, PhysReg::XMM13,
-                               PhysReg::XMM14, PhysReg::XMM15};
+                                PhysReg::R13, PhysReg::R14, PhysReg::R15};
+            a.calleeSavedXmm = {PhysReg::XMM6,  PhysReg::XMM7,  PhysReg::XMM8,  PhysReg::XMM9,  PhysReg::XMM10,
+                                PhysReg::XMM11, PhysReg::XMM12, PhysReg::XMM13, PhysReg::XMM14, PhysReg::XMM15};
 
             // The allocatable pool is deliberately *only* the callee-saved
             // registers (never rax/rcx/rdx/r8/r9/r10/r11 or xmm0-5): those
@@ -31,13 +30,13 @@ namespace zust::codegen::machine {
             // of every vreg unconditionally, not just the ones that
             // actually cross a call.
             a.allocatableGpr = {PhysReg::RBX, PhysReg::RDI, PhysReg::RSI, PhysReg::R12,
-                               PhysReg::R13, PhysReg::R14, PhysReg::R15};
+                                PhysReg::R13, PhysReg::R14, PhysReg::R15};
             a.scratchGpr1 = PhysReg::R10;
             a.scratchGpr2 = PhysReg::R11;
 
             // xmm14/xmm15 held back as scratch for the same reason.
-            a.allocatableXmm = {PhysReg::XMM6, PhysReg::XMM7,  PhysReg::XMM8,  PhysReg::XMM9,
-                               PhysReg::XMM10, PhysReg::XMM11, PhysReg::XMM12, PhysReg::XMM13};
+            a.allocatableXmm = {PhysReg::XMM6,  PhysReg::XMM7,  PhysReg::XMM8,  PhysReg::XMM9,
+                                PhysReg::XMM10, PhysReg::XMM11, PhysReg::XMM12, PhysReg::XMM13};
             a.scratchXmm1 = PhysReg::XMM14;
             a.scratchXmm2 = PhysReg::XMM15;
 

@@ -18,6 +18,7 @@ namespace zust::zir {
     class LICMPass : public Pass {
     public:
         const char *name() const override { return "licm"; }
+
         bool run(Function &fn, AnalysisManager &am) override;
     };
 

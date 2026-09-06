@@ -190,8 +190,10 @@ namespace zust {
                     const BasicBlock &block = fn_.block(bid);
                     out_ << block.label() << ":\n";
                     if (bid != fn_.entry())
-                        for (ValueId param : block.params()) emitPhi(bid, param);
-                    for (InstId iid : block.insts()) emitInstruction(fn_.inst(iid));
+                        for (ValueId param : block.params())
+                            emitPhi(bid, param);
+                    for (InstId iid : block.insts())
+                        emitInstruction(fn_.inst(iid));
                     emitTerminator(block.term());
                 }
                 out_ << "}\n\n";
@@ -271,7 +273,8 @@ namespace zust {
 
                 const std::vector<ValueId> &params = fn_.block(target).params();
                 std::size_t idx = 0;
-                while (idx < params.size() && params[idx] != param) ++idx;
+                while (idx < params.size() && params[idx] != param)
+                    ++idx;
 
                 out_ << "  " << name << " = phi " << llvmType(m_.types(), fn_.typeOf(param));
                 bool first = true;
@@ -280,8 +283,8 @@ namespace zust {
                     for (const BlockRef &edge : fn_.block(pred).term().targets) {
                         if (edge.block != target || idx >= edge.args.size())
                             continue;
-                        out_ << (first ? " " : ", ") << "[ " << ref(edge.args[idx]) << ", %"
-                             << fn_.block(pred).label() << " ]";
+                        out_ << (first ? " " : ", ") << "[ " << ref(edge.args[idx]) << ", %" << fn_.block(pred).label()
+                             << " ]";
                         first = false;
                     }
                 }
@@ -310,8 +313,7 @@ namespace zust {
                             return;
                         }
                         std::string name = freshName(inst.result);
-                        out_ << "  " << name << " = bitcast " << typedRef(inst.operands[0]) << " to " << toLlvm
-                             << "\n";
+                        out_ << "  " << name << " = bitcast " << typedRef(inst.operands[0]) << " to " << toLlvm << "\n";
                         return;
                     }
                     case Opcode::Alloca: {
@@ -326,8 +328,7 @@ namespace zust {
                         return;
                     }
                     case Opcode::Store: {
-                        out_ << "  store " << typedRef(inst.operands[0]) << ", " << typedRef(inst.operands[1])
-                             << "\n";
+                        out_ << "  store " << typedRef(inst.operands[0]) << ", " << typedRef(inst.operands[1]) << "\n";
                         return;
                     }
                     case Opcode::Add:
@@ -348,9 +349,8 @@ namespace zust {
                     case Opcode::FMul:
                     case Opcode::FDiv: {
                         std::string name = freshName(inst.result);
-                        out_ << "  " << name << " = " << binopKeyword(inst.op) << " "
-                             << llvmType(m_.types(), inst.type) << " " << ref(inst.operands[0]) << ", "
-                             << ref(inst.operands[1]) << "\n";
+                        out_ << "  " << name << " = " << binopKeyword(inst.op) << " " << llvmType(m_.types(), inst.type)
+                             << " " << ref(inst.operands[0]) << ", " << ref(inst.operands[1]) << "\n";
                         return;
                     }
                     case Opcode::ICmp: {
@@ -402,7 +402,8 @@ namespace zust {
                         std::string name = freshName(inst.result);
                         out_ << "  " << name << " = getelementptr " << llvmType(m_.types(), inst.elemType) << ", "
                              << typedRef(inst.operands[0]);
-                        for (std::size_t i = 1; i < inst.operands.size(); ++i) out_ << ", " << typedRef(inst.operands[i]);
+                        for (std::size_t i = 1; i < inst.operands.size(); ++i)
+                            out_ << ", " << typedRef(inst.operands[i]);
                         out_ << "\n";
                         return;
                     }
@@ -417,8 +418,8 @@ namespace zust {
                             name = freshName(inst.result);
                             out_ << name << " = ";
                         }
-                        out_ << "call " << llvmFnSigForCall(m_.types(), calleeFn.signature()) << " @"
-                             << calleeFn.name() << "(";
+                        out_ << "call " << llvmFnSigForCall(m_.types(), calleeFn.signature()) << " @" << calleeFn.name()
+                             << "(";
                         for (std::size_t i = 0; i < inst.operands.size(); ++i) {
                             if (i)
                                 out_ << ", ";
@@ -526,12 +527,12 @@ namespace zust {
                         out_ << "  unreachable\n";
                         return;
                     case TermKind::Switch: {
-                        out_ << "  switch " << typedRef(t.cond) << ", label %"
-                             << fn_.block(t.targets[0].block).label() << " [\n";
+                        out_ << "  switch " << typedRef(t.cond) << ", label %" << fn_.block(t.targets[0].block).label()
+                             << " [\n";
                         TypeId condTy = fn_.typeOf(t.cond);
                         for (std::size_t i = 1; i < t.targets.size(); ++i) {
-                            out_ << "    " << llvmType(m_.types(), condTy) << " " << t.caseValues[i - 1]
-                                 << ", label %" << fn_.block(t.targets[i].block).label() << "\n";
+                            out_ << "    " << llvmType(m_.types(), condTy) << " " << t.caseValues[i - 1] << ", label %"
+                                 << fn_.block(t.targets[i].block).label() << "\n";
                         }
                         out_ << "  ]\n";
                         return;

@@ -14,6 +14,7 @@ namespace zust::zir {
     class InstCombinePass : public Pass {
     public:
         const char *name() const override { return "instcombine"; }
+
         bool run(Function &fn, AnalysisManager &am) override;
     };
 

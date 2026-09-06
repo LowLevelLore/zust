@@ -20,6 +20,7 @@ namespace zust::zir {
     class SCCPPass : public Pass {
     public:
         const char *name() const override { return "sccp"; }
+
         bool run(Function &fn, AnalysisManager &am) override;
     };
 

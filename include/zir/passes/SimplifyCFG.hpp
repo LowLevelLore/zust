@@ -18,6 +18,7 @@ namespace zust::zir {
     class SimplifyCFGPass : public Pass {
     public:
         const char *name() const override { return "simplifycfg"; }
+
         bool run(Function &fn, AnalysisManager &am) override;
     };
 

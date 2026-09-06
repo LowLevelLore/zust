@@ -17,6 +17,7 @@ namespace zust::zir {
     class DCEPass : public Pass {
     public:
         const char *name() const override { return "dce"; }
+
         bool run(Function &fn, AnalysisManager &am) override;
     };
 

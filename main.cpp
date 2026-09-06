@@ -34,8 +34,8 @@ namespace {
             std::vector<zir::VerifierFailure> failures = zir::Verifier::verify(mod);
             if (!failures.empty()) {
                 for (const zir::VerifierFailure &f : failures) {
-                    std::cerr << "ZIR verification failed [" << zir::toString(f.check) << "] in @" << f.function
-                              << ": " << f.detail << "\n";
+                    std::cerr << "ZIR verification failed [" << zir::toString(f.check) << "] in @" << f.function << ": "
+                              << f.detail << "\n";
                 }
                 return std::nullopt;
             }

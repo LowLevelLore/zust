@@ -86,12 +86,12 @@ namespace zust::codegen::machine {
 
         // Reg
         bool isVirtual = false;
-        std::uint32_t vreg = 0;              // meaningful when isVirtual
-        PhysReg preg = PhysReg::None;         // meaningful when !isVirtual
+        std::uint32_t vreg = 0;        // meaningful when isVirtual
+        PhysReg preg = PhysReg::None;  // meaningful when !isVirtual
         RegClass regClass = RegClass::GPR;
-        std::uint32_t widthBits = 64;         // GPR: 8/16/32/64. XMM: 32 (float) or 64 (double).
-        bool isMemory = false;                // true: this Reg operand is really "[reg]" (a pointer dereference)
-        std::int64_t memDisp = 0;             // byte displacement added to isMemory's address
+        std::uint32_t widthBits = 64;  // GPR: 8/16/32/64. XMM: 32 (float) or 64 (double).
+        bool isMemory = false;         // true: this Reg operand is really "[reg]" (a pointer dereference)
+        std::int64_t memDisp = 0;      // byte displacement added to isMemory's address
 
         // Imm
         std::uint64_t immBits = 0;  // raw bits; immIsFloat says how to read them
@@ -242,8 +242,8 @@ namespace zust::codegen::machine {
 
         // ---- filled in by FrameLayout (Wave 5.5) ----
         std::int64_t frameSize = 0;
-        std::vector<std::int64_t> frameSlotOffsets;  // parallel to frameSlots, rbp-relative (negative)
-        std::vector<PhysReg> calleeSavedUsed;         // in save order; epilogue restores in reverse
+        std::vector<std::int64_t> frameSlotOffsets;    // parallel to frameSlots, rbp-relative (negative)
+        std::vector<PhysReg> calleeSavedUsed;          // in save order; epilogue restores in reverse
         std::vector<std::int64_t> calleeSavedOffsets;  // parallel to calleeSavedUsed, rbp-relative
         bool needsFramePointer = true;
 

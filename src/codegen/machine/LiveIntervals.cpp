@@ -30,10 +30,10 @@ namespace zust::codegen::machine {
 
         std::vector<LiveInterval> result;
         result.reserve(byVreg.size());
-        for (auto &[vreg, interval] : byVreg) result.push_back(interval);
-        std::sort(result.begin(), result.end(), [](const LiveInterval &a, const LiveInterval &b) {
-            return a.start < b.start;
-        });
+        for (auto &[vreg, interval] : byVreg)
+            result.push_back(interval);
+        std::sort(result.begin(), result.end(),
+                  [](const LiveInterval &a, const LiveInterval &b) { return a.start < b.start; });
         return result;
     }
 

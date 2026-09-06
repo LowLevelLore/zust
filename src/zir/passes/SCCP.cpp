@@ -31,7 +31,8 @@ namespace zust::zir {
             for (const BlockRef &ref : fn.block(BlockId(static_cast<BlockId::Value>(bi))).term().targets) {
                 auto &slots = incoming[ref.block.value()];
                 slots.resize(ref.args.size());
-                for (std::size_t i = 0; i < ref.args.size(); ++i) slots[i].push_back(ref.args[i]);
+                for (std::size_t i = 0; i < ref.args.size(); ++i)
+                    slots[i].push_back(ref.args[i]);
             }
         }
 
@@ -104,13 +105,15 @@ namespace zust::zir {
                 Instruction &inst = fn.inst(iid);
                 if (inst.op == Opcode::Const)
                     continue;  // never rewrite the very consts we just introduced
-                for (ValueId &operand : inst.operands) doSubst(operand);
+                for (ValueId &operand : inst.operands)
+                    doSubst(operand);
             }
             Terminator &t = block.term();
             doSubst(t.cond);
             doSubst(t.retValue);
             for (BlockRef &ref : t.targets)
-                for (ValueId &arg : ref.args) doSubst(arg);
+                for (ValueId &arg : ref.args)
+                    doSubst(arg);
         }
         return true;
     }

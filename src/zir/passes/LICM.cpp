@@ -55,7 +55,8 @@ namespace zust::zir {
             std::unordered_map<ValueId::Value, BlockId> defBlock;
             for (BlockId::Value bv : body) {
                 BlockId b(bv);
-                for (ValueId p : fn.block(b).params()) defBlock[p.value()] = b;
+                for (ValueId p : fn.block(b).params())
+                    defBlock[p.value()] = b;
                 for (InstId iid : fn.block(b).insts())
                     if (fn.inst(iid).result.isValid())
                         defBlock[fn.inst(iid).result.value()] = b;

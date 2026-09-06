@@ -18,7 +18,8 @@ namespace {
 
     bool runToFixpoint(SimplifyCFGPass &pass, Function &fn, AnalysisManager &am) {
         bool changedAny = false;
-        while (pass.run(fn, am)) changedAny = true;
+        while (pass.run(fn, am))
+            changedAny = true;
         return changedAny;
     }
 }  // namespace
@@ -52,8 +53,8 @@ fn @f() -> i64 {
     // The always-taken arm's `ret i64 1` should now be reachable directly
     // from entry (merged straight in), and the untaken `^else` arm's `ret
     // i64 2` should be gone from the reachable text entirely.
-    bool keptTakenArm = printed.find("ret i64 %a") != std::string::npos ||
-                       printed.find("const i64 1") != std::string::npos;
+    bool keptTakenArm =
+        printed.find("ret i64 %a") != std::string::npos || printed.find("const i64 1") != std::string::npos;
     CHECK(keptTakenArm);
     CHECK(printed.find("const i64 2") == std::string::npos);
 }

@@ -70,6 +70,7 @@ namespace zust::codegen::machine {
             std::uint64_t bits;
             std::uint32_t widthBits;
         };
+
         const std::vector<FloatConstant> &floatConstants() const { return floatConstants_; }
 
     private:

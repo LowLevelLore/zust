@@ -129,8 +129,8 @@ namespace zust::zir {
             if (!found)
                 return std::nullopt;
 
-            shape.exitTarget = headerTerm.targets[0].block == latch ? headerTerm.targets[1].block
-                                                                    : headerTerm.targets[0].block;
+            shape.exitTarget =
+                headerTerm.targets[0].block == latch ? headerTerm.targets[1].block : headerTerm.targets[0].block;
 
             Terminator &latchTerm = fn.block(latch).term();
             if (latchTerm.kind != TermKind::Br || latchTerm.targets[0].block != header)
@@ -235,7 +235,8 @@ namespace zust::zir {
                 for (InstId iid : fn.block(latch).insts()) {
                     const Instruction &src = fn.inst(iid);
                     Instruction dst = src;
-                    for (ValueId &operand : dst.operands) operand = substitute(operand, valueMap);
+                    for (ValueId &operand : dst.operands)
+                        operand = substitute(operand, valueMap);
                     if (dst.result.isValid()) {
                         ValueId fresh = fn.newValue(dst.type);
                         valueMap[dst.result.value()] = fresh;
@@ -280,10 +281,9 @@ namespace zust::zir {
             // such direct reference has to be replaced with the concrete
             // exit-time value everywhere it might still occur, not just
             // along the one exit edge's argument list.
-            std::uint64_t exitCounter =
-                counterValues.empty()
-                    ? shape.initial
-                    : applyStep(shape.stepOp, shape.bits, counterValues.back(), shape.step);
+            std::uint64_t exitCounter = counterValues.empty()
+                                            ? shape.initial
+                                            : applyStep(shape.stepOp, shape.bits, counterValues.back(), shape.step);
             ValueId exitConst = fn.newValue(fn.typeOf(shape.counterParam));
             Instruction exitInst;
             exitInst.op = Opcode::Const;

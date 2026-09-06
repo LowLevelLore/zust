@@ -26,6 +26,7 @@ namespace zust::zir {
         explicit TailCallPass(Module &m) : module_(m) {}
 
         const char *name() const override { return "tailcall"; }
+
         bool run(Function &fn, AnalysisManager &am) override;
 
     private:

@@ -85,7 +85,8 @@ fn @f() -> void {
     // dead here). Confirms DCE needs a fixpoint, not one flat pass, on its
     // own even without another pass's help.
     bool changedAny = false;
-    while (pass.run(fn, am)) changedAny = true;
+    while (pass.run(fn, am))
+        changedAny = true;
     CHECK(changedAny);
 
     CHECK(Verifier::verify(m).empty());

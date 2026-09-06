@@ -70,7 +70,8 @@ namespace zust::zir {
                     for (InstId cid : callee.block(callee.entry()).insts()) {
                         const Instruction &src = callee.inst(cid);
                         Instruction dst = src;
-                        for (ValueId &operand : dst.operands) operand = substitute(operand, valueMap);
+                        for (ValueId &operand : dst.operands)
+                            operand = substitute(operand, valueMap);
                         if (dst.result.isValid()) {
                             ValueId fresh = caller.newValue(dst.type);
                             valueMap[dst.result.value()] = fresh;
@@ -132,7 +133,8 @@ namespace zust::zir {
             Function &fn = m.function(FuncId(static_cast<FuncId::Value>(i)));
             if (fn.isExtern())
                 continue;
-            while (inlineOneCallSite(m, fn)) changedAny = true;
+            while (inlineOneCallSite(m, fn))
+                changedAny = true;
         }
         return changedAny;
     }

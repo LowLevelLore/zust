@@ -118,7 +118,7 @@ namespace zust::zir {
         // load of its own yet still be one of the edges a phi needs a
         // contribution from.
         bool hasReachingDefEverywhere(Function &fn, ValueId target, const std::vector<std::vector<BlockId>> &children,
-                                     const std::unordered_set<BlockId::Value> &frontierBlocks) {
+                                      const std::unordered_set<BlockId::Value> &frontierBlocks) {
             bool safe = true;
             std::function<void(BlockId, bool)> visit = [&](BlockId b, bool definedIn) {
                 bool defined = definedIn || frontierBlocks.count(b.value()) != 0;
@@ -137,7 +137,8 @@ namespace zust::zir {
                             safe = false;
                     }
                 }
-                for (BlockId ch : children[b.value()]) visit(ch, defined);
+                for (BlockId ch : children[b.value()])
+                    visit(ch, defined);
             };
             visit(fn.entry(), false);
             return safe;
@@ -166,7 +167,8 @@ namespace zust::zir {
         std::vector<Candidate> safe;
         for (const Candidate &c : shapeOk) {
             std::unordered_set<BlockId::Value> frontierBlocks;
-            for (BlockId b : frontierOf[c.alloca.value()]) frontierBlocks.insert(b.value());
+            for (BlockId b : frontierOf[c.alloca.value()])
+                frontierBlocks.insert(b.value());
             if (hasReachingDefEverywhere(fn, c.alloca, children, frontierBlocks))
                 safe.push_back(c);
         }
@@ -186,7 +188,8 @@ namespace zust::zir {
         }
 
         std::unordered_set<Key> safeSet;
-        for (const Candidate &c : safe) safeSet.insert(c.alloca.value());
+        for (const Candidate &c : safe)
+            safeSet.insert(c.alloca.value());
 
         std::unordered_map<Key, ValueId> globalSubst;  // a removed load's result -> its reaching value
         std::unordered_set<InstId::Value> toRemove;    // dead alloca/store/load instructions
@@ -195,14 +198,15 @@ namespace zust::zir {
             [&](BlockId b, std::unordered_map<Key, ValueId> state) {
                 auto pit = paramFor.find(b.value());
                 if (pit != paramFor.end())
-                    for (auto &entry : pit->second) state[entry.first] = entry.second;
+                    for (auto &entry : pit->second)
+                        state[entry.first] = entry.second;
 
                 for (InstId iid : fn.block(b).insts()) {
                     Instruction &inst = fn.inst(iid);
                     if (inst.op == Opcode::Alloca && safeSet.count(inst.result.value())) {
                         toRemove.insert(iid.value());
                     } else if (inst.op == Opcode::Store && inst.operands.size() == 2 &&
-                              safeSet.count(inst.operands[1].value())) {
+                               safeSet.count(inst.operands[1].value())) {
                         ValueId value = inst.operands[0];
                         auto sit = globalSubst.find(value.value());
                         if (sit != globalSubst.end())
@@ -210,7 +214,7 @@ namespace zust::zir {
                         state[inst.operands[1].value()] = value;
                         toRemove.insert(iid.value());
                     } else if (inst.op == Opcode::Load && inst.operands.size() == 1 &&
-                              safeSet.count(inst.operands[0].value())) {
+                               safeSet.count(inst.operands[0].value())) {
                         globalSubst[inst.result.value()] = state.at(inst.operands[0].value());
                         toRemove.insert(iid.value());
                     }
@@ -229,7 +233,8 @@ namespace zust::zir {
                     }
                 }
 
-                for (BlockId ch : children[b.value()]) rename(ch, state);
+                for (BlockId ch : children[b.value()])
+                    rename(ch, state);
             };
         rename(fn.entry(), {});
 
@@ -263,7 +268,8 @@ namespace zust::zir {
             substIn(t.cond);
             substIn(t.retValue);
             for (BlockRef &ref : t.targets)
-                for (ValueId &arg : ref.args) substIn(arg);
+                for (ValueId &arg : ref.args)
+                    substIn(arg);
         }
 
         return true;

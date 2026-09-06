@@ -15,16 +15,19 @@ namespace zust::zir {
                 v = it->second;
         }
 
-        void substituteInBlock(BasicBlock &block, Function &fn, const std::unordered_map<ValueId::Value, ValueId> &subst) {
+        void substituteInBlock(BasicBlock &block, Function &fn,
+                               const std::unordered_map<ValueId::Value, ValueId> &subst) {
             for (InstId iid : block.insts()) {
                 Instruction &inst = fn.inst(iid);
-                for (ValueId &operand : inst.operands) substituteValue(operand, subst);
+                for (ValueId &operand : inst.operands)
+                    substituteValue(operand, subst);
             }
             Terminator &t = block.term();
             substituteValue(t.cond, subst);
             substituteValue(t.retValue, subst);
             for (BlockRef &ref : t.targets)
-                for (ValueId &arg : ref.args) substituteValue(arg, subst);
+                for (ValueId &arg : ref.args)
+                    substituteValue(arg, subst);
         }
 
         // Looks up whether `v` is defined by a still-in-place `const`
@@ -92,7 +95,8 @@ namespace zust::zir {
                     continue;  // malformed input; leave it for the Verifier to reject
 
                 std::unordered_map<ValueId::Value, ValueId> subst;
-                for (std::size_t i = 0; i < params.size(); ++i) subst[params[i].value()] = args[i];
+                for (std::size_t i = 0; i < params.size(); ++i)
+                    subst[params[i].value()] = args[i];
                 if (!subst.empty())
                     substituteInBlock(fn.block(b), fn, subst);
 
@@ -112,6 +116,7 @@ namespace zust::zir {
             }
             return false;
         }
+
         // Folding away a CondBr arm (or a merge) can leave a whole chain of
         // blocks unreachable from entry while they still point at each
         // other -- the Verifier's predecessor check (docs/IR-DESIGN.md

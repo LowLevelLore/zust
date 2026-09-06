@@ -17,10 +17,11 @@ namespace zust::zir {
         }
 
         std::vector<std::vector<BlockId>> computePredecessors(const Function &fn,
-                                                               const std::vector<std::vector<BlockId>> &succ) {
+                                                              const std::vector<std::vector<BlockId>> &succ) {
             std::vector<std::vector<BlockId>> preds(fn.blockCount());
             for (std::size_t i = 0; i < succ.size(); ++i) {
-                for (BlockId s : succ[i]) preds[s.value()].push_back(BlockId(static_cast<BlockId::Value>(i)));
+                for (BlockId s : succ[i])
+                    preds[s.value()].push_back(BlockId(static_cast<BlockId::Value>(i)));
             }
             return preds;
         }
@@ -48,8 +49,8 @@ namespace zust::zir {
         // (independent) copy of this algorithm for the fuller rationale;
         // this one exists for the pass pipeline rather than the verifier.
         std::vector<std::vector<bool>> computeDominators(const Function &fn,
-                                                          const std::vector<std::vector<BlockId>> &preds,
-                                                          const std::vector<bool> &reachable) {
+                                                         const std::vector<std::vector<BlockId>> &preds,
+                                                         const std::vector<bool> &reachable) {
             std::size_t n = fn.blockCount();
             std::vector<std::vector<bool>> dom(n, std::vector<bool>(n, false));
             if (!fn.entry().isValid())
@@ -58,7 +59,8 @@ namespace zust::zir {
             dom[entryIdx][entryIdx] = true;
             for (std::size_t i = 0; i < n; ++i) {
                 if (reachable[i] && i != entryIdx) {
-                    for (std::size_t j = 0; j < n; ++j) dom[i][j] = reachable[j];
+                    for (std::size_t j = 0; j < n; ++j)
+                        dom[i][j] = reachable[j];
                 }
             }
 
@@ -77,7 +79,8 @@ namespace zust::zir {
                             newDom = dom[p.value()];
                             first = false;
                         } else {
-                            for (std::size_t k = 0; k < n; ++k) newDom[k] = newDom[k] && dom[p.value()][k];
+                            for (std::size_t k = 0; k < n; ++k)
+                                newDom[k] = newDom[k] && dom[p.value()][k];
                         }
                     }
                     if (first)
@@ -97,7 +100,7 @@ namespace zust::zir {
         // immediate dominator is the strict dominator with the most
         // dominators of its own, i.e. the one deepest in that chain.
         std::vector<BlockId> computeImmediateDominators(const Function &fn, const std::vector<bool> &reachable,
-                                                         const std::vector<std::vector<bool>> &dom) {
+                                                        const std::vector<std::vector<bool>> &dom) {
             std::size_t n = fn.blockCount();
             std::vector<BlockId> idom(n);
             if (!fn.entry().isValid())
@@ -132,9 +135,9 @@ namespace zust::zir {
         // every node visited strictly before reaching the join's own
         // immediate dominator.
         std::vector<std::vector<BlockId>> computeDominanceFrontiers(const Function &fn,
-                                                                     const std::vector<bool> &reachable,
-                                                                     const std::vector<std::vector<BlockId>> &preds,
-                                                                     const std::vector<BlockId> &idom) {
+                                                                    const std::vector<bool> &reachable,
+                                                                    const std::vector<std::vector<BlockId>> &preds,
+                                                                    const std::vector<BlockId> &idom) {
             std::size_t n = fn.blockCount();
             std::vector<std::vector<bool>> dfSet(n, std::vector<bool>(n, false));
             for (std::size_t bi = 0; bi < n; ++bi) {
@@ -193,10 +196,16 @@ namespace zust::zir {
         return idom_[b.value()];
     }
 
-    const std::vector<BlockId> &DominatorTree::predecessors(BlockId b) const { return preds_[b.value()]; }
+    const std::vector<BlockId> &DominatorTree::predecessors(BlockId b) const {
+        return preds_[b.value()];
+    }
 
-    const std::vector<BlockId> &DominatorTree::successors(BlockId b) const { return succ_[b.value()]; }
+    const std::vector<BlockId> &DominatorTree::successors(BlockId b) const {
+        return succ_[b.value()];
+    }
 
-    const std::vector<BlockId> &DominatorTree::dominanceFrontier(BlockId b) const { return domFrontier_[b.value()]; }
+    const std::vector<BlockId> &DominatorTree::dominanceFrontier(BlockId b) const {
+        return domFrontier_[b.value()];
+    }
 
 }  // namespace zust::zir
