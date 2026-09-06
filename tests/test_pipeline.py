@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import difflib
+import os
+import shlex
 import shutil
 import subprocess
 from pathlib import Path
@@ -85,10 +87,17 @@ def compile_source(
     target_config,
     zpiler_path: Path,
 ) -> tuple[list[str], subprocess.CompletedProcess[bytes]]:
+    # ZPILER_EXTRA_ARGS is not a permanent per-target setting -- it's how a
+    # PRD wave verifies a codegen path that's still behind a flag before it
+    # becomes the default (docs/PRD-ZIR.md Wave 4.1's `--zir-codegen`, e.g.
+    # `ZPILER_EXTRA_ARGS=--zir-codegen TARGET=llvm pytest -q`). Applied to
+    # every target compiled in the run, same as TARGET itself.
+    extra_args = shlex.split(os.environ.get("ZPILER_EXTRA_ARGS", ""))
     cmd = [
         str(zpiler_path),
         "--format",
         target_config.zpiler_format,
+        *extra_args,
         "-o",
         str(asm_out),
         str(source),

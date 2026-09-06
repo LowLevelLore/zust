@@ -205,7 +205,7 @@ LLVM goes first: it is the cheap oracle. `llc` on Linux CI validates the whole I
 design before a single line of x86 instruction selection is written, and it is
 what stands in for the ZIR interpreter this rewrite deliberately skips.
 
-- [ ] **4.1 [V]** `LlvmBackend`: ZIR → textual `.ll`, behind `--zir-codegen`.
+- [x] **4.1 [V]** `LlvmBackend`: ZIR → textual `.ll`, behind `--zir-codegen`.
       *Exit:* `TARGET=llvm pytest -q` green (40/40) with the flag; goldens
       untouched.
 - [ ] **4.2 [V]** Flip the default; delete `CodeGenLLVM.cpp`. *Exit:* green with

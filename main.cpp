@@ -15,11 +15,37 @@
 #include "support/CommandLine.hpp"
 #include "support/File.hpp"
 #include "typechecker/TypeChecker.hpp"
+#include "codegen/ZirLlvmBackend.hpp"
 #include "zir/Printer.hpp"
 #include "zir/Verifier.hpp"
 #include "zirgen/ZirGen.hpp"
 
 using namespace zust;
+
+namespace {
+    // Shared by `--emit=zir` and `--zir-codegen` (docs/PRD-ZIR.md Wave 3/4):
+    // both need a verified ZIR module before doing anything target-specific
+    // with it. Returns nullopt (having already reported the problem) on a
+    // lowering exception or a verifier failure.
+    std::optional<zir::Module> lowerAndVerify(const ASTNode &program, const std::string &sourceName) {
+        try {
+            ZirGen zirGen;
+            zir::Module mod = zirGen.lower(program, sourceName);
+            std::vector<zir::VerifierFailure> failures = zir::Verifier::verify(mod);
+            if (!failures.empty()) {
+                for (const zir::VerifierFailure &f : failures) {
+                    std::cerr << "ZIR verification failed [" << zir::toString(f.check) << "] in @" << f.function
+                              << ": " << f.detail << "\n";
+                }
+                return std::nullopt;
+            }
+            return mod;
+        } catch (std::exception const &exc) {
+            std::cerr << "ERROR: " << exc.what() << "\n";
+            return std::nullopt;
+        }
+    }
+}  // namespace
 
 int main(int argc, char *argv[]) {
     if (argc < 2) {
@@ -135,18 +161,23 @@ int main(int argc, char *argv[]) {
     }
 
     if (cli.getEmit() == "zir") {
+        std::optional<zir::Module> mod = lowerAndVerify(*program, inputFile);
+        if (!mod)
+            return 1;
+        zir::Printer::print(*mod, *outstream);
+        return 0;
+    }
+
+    // Wave 4.1: `--zir-codegen` routes `--format llvm-ir` through ZirGen +
+    // ZirLlvmBackend instead of the legacy AST-consuming LlvmBackend the
+    // BackendRegistry just resolved above. Every other format ignores the
+    // flag -- Wave 5/6's native backends aren't ZIR consumers yet.
+    if (cli.wantsZirCodegen() && targetName == "llvm-ir") {
+        std::optional<zir::Module> mod = lowerAndVerify(*program, inputFile);
+        if (!mod)
+            return 1;
         try {
-            ZirGen zirGen;
-            zir::Module mod = zirGen.lower(*program, inputFile);
-            std::vector<zir::VerifierFailure> failures = zir::Verifier::verify(mod);
-            if (!failures.empty()) {
-                for (const zir::VerifierFailure &f : failures) {
-                    std::cerr << "ZIR verification failed [" << zir::toString(f.check) << "] in @" << f.function
-                              << ": " << f.detail << "\n";
-                }
-                return 1;
-            }
-            zir::Printer::print(mod, *outstream);
+            ZirLlvmBackend::emit(*mod, *outstream);
         } catch (std::exception const &exc) {
             std::cerr << "ERROR: " << exc.what() << "\n";
             return 1;
