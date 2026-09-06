@@ -37,12 +37,22 @@ namespace zust::zir {
         bool inlineOneCallSite(Module &m, Function &caller) {
             for (std::size_t bi = 0; bi < caller.blockCount(); ++bi) {
                 BlockId bid(static_cast<BlockId::Value>(bi));
-                std::vector<InstId> &insts = caller.block(bid).insts();
-                for (std::size_t pos = 0; pos < insts.size(); ++pos) {
-                    Instruction &call = caller.inst(insts[pos]);
-                    if (call.op != Opcode::Call)
+                for (std::size_t pos = 0; pos < caller.block(bid).insts().size(); ++pos) {
+                    // Everything read off the call instruction is snapshotted
+                    // here, by value: `caller.addInst` below pushes to both
+                    // `caller`'s instruction arena and this block's InstId
+                    // list, either of which can reallocate -- so no reference
+                    // into `caller`'s storage may be held across the copy
+                    // loop. (Root cause of a heap-use-after-free at -O3.)
+                    InstId callId = caller.block(bid).insts()[pos];
+                    if (caller.inst(callId).op != Opcode::Call)
                         continue;
-                    Function &callee = m.function(call.callee);
+                    const Instruction &callSnapshotRef = caller.inst(callId);
+                    FuncId calleeId = callSnapshotRef.callee;
+                    std::vector<ValueId> callArgs = callSnapshotRef.operands;
+                    ValueId oldResult = callSnapshotRef.result;
+
+                    Function &callee = m.function(calleeId);
                     if (&callee == &caller || callee.isExtern() || callee.isVariadic())
                         continue;
                     if (callee.blockCount() != 1)
@@ -63,13 +73,12 @@ namespace zust::zir {
                     // correctly).
                     std::unordered_map<ValueId::Value, ValueId> valueMap;
                     const std::vector<ValueId> &calleeParams = callee.block(callee.entry()).params();
-                    for (std::size_t i = 0; i < calleeParams.size() && i < call.operands.size(); ++i)
-                        valueMap[calleeParams[i].value()] = call.operands[i];
+                    for (std::size_t i = 0; i < calleeParams.size() && i < callArgs.size(); ++i)
+                        valueMap[calleeParams[i].value()] = callArgs[i];
 
                     std::vector<InstId> copied;
                     for (InstId cid : callee.block(callee.entry()).insts()) {
-                        const Instruction &src = callee.inst(cid);
-                        Instruction dst = src;
+                        Instruction dst = callee.inst(cid);  // copy out of `callee` before touching `caller`
                         for (ValueId &operand : dst.operands)
                             operand = substitute(operand, valueMap);
                         if (dst.result.isValid()) {
@@ -77,13 +86,7 @@ namespace zust::zir {
                             valueMap[dst.result.value()] = fresh;
                             dst.result = fresh;
                         }
-                        InstId newId = caller.addInst(bid, std::move(dst));
-                        copied.push_back(newId);
-                        // addInst appended it to the *end* of this block's
-                        // list; it belongs where the call was instead, so
-                        // pull it back out here and place the whole run in
-                        // order below.
-                        insts.pop_back();
+                        copied.push_back(caller.addInst(bid, std::move(dst)));
                     }
 
                     const Terminator &calleeTerm = callee.block(callee.entry()).term();
@@ -91,12 +94,13 @@ namespace zust::zir {
                     if (calleeTerm.kind == TermKind::Ret && calleeTerm.retValue.isValid())
                         replacement = substitute(calleeTerm.retValue, valueMap);
 
-                    // Splice the copied body in where the call was, then
-                    // drop the call itself. If the call's own result was
-                    // used, every use of it elsewhere in `caller` now needs
-                    // to see `replacement` instead -- a plain function-wide
-                    // substitution, same pattern every other pass here uses.
-                    ValueId oldResult = call.result;
+                    // `addInst` appended each copied instruction's id to the
+                    // end of this block; move the whole run to where the call
+                    // was and drop the call. Re-fetch the list now (it may
+                    // have moved); indices below `pos` are still valid since
+                    // the copy loop only appended.
+                    std::vector<InstId> &insts = caller.block(bid).insts();
+                    insts.erase(insts.end() - static_cast<long>(copied.size()), insts.end());
                     insts.erase(insts.begin() + static_cast<long>(pos));
                     insts.insert(insts.begin() + static_cast<long>(pos), copied.begin(), copied.end());
 
