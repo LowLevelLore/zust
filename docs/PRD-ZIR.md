@@ -68,14 +68,14 @@ observable behaviors the 40 goldens depend on (or, where noted, behaviors the
 goldens do NOT exercise but a naive rewrite would still change). Get these into
 `tests/zir/` as pinning cases where the existing suite doesn't already cover them.
 
-- [ ] **`&&` / `||` are non-short-circuiting.** All three backends lower them to a
+- [x] **`&&` / `||` are non-short-circuiting.** All three backends lower them to a
       plain bitwise `and`/`or` on the promoted type, evaluating both operands
       unconditionally — `CodeGenLinux.cpp:349`, `CodeGenWindows.cpp:404`,
       `CodeGenLLVM.cpp:316`. No existing test has a side-effecting RHS, so a
       short-circuiting `condbr` lowering would pass the whole suite and still be
       a silent language change. Lower to `and`/`or` on `i1` deliberately; add a
       new `tests/zir/` case with an effectful RHS.
-- [ ] **Global hoisting into `main`** — `CodeGenLLVM.cpp:700-744`, mirrored in
+- [x] **Global hoisting into `main`** — `CodeGenLLVM.cpp:700-744`, mirrored in
       both native backends. Four rules:
       1. Every top-level `VariableDeclaration` becomes a **zero-initialized**
          global; the initializer expression is not a static initializer.
@@ -89,12 +89,12 @@ goldens do NOT exercise but a naive rewrite would still change). Get these into
       4. `main` gets an unconditional trailing `ret 0` after its body. ZIR forbids
          two terminators per block, so lowering needs a verifier-legal tail
          (e.g. only append it when the body doesn't already end in `ret`).
-- [ ] **`promoteType` lattice** — reproduce `TypeChecker.hpp:28-77` exactly,
+- [x] **`promoteType` lattice** — reproduce `TypeChecker.hpp:28-77` exactly,
       including the easy-to-miss rule that **an int wider than a float promotes to
       a float of the int's width** (`float32 + int64 → double`, not `float32`), and
       that two same-width ints of differing signedness promote to the **signed**
       one. `mixed_types.stdout` and `binary.stdout` depend on both.
-- [ ] **Float comparisons use unsigned setcc after `ucomis{s,d}`** (ROADMAP M0-7).
+- [x] **Float comparisons use unsigned setcc after `ucomis{s,d}`** (ROADMAP M0-7).
       Do not regress. The known NaN gap (`<`/`<=` true against NaN on natives,
       false via LLVM's ordered predicates) is unreachable today — decide the ZIR
       `fcmp` semantics deliberately rather than let it fall out of whichever
@@ -102,31 +102,31 @@ goldens do NOT exercise but a naive rewrite would still change). Get these into
 - [ ] **Variadic calls** — SysV sets `al` to the vector-arg count; Win64 duplicates
       float args into the paired GPR at the same index. Every one of the 40 cases
       calls `printf`, so this is on the critical path everywhere.
-- [ ] **Boolean representation.** Decide once: **`i1` in ZIR, 1 byte in memory**,
+- [x] **Boolean representation.** Decide once: **`i1` in ZIR, 1 byte in memory**,
       with explicit `zext`/`trunc` at every load/store boundary, and lower every
       condition as `icmp ne <ty> %v, 0` (matches the natives' "test the whole
       register" behavior and is a no-op fix for LLVM's current bit-0-only `trunc`
       divergence).
-- [ ] **Float literals stored as IEEE bits**, not re-derived from decimal text at
+- [x] **Float literals stored as IEEE bits**, not re-derived from decimal text at
       print time — three different current pipelines (raw source text on Linux,
       decoded on Windows, `stof`/`stod` + 17-sig-digit reprint on LLVM) agree only
       by accident. Store the bit pattern in the ZIR constant and emit from bits on
       every backend to remove this as a source of divergence.
-- [ ] **`break`/`continue`** — `continue` in a `for` jumps to the post-statement
+- [x] **`break`/`continue`** — `continue` in a `for` jumps to the post-statement
       (still runs the increment); in a `while` it jumps to the condition. Both
       throw if used outside a loop (also rejected by the parser at parse time).
-- [ ] **Missing return** — currently unchecked and currently produces a function
+- [x] **Missing return** — currently unchecked and currently produces a function
       with no trailing `ret` at all (execution falls into whatever is emitted
       next). No existing test exercises this. The ZIR verifier will force a
       decision (every block needs exactly one terminator) — pick `unreachable`
       to match today's undefined behavior, not a synthesized `ret 0`, and record
       the choice with a `tests/zir/` case.
-- [ ] **Integer widening picks `zext` vs `sext` by the *source* type's
+- [x] **Integer widening picks `zext` vs `sext` by the *source* type's
       signedness**, matching `castValue`'s existing split — getting this backwards
       at a variadic boundary turns a wrapped `uint8_t` value like `255` into `-1`.
 - [ ] **DCE must treat calls as side-effecting**, or `-O1` deletes the `printf`
       every golden depends on.
-- [ ] The three `tests/expected/runtime/variables.{linux,llvm,windows}.stdout`
+- [x] The three `tests/expected/runtime/variables.{linux,llvm,windows}.stdout`
       overrides are confirmed byte-identical to the shared `variables.stdout` —
       they are `--bless` residue, not a real per-backend divergence. Leave them
       (constraint 1); do not treat their existence as evidence of a real
@@ -190,11 +190,11 @@ Build in this order — each step is independently testable
 
 ## Wave 3 — Lowering
 
-- [ ] **3.1 [S]** `ZirGen` for expressions/statements. Every rule in the behavior
+- [x] **3.1 [S]** `ZirGen` for expressions/statements. Every rule in the behavior
       inventory above lives here and nowhere else. Locals →
       `alloca`/`load`/`store`, no cleverness (mem2reg promotes later). *Exit:*
       all 40 cases lower and verify clean at `-O0`; `--emit=zir` round-trips.
-- [ ] **3.2 [S]** `ZirGen` global-init hoisting, isolated in one function with the
+- [x] **3.2 [S]** `ZirGen` global-init hoisting, isolated in one function with the
       four-rule ordering written out verbatim. *Exit:* `--emit=zir` on
       `operations/unary.zz` and `operations/binary.zz` shows the hoisted
       statements in exact source order at the head of `@main`.

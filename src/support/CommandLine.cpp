@@ -52,6 +52,8 @@ namespace zust {
                 // BackendRegistry happens in main.cpp, the one place that is
                 // allowed to know about targets.
                 format = argv[i];
+            } else if (std::strncmp(arg, "--emit=", 7) == 0) {
+                emit = arg + 7;
             } else {
                 // treat as input file
                 if (!inputFile.empty()) {
@@ -101,6 +103,10 @@ namespace zust {
         return format;
     }
 
+    std::string CommandLine::getEmit() const noexcept {
+        return emit;
+    }
+
     int CommandLine::getVerbosity() const noexcept {
         return verbosity;
     }
@@ -115,6 +121,7 @@ namespace zust {
                   << "Options:\n"
                   << "    `-o`, `--output`  :: Set the output filepath.\n"
                   << "    `-f`, `--format`  :: Set the output format.\n"
+                  << "    `--emit=zir`      :: Print the lowered ZIR module instead of running codegen.\n"
                   << "Anything else is treated as the input file path.\n";
     }
 

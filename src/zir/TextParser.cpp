@@ -792,6 +792,23 @@ namespace zust::zir {
                     inst.type = fn.typeOf(a);
                     return inst;
                 }
+                if (op == "globaladdr") {
+                    std::string name = expectAt();
+                    GlobalId g{};
+                    for (std::size_t i = 0; i < m.globals().size(); ++i) {
+                        if (m.globals()[i].name == name) {
+                            g = GlobalId(static_cast<GlobalId::Value>(i));
+                            break;
+                        }
+                    }
+                    if (!g.isValid())
+                        throw ParseError("reference to undeclared global '@" + name + "'");
+                    Instruction inst;
+                    inst.op = Opcode::GlobalAddr;
+                    inst.global = g;
+                    inst.type = m.types().ptrType(m.global(g).type);
+                    return inst;
+                }
                 throw ParseError("unknown instruction opcode '" + op + "'");
             }
 

@@ -354,6 +354,11 @@ namespace zust::zir {
                             // per-cast-kind width/kind rules are a refinement
                             // for when ZIRGen (Wave 3) starts emitting casts.
                             break;
+                        case Opcode::GlobalAddr:
+                            if (!inst.global.isValid() || inst.global.value() >= m.globals().size())
+                                fail(out, VerifierCheck::OperandTypes, fn,
+                                     "globaladdr references a global that does not exist in this module");
+                            break;
                     }
                 }
             }

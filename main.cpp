@@ -15,6 +15,9 @@
 #include "support/CommandLine.hpp"
 #include "support/File.hpp"
 #include "typechecker/TypeChecker.hpp"
+#include "zir/Printer.hpp"
+#include "zir/Verifier.hpp"
+#include "zirgen/ZirGen.hpp"
 
 using namespace zust;
 
@@ -129,6 +132,26 @@ int main(int argc, char *argv[]) {
             std::exit(1);
         }
         outstream = &ofs;  // now point at the file
+    }
+
+    if (cli.getEmit() == "zir") {
+        try {
+            ZirGen zirGen;
+            zir::Module mod = zirGen.lower(*program, inputFile);
+            std::vector<zir::VerifierFailure> failures = zir::Verifier::verify(mod);
+            if (!failures.empty()) {
+                for (const zir::VerifierFailure &f : failures) {
+                    std::cerr << "ZIR verification failed [" << zir::toString(f.check) << "] in @" << f.function
+                              << ": " << f.detail << "\n";
+                }
+                return 1;
+            }
+            zir::Printer::print(mod, *outstream);
+        } catch (std::exception const &exc) {
+            std::cerr << "ERROR: " << exc.what() << "\n";
+            return 1;
+        }
+        return 0;
     }
 
     try {

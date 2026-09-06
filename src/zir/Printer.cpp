@@ -95,6 +95,8 @@ namespace zust::zir {
                     return "call";
                 case Opcode::Select:
                     return "select";
+                case Opcode::GlobalAddr:
+                    return "globaladdr";
             }
             throw std::runtime_error("opcodeKeyword: unknown Opcode");
         }
@@ -311,6 +313,9 @@ namespace zust::zir {
                 case Opcode::Select:
                     out << "select " << valueRef(fn, inst.operands[0]) << ", " << valueRef(fn, inst.operands[1]) << ", "
                         << valueRef(fn, inst.operands[2]);
+                    break;
+                case Opcode::GlobalAddr:
+                    out << "globaladdr @" << m.global(inst.global).name;
                     break;
             }
             return out.str();

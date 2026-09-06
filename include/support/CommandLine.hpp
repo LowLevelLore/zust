@@ -29,6 +29,11 @@ namespace zust {
         // resolving "" / "default" to a concrete target and validating the
         // result belongs to the caller.
         std::string getFormat() const noexcept;
+        // The raw --emit value ("zir", currently the only one), or "" if
+        // --emit was never given. When set, main.cpp prints the ZIR module
+        // (via ZirGen + zir::Printer) instead of running a codegen backend --
+        // see docs/PRD-ZIR.md Wave 3.1's exit criterion.
+        std::string getEmit() const noexcept;
         int getVerbosity() const noexcept;
         bool printAST() const noexcept;
         static void printUsage(const std::string &programName);
@@ -48,6 +53,7 @@ namespace zust {
         std::string inputFile;
         std::string outputFile;
         std::string format;
+        std::string emit;
     };
 
 }  // namespace zust
