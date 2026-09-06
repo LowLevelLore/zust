@@ -1,21 +1,69 @@
 // The one file a new backend's registration touches outside its own
-// directory (docs/BACKENDS.md §A.4). Each backend here is a thin adapter over
-// the existing AST-consuming CodeGen* classes -- Wave 4+ of docs/PRD-ZIR.md
-// replaces these bodies with real ZIR-consuming backends one at a time
-// without anything outside this file changing.
+// directory (docs/BACKENDS.md §A.4). Every backend here is now a thin
+// adapter over the ZIR pipeline: ZirGen lowers the (already type-checked)
+// AST to a ZIR Module, the requested optimization pipeline runs, and a
+// ZIR-consuming emitter renders it -- ZirLlvmBackend for llvm-ir, the
+// shared x86 machine layer (X86InstSel -> LinearScan -> FrameLayout ->
+// AsmWriter) against a TargetABI for the two native targets. The legacy
+// AST-walking CodeGen* emitters were deleted in Wave 7.1.
+#include <sstream>
+
 #include "codegen/Backend.hpp"
-#include "codegen/CodeGen.hpp"
+#include "codegen/ZirLlvmBackend.hpp"
+#include "codegen/machine/NativeBackend.hpp"
+#include "codegen/machine/SysVAbi.hpp"
+#include "codegen/machine/Win64Abi.hpp"
+#include "zir/PassManager.hpp"
+#include "zir/Verifier.hpp"
+#include "zir/passes/Pipeline.hpp"
+#include "zirgen/ZirGen.hpp"
 
 namespace zust {
     namespace {
+
+        // Shared by every ZIR-consuming backend below: lower, verify, run
+        // the requested optimization pipeline, verify again. Throws (with a
+        // message describing every failure) rather than returning a status,
+        // matching how a Backend::emit() failure already propagates to
+        // main.cpp's catch block.
+        zir::Module lowerOptimizeVerify(const ASTNode &program, const std::string &sourceName, int optLevel) {
+            ZirGen zirGen;
+            zir::Module mod = zirGen.lower(program, sourceName);
+            auto verifyOrThrow = [&] {
+                std::vector<zir::VerifierFailure> failures = zir::Verifier::verify(mod);
+                if (failures.empty())
+                    return;
+                std::ostringstream msg;
+                for (const zir::VerifierFailure &f : failures) {
+                    msg << "ZIR verification failed [" << zir::toString(f.check) << "] in @" << f.function << ": "
+                        << f.detail << "\n";
+                }
+                throw std::runtime_error(msg.str());
+            };
+            verifyOrThrow();  // catches a ZirGen bug before it reaches optimization at all
+
+            zir::AnalysisManager am;
+            zir::PassManager pm = zir::buildPipeline(optLevel, mod);
+            pm.run(mod, am);
+            verifyOrThrow();  // catches an optimizer bug before it reaches codegen
+            return mod;
+        }
 
         class LinuxBackend final : public Backend {
         public:
             const TargetInfo &info() const override { return kInfo; }
 
-            void emit(std::unique_ptr<ASTNode> program, std::ostream &out) override {
-                CodeGenLinux cg(out);
-                cg.generate(std::move(program));
+            // docs/PRD-ZIR.md Wave 6.1/6.3: the ZIR-consuming native
+            // pipeline (X86InstSel -> LinearScan -> FrameLayout ->
+            // AsmWriterAtt against SysVAbi) at every optimization level,
+            // sharing every line of the Wave 5 machine layer with the
+            // Windows backend and differing only in the TargetABI value
+            // and the AT&T writer choice. The cross-block-value handling
+            // that made -O1+ sound for Windows (Wave 6.4) is target-neutral
+            // and applies here unchanged.
+            void emit(std::unique_ptr<ASTNode> program, std::ostream &out, int optLevel) override {
+                zir::Module mod = lowerOptimizeVerify(*program, "zust", optLevel);
+                codegen::machine::emitNative(mod, codegen::machine::sysVAbi(), /*intelSyntax=*/false, out);
             }
 
             static const TargetInfo kInfo;
@@ -33,9 +81,22 @@ namespace zust {
         public:
             const TargetInfo &info() const override { return kInfo; }
 
-            void emit(std::unique_ptr<ASTNode> program, std::ostream &out) override {
-                CodeGenWindows cg(out);
-                cg.generate(std::move(program));
+            // docs/PRD-ZIR.md Wave 6.2/6.4: runs the ZIR-consuming pipeline
+            // (X86InstSel -> LinearScan -> FrameLayout -> AsmWriterIntel
+            // against Win64Abi) at every optimization level. LiveIntervals/
+            // LinearScan's own scope is still block-local (see
+            // LiveIntervals.hpp), but Wave 6.4 made that sound past -O0
+            // too: X86InstSel now gives every value actually used outside
+            // the block that defines it (any non-entry block parameter
+            // unconditionally, plus whatever computeCrossBlockValues()
+            // flags -- what Wave 4.4's Mem2Reg introduces at -O1+, both as
+            // explicit block-parameter merges and as plain dominance with
+            // no merge at all) its own dedicated frame slot instead of
+            // ever needing a vreg live across a block boundary -- see
+            // X86InstSel.hpp's class comment.
+            void emit(std::unique_ptr<ASTNode> program, std::ostream &out, int optLevel) override {
+                zir::Module mod = lowerOptimizeVerify(*program, "zust", optLevel);
+                codegen::machine::emitNative(mod, codegen::machine::win64Abi(), /*intelSyntax=*/true, out);
             }
 
             static const TargetInfo kInfo;
@@ -53,21 +114,50 @@ namespace zust {
         public:
             const TargetInfo &info() const override { return kInfo; }
 
-            void emit(std::unique_ptr<ASTNode> program, std::ostream &out) override {
-                CodeGenLLVM cg(out);
-                cg.generate(std::move(program));
+            // docs/PRD-ZIR.md Wave 4.2 "flip the default": this used to wrap
+            // the AST-consuming CodeGenLLVM (deleted this wave, having lived
+            // behind --zir-codegen since Wave 4.1 proved ZirLlvmBackend out).
+            // The program is already fully type-checked by the time main.cpp
+            // reaches here, same precondition CodeGenLLVM relied on.
+            void emit(std::unique_ptr<ASTNode> program, std::ostream &out, int optLevel) override {
+                zir::Module mod = lowerOptimizeVerify(*program, "zust", optLevel);
+                ZirLlvmBackend::emit(mod, out);
             }
 
             static const TargetInfo kInfo;
         };
 
-        const TargetInfo LlvmBackend::kInfo{"llvm-ir",
-                                            "Textual LLVM IR",
-                                            ".ll",
-                                            AsmSyntax::None,
-                                            /*isNative=*/false,
-                                            {"llc", "-filetype=obj", "$IN", "-o", "$OUT"},
-                                            {"gcc", "$IN", "-o", "$OUT", "-no-pie"}};
+        // `clang -c` rather than a standalone `llc -filetype=obj`: both
+        // assemble textual IR to an object file identically (clang's codegen
+        // path *is* llc's), but `clang` is the one binary guaranteed present
+        // everywhere this target is exercised -- it's a listed CI dependency
+        // already, and it is literally the only one of the two that the
+        // official Windows LLVM distribution ships (no standalone
+        // llc.exe/opt.exe at all).
+        //
+        // On Windows, clang's *implicit* default target is MSVC (its actual
+        // "native" ABI there), which emits calls to MSVC's `__chkstk` for
+        // any function with a large enough stack frame -- a symbol mingw's
+        // libc/ld does not provide, so linking with `gcc`/mingw fails for
+        // exactly those functions. `--target=x86_64-w64-mingw32` makes
+        // clang target the same GNU/mingw environment `gcc` itself does
+        // (GNU-style `___chkstk_ms` instead), which is what the link step
+        // below actually needs. This is the one platform `#ifdef`
+        // CONVENTIONS.md carves out for target selection (matching
+        // `BackendRegistry::hostDefaultName`'s own) -- on Linux, clang's
+        // default already matches the host, and there is no chkstk
+        // convention to collide with in the first place.
+#if defined(_WIN64)
+        const std::vector<std::string> kLlvmAssembleCmd{"clang", "--target=x86_64-w64-mingw32", "-c", "$IN", "-o",
+                                                        "$OUT"};
+#else
+        const std::vector<std::string> kLlvmAssembleCmd{"clang", "-c", "$IN", "-o", "$OUT"};
+#endif
+
+        const TargetInfo LlvmBackend::kInfo{
+            "llvm-ir",          "Textual LLVM IR", ".ll",
+            AsmSyntax::None,
+            /*isNative=*/false, kLlvmAssembleCmd,  {"gcc", "$IN", "-o", "$OUT", "-no-pie"}};
 
     }  // namespace
 

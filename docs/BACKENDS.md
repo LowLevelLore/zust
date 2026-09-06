@@ -5,7 +5,7 @@ lands (IR-level). The goal is that adding a backend means **writing one backend
 and registering it in one line**, with the CLI, the driver, `--formats`, and the
 test harness picking it up automatically.
 
-Related: `docs/ARCHITECTURE.md`, `docs/IR-DESIGN.md`, `docs/ROADMAP.md`.
+Related: `docs/ARCHITECTURE.md`, `docs/IR-DESIGN.md`, `docs/ZIR-PASSES.md`, `docs/ROADMAP.md`.
 
 ---
 

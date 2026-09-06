@@ -43,7 +43,11 @@ namespace zust {
     public:
         virtual ~Backend() = default;
         virtual const TargetInfo &info() const = 0;
-        virtual void emit(std::unique_ptr<ASTNode> program, std::ostream &out) = 0;
+        // `optLevel` is 0-3 (docs/PRD-ZIR.md Wave 4.3's -O0..-O3). A backend
+        // that has no optimization pipeline of its own yet (Linux, Windows
+        // -- Wave 5/6 territory) is free to ignore it; llvm-ir's is the
+        // first to actually run one (Wave 4.4).
+        virtual void emit(std::unique_ptr<ASTNode> program, std::ostream &out, int optLevel) = 0;
     };
 
     class BackendRegistry {

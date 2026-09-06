@@ -57,6 +57,12 @@ namespace zust::zir {
         Gep,
         Call,
         Select,
+        // Produces the (opaque) address of a module-level global as a `ptr`
+        // value -- not in docs/IR-DESIGN.md's original instruction table,
+        // added in Wave 3 because lowering has no other way to reference a
+        // global (every string literal becomes a GlobalVar, and every use of
+        // one needs its address).
+        GlobalAddr,
     };
 
     enum class CmpPred : std::uint8_t {
@@ -112,6 +118,7 @@ namespace zust::zir {
         CmpPred pred = CmpPred::None;  // icmp/fcmp
         ConstValue constant;           // const
         FuncId callee;                 // call
+        GlobalId global;               // GlobalAddr
         // The type being addressed, for the two opcodes that need one even
         // though ZIR pointers are otherwise opaque ("ptr", no pointee
         // tracked at the type level): alloca's allocated type, or gep's

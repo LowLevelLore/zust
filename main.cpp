@@ -15,8 +15,37 @@
 #include "support/CommandLine.hpp"
 #include "support/File.hpp"
 #include "typechecker/TypeChecker.hpp"
+#include "zir/PassManager.hpp"
+#include "zir/Printer.hpp"
+#include "zir/Verifier.hpp"
+#include "zir/passes/Pipeline.hpp"
+#include "zirgen/ZirGen.hpp"
 
 using namespace zust;
+
+namespace {
+    // Used by `--emit=zir` (docs/PRD-ZIR.md Wave 3) to get a verified ZIR
+    // module before printing it. Returns nullopt (having already reported
+    // the problem) on a lowering exception or a verifier failure.
+    std::optional<zir::Module> lowerAndVerify(const ASTNode &program, const std::string &sourceName) {
+        try {
+            ZirGen zirGen;
+            zir::Module mod = zirGen.lower(program, sourceName);
+            std::vector<zir::VerifierFailure> failures = zir::Verifier::verify(mod);
+            if (!failures.empty()) {
+                for (const zir::VerifierFailure &f : failures) {
+                    std::cerr << "ZIR verification failed [" << zir::toString(f.check) << "] in @" << f.function << ": "
+                              << f.detail << "\n";
+                }
+                return std::nullopt;
+            }
+            return mod;
+        } catch (std::exception const &exc) {
+            std::cerr << "ERROR: " << exc.what() << "\n";
+            return std::nullopt;
+        }
+    }
+}  // namespace
 
 int main(int argc, char *argv[]) {
     if (argc < 2) {
@@ -131,8 +160,27 @@ int main(int argc, char *argv[]) {
         outstream = &ofs;  // now point at the file
     }
 
+    if (cli.getEmit() == "zir") {
+        std::optional<zir::Module> mod = lowerAndVerify(*program, inputFile);
+        if (!mod)
+            return 1;
+        zir::AnalysisManager am;
+        zir::PassManager pm = zir::buildPipeline(cli.getOptLevel(), *mod);
+        pm.run(*mod, am);
+        std::vector<zir::VerifierFailure> failures = zir::Verifier::verify(*mod);
+        if (!failures.empty()) {
+            for (const zir::VerifierFailure &f : failures) {
+                std::cerr << "ZIR verification failed after optimization [" << zir::toString(f.check) << "] in @"
+                          << f.function << ": " << f.detail << "\n";
+            }
+            return 1;
+        }
+        zir::Printer::print(*mod, *outstream);
+        return 0;
+    }
+
     try {
-        backend->emit(std::move(program), *outstream);
+        backend->emit(std::move(program), *outstream, cli.getOptLevel());
     } catch (std::exception const &exc) {
         std::cerr << "ERROR: " << exc.what() << "\n";
         return 1;

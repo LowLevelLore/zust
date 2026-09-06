@@ -136,11 +136,31 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
 
 
+def parse_opt_env() -> list[str]:
+    """Optimization levels to run, from OPT (default: all four).
+
+    docs/PRD-ZIR.md Wave 7.2 -- the full default matrix is
+    40 cases x 3 targets x 4 opt levels. `OPT=0` or `OPT=0,2` narrows it.
+    """
+    env = os.getenv("OPT")
+    raw = env.split(",") if env else ["0", "1", "2", "3"]
+    levels = [lvl.strip() for lvl in raw if lvl.strip()]
+    for lvl in levels:
+        if lvl not in {"0", "1", "2", "3"}:
+            raise pytest.UsageError(f"OPT={env} has an unknown level {lvl!r} (want 0..3)")
+    return levels
+
+
 def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
     if "target_name" in metafunc.fixturenames:
         targets = parse_target_env()
         metafunc.parametrize(
             "target_name", targets, ids=[f"target={target}" for target in targets]
+        )
+    if "opt_level" in metafunc.fixturenames:
+        levels = parse_opt_env()
+        metafunc.parametrize(
+            "opt_level", levels, ids=[f"O{level}" for level in levels]
         )
 
 

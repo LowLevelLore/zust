@@ -24,7 +24,11 @@ target_include_directories(zust_unit_tests PRIVATE ${PROJECT_SOURCE_DIR}/include
 # tests/zir/<pass>/ .zir fixtures (round-trip today; per-pass in/out once
 # Wave 4 lands passes) are read from disk at test time, not embedded.
 target_compile_definitions(zust_unit_tests PRIVATE
-    ZUST_ZIR_FIXTURES_DIR="${PROJECT_SOURCE_DIR}/tests/zir")
+    ZUST_ZIR_FIXTURES_DIR="${PROJECT_SOURCE_DIR}/tests/zir"
+    # The real golden-suite .zz sources, for ZirGenTest's over-every-test-case
+    # sweep -- reads them directly rather than duplicating fixtures, so it
+    # never drifts from the frozen tests/**/*.zz files it's exercising.
+    ZUST_TESTS_DIR="${PROJECT_SOURCE_DIR}/tests")
 
 include(${doctest_SOURCE_DIR}/scripts/cmake/doctest.cmake)
 doctest_discover_tests(zust_unit_tests)

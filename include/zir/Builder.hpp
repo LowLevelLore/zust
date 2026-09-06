@@ -55,6 +55,17 @@ namespace zust::zir {
             return emit(std::move(inst));
         }
 
+        // The global's own type (module_.global(g).type) already says what
+        // it points at, so unlike alloca/gep this needs no separate elemType
+        // -- Ptr's own opaqueness means the result type is just "ptr".
+        ValueId globalAddr(GlobalId g) {
+            Instruction inst;
+            inst.op = Opcode::GlobalAddr;
+            inst.type = module_.types().ptrType(module_.global(g).type);
+            inst.global = g;
+            return emit(std::move(inst));
+        }
+
         ValueId load(TypeId ty, ValueId ptr) {
             Instruction inst;
             inst.op = Opcode::Load;

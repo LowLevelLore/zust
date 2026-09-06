@@ -29,6 +29,16 @@ namespace zust {
         // resolving "" / "default" to a concrete target and validating the
         // result belongs to the caller.
         std::string getFormat() const noexcept;
+        // The raw --emit value ("zir", currently the only one), or "" if
+        // --emit was never given. When set, main.cpp prints the ZIR module
+        // (via ZirGen + zir::Printer) instead of running a codegen backend --
+        // see docs/PRD-ZIR.md Wave 3.1's exit criterion.
+        std::string getEmit() const noexcept;
+        // docs/PRD-ZIR.md Wave 4.3: -O0 (default) through -O3, from
+        // `-O0`/`-O1`/`-O2`/`-O3` (bare `-O` means `-O1`, matching gcc/clang).
+        // A backend with no optimization pipeline of its own yet is free to
+        // ignore it.
+        int getOptLevel() const noexcept;
         int getVerbosity() const noexcept;
         bool printAST() const noexcept;
         static void printUsage(const std::string &programName);
@@ -44,10 +54,12 @@ namespace zust {
         bool formatsFlag = false;
         bool jsonFlag = false;
         int verbosity = 1;
+        int optLevel = 0;
 
         std::string inputFile;
         std::string outputFile;
         std::string format;
+        std::string emit;
     };
 
 }  // namespace zust

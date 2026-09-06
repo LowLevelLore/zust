@@ -1,6 +1,18 @@
 # zpiler Architecture
 
-## Current pipeline (as of today)
+> **Status (Wave 6 complete).** The five-stage ZIR pipeline described under
+> *Target pipeline* below has landed for all three backends. Every backend now
+> consumes ZIR: `ZirLlvmBackend` for `llvm-ir`, and the shared x86 machine
+> layer (`X86InstSel → LinearScan → FrameLayout → AsmWriter{Att,Intel}`)
+> against a `TargetABI` value (`SysVAbi` / `Win64Abi`) for the two native
+> targets, at every optimization level `-O0`–`-O3`. The legacy AST-walking
+> `CodeGen{Linux,Windows,LLVM}` emitters and `RegisterAllocator` have been
+> deleted. What remains of the old coupling: the parser still builds the
+> `ScopeContext` chain and the `FunctionScope` frame API / `NameMapper` are
+> not yet removed (PRD-ZIR Wave 7.1). The diagram immediately below is kept
+> for historical context.
+
+## Original pipeline (pre-ZIR, for context)
 
 ```
                  .zz source text
@@ -51,7 +63,10 @@ The parser, symbol table, and code generator are coupled:
 
 That is the motivation for ZIR.
 
-## Target pipeline
+## The pipeline (current, post-Wave-6)
+
+Reference docs: `docs/IR-DESIGN.md` (the IR), `docs/ZIR-PASSES.md` (the
+optimization passes), `docs/BACKENDS.md` (the emitters).
 
 ```
    Lexer ──▶ Parser ──▶ AST (+spans, no symbols)
@@ -73,22 +88,24 @@ That is the motivation for ZIR.
                    │  (-O0..-O3)  │  inline, licm, tailcall
                    └──────────────┘
                           │
-                          ├──────────────▶ ZIR interpreter (test oracle)
-                          │
         ┌─────────────────┼─────────────────┐
         ▼                 ▼                 ▼
   LLVM IR emit      x86_64 SysV        x86_64 Win64
-  (thin, ~400 loc)  ┌────────────────────────────┐
-                    │ shared: isel, live ranges, │
-                    │ linear-scan regalloc,      │
-                    │ frame layout, peephole     │
-                    │ ABI differences = data     │
+  (ZirLlvmBackend)  ┌────────────────────────────┐
+                    │ shared: X86InstSel,        │
+                    │ LiveIntervals, LinearScan, │
+                    │ FrameLayout, AsmWriter     │
+                    │ ABI differences = a        │
+                    │ TargetABI value            │
                     └────────────────────────────┘
 ```
 
-The native backends become **one** code generator parameterized by an ABI
-description (argument registers, callee-saved set, shadow space, red zone,
-assembler syntax), rather than two forks.
+The native backends are **one** code generator parameterized by a `TargetABI`
+value (argument registers, callee-saved set, shared vs independent arg slots,
+shadow space, red zone, variadic rule, assembler syntax) — `SysVAbi` and
+`Win64Abi` — rather than two forks. The standalone ZIR interpreter from the
+original plan was skipped; `llc` on the LLVM backend is the execution oracle
+(`docs/IR-DESIGN.md` § Interpreter).
 
 ## Key data structures
 
@@ -123,11 +140,12 @@ isFunction, name}`. A flat bag of booleans rather than a tagged union — adding
 arrays, slices, or structs will require restructuring this into a proper type
 table with interned `TypeId`s. See ROADMAP M2/M6.
 
-### `RegisterAllocator` (`include/codegen/RegisterAllocator.hpp`)
-Per-target free lists (`forSysV()` / `forMSVC()`) plus an LRU victim picker and a
-spill-slot table. It allocates *during* emission with no knowledge of live ranges,
-so it spills far more than necessary and cannot keep a value in a register across
-a statement boundary. Replacement is a ZIR-level linear-scan allocator (M5).
+### Register allocation (`src/codegen/machine/LinearScan.cpp`)
+The legacy per-emission `RegisterAllocator` is **deleted** (Wave 7.1). Native
+codegen now runs `LinearScan` over block-local `LiveIntervals` on the machine IR
+`X86InstSel` produces, with the allocatable pool set to exactly the callee-saved
+registers so every vreg is call-safe unconditionally. See `docs/BACKENDS.md` and
+`docs/PRD-ZIR.md` Wave 5.
 
 ## Where the platform differences actually are
 

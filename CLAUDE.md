@@ -79,7 +79,7 @@ Expectations mirror the source path under `tests/expected/<mode>/`. A
 
 ```bash
 ./build/zpiler --format x86_64-linux -o out.s prog.zz && as out.s -o out.o && gcc out.o -o prog && ./prog
-./build/zpiler --format llvm-ir      -o out.ll prog.zz && llc -filetype=obj out.ll -o out.o && gcc out.o -o prog -no-pie && ./prog
+./build/zpiler --format llvm-ir      -o out.ll prog.zz && clang -c out.ll -o out.o && gcc out.o -o prog -no-pie && ./prog
 ./build/zpiler --format x86_64-mswin -o out.asm prog.zz && ml64 /nologo /c out.asm && gcc out.obj -o prog.exe && ./prog.exe
 ```
 
