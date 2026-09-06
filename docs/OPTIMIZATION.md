@@ -12,6 +12,12 @@ speedup.
 
 ## Part 1 — Generated code
 
+> **Status.** The ZIR pass pipeline (`-O1`/`-O2`/`-O3`) and the linear-scan
+> native register allocator have landed (PRD-ZIR Waves 4–6). `docs/ZIR-PASSES.md`
+> documents every pass. The table below is the original prioritization; items
+> 1–4 and 6–9 exist now as ZIR passes, item 5 partially (`X86InstSel` does
+> direct selection, no tree tiling yet), item 10 is still M6.
+
 ### Where the wins are, today
 
 The current AST-walking backends leave large, easily measurable amounts on the
