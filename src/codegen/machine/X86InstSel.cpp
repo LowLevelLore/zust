@@ -72,13 +72,50 @@ namespace zust::codegen::machine {
                     throw std::runtime_error("X86InstSel: unhandled comparison predicate");
             }
         }
+
+        // Where one argument lands: a physical register, or a stack slot
+        // (0-based index among the stack-passed arguments only).
+        struct ArgPlacement {
+            PhysReg reg = PhysReg::None;
+            std::int64_t stackSlot = -1;
+        };
+
+        // Assigns every argument to a register or a stack slot per the
+        // ABI's argument-slot rule. Win64 (sharedArgSlots): slot N is the
+        // Nth int-arg reg or the Nth xmm-arg reg, never both. SysV:
+        // independent GPR and XMM counters.
+        std::vector<ArgPlacement> placeArgs(const TargetABI &abi, const std::vector<bool> &isFloat) {
+            std::vector<ArgPlacement> out(isFloat.size());
+            std::size_t gpr = 0, xmm = 0, stack = 0;
+            for (std::size_t i = 0; i < isFloat.size(); ++i) {
+                if (abi.sharedArgSlots) {
+                    if (i < abi.intArgRegs.size())
+                        out[i].reg = isFloat[i] ? abi.xmmArgRegs[i] : abi.intArgRegs[i];
+                    else
+                        out[i].stackSlot = static_cast<std::int64_t>(stack++);
+                } else if (isFloat[i]) {
+                    if (xmm < abi.xmmArgRegs.size())
+                        out[i].reg = abi.xmmArgRegs[xmm++];
+                    else
+                        out[i].stackSlot = static_cast<std::int64_t>(stack++);
+                } else {
+                    if (gpr < abi.intArgRegs.size())
+                        out[i].reg = abi.intArgRegs[gpr++];
+                    else
+                        out[i].stackSlot = static_cast<std::int64_t>(stack++);
+                }
+            }
+            return out;
+        }
     }  // namespace
 
     RegClass X86InstSel::classOf(TypeId t) const {
         return m_.types().get(t).kind == TypeKind::Float ? RegClass::XMM : RegClass::GPR;
     }
 
-    bool X86InstSel::isFloatType(TypeId t) const { return m_.types().get(t).kind == TypeKind::Float; }
+    bool X86InstSel::isFloatType(TypeId t) const {
+        return m_.types().get(t).kind == TypeKind::Float;
+    }
 
     std::uint32_t X86InstSel::widthOf(TypeId t) const {
         const Type &ty = m_.types().get(t);
@@ -156,7 +193,8 @@ namespace zust::codegen::machine {
 
         for (std::size_t bi = 0; bi < fn_->blockCount(); ++bi) {
             BlockId b(static_cast<BlockId::Value>(bi));
-            for (ValueId param : fn_->block(b).params()) defBlockOf_[param.value()] = static_cast<std::int32_t>(bi);
+            for (ValueId param : fn_->block(b).params())
+                defBlockOf_[param.value()] = static_cast<std::int32_t>(bi);
             for (InstId iid : fn_->block(b).insts()) {
                 const Instruction &inst = fn_->inst(iid);
                 if (inst.result.isValid())
@@ -178,17 +216,20 @@ namespace zust::codegen::machine {
             BlockId b(static_cast<BlockId::Value>(bi));
             for (InstId iid : fn_->block(b).insts()) {
                 const Instruction &inst = fn_->inst(iid);
-                for (ValueId op : inst.operands) markUse(op, bi);
+                for (ValueId op : inst.operands)
+                    markUse(op, bi);
             }
             const Terminator &t = fn_->block(b).term();
             switch (t.kind) {
                 case TermKind::Br:
-                    for (ValueId a : t.targets[0].args) markUse(a, bi);
+                    for (ValueId a : t.targets[0].args)
+                        markUse(a, bi);
                     break;
                 case TermKind::CondBr:
                     markUse(t.cond, bi);
                     for (const auto &target : t.targets)
-                        for (ValueId a : target.args) markUse(a, bi);
+                        for (ValueId a : target.args)
+                            markUse(a, bi);
                     break;
                 case TermKind::Ret:
                     markUse(t.retValue, bi);
@@ -295,7 +336,9 @@ namespace zust::codegen::machine {
         return o;
     }
 
-    void X86InstSel::emit(MachineInst inst) { cur_->insts.push_back(std::move(inst)); }
+    void X86InstSel::emit(MachineInst inst) {
+        cur_->insts.push_back(std::move(inst));
+    }
 
     MachineFunction X86InstSel::select(Function &fn) {
         MachineFunction mf;
@@ -342,37 +385,37 @@ namespace zust::codegen::machine {
 
     void X86InstSel::selectEntryParamCopyIn() {
         const std::vector<ValueId> &params = fn_->block(fn_->entry()).params();
+        std::vector<bool> isFloatFlags(params.size());
+        for (std::size_t i = 0; i < params.size(); ++i)
+            isFloatFlags[i] = isFloatType(fn_->typeOf(params[i]));
+        std::vector<ArgPlacement> placement = placeArgs(abi_, isFloatFlags);
+
         for (std::size_t i = 0; i < params.size(); ++i) {
             ValueId p = params[i];
             TypeId ty = fn_->typeOf(p);
-            bool isFloat = isFloatType(ty);
+            bool isFloat = isFloatFlags[i];
             std::uint32_t width = widthOf(ty);
-            std::size_t slot = i;  // Win64: shared slot indexing
 
             std::uint32_t vr = mf_->newVReg(isFloat ? RegClass::XMM : RegClass::GPR, width);
             vregOf_[p.value()] = vr;
             hasVReg_[p.value()] = true;
 
-            if (slot < abi_.intArgRegs.size()) {
+            if (placement[i].reg != PhysReg::None) {
                 MachineInst mi;
                 mi.operands.push_back(MachineOperand::vregOp(vr, isFloat ? RegClass::XMM : RegClass::GPR, width));
-                if (isFloat) {
-                    mi.mnemonic = width == 32 ? "movss" : "movsd";
-                    mi.operands.push_back(MachineOperand::pregOp(abi_.xmmArgRegs[slot], width));
-                } else {
-                    mi.mnemonic = "mov";
-                    mi.operands.push_back(MachineOperand::pregOp(abi_.intArgRegs[slot], width));
-                }
+                mi.mnemonic = isFloat ? (width == 32 ? "movss" : "movsd") : "mov";
+                mi.operands.push_back(MachineOperand::pregOp(placement[i].reg, width));
                 mi.defIndices = {0};
                 emit(std::move(mi));
             } else {
                 // Stack-passed parameter: [rbp + 16 (return addr + saved
-                // rbp) + shadowSpace + 8*(slot - argRegCount)].
-                std::int64_t disp = 16 + abi_.shadowSpaceBytes + 8 * static_cast<std::int64_t>(slot - abi_.intArgRegs.size());
+                // rbp) + shadowSpace + 8*(stack-slot index)].
+                std::int64_t disp = 16 + abi_.shadowSpaceBytes + 8 * placement[i].stackSlot;
                 MachineInst mi;
                 mi.mnemonic = isFloat ? (width == 32 ? "movss" : "movsd") : "mov";
                 mi.operands.push_back(MachineOperand::vregOp(vr, isFloat ? RegClass::XMM : RegClass::GPR, width));
-                mi.operands.push_back(MachineOperand::memOp(PhysReg::RBP, disp, width, isFloat ? RegClass::XMM : RegClass::GPR));
+                mi.operands.push_back(
+                    MachineOperand::memOp(PhysReg::RBP, disp, width, isFloat ? RegClass::XMM : RegClass::GPR));
                 mi.defIndices = {0};
                 emit(std::move(mi));
             }
@@ -600,7 +643,7 @@ namespace zust::codegen::machine {
                 MachineInst copyOut;
                 copyOut.mnemonic = "mov";
                 copyOut.operands = {MachineOperand::vregOp(vr, RegClass::GPR, width),
-                                   MachineOperand::pregOp(isRem ? PhysReg::RDX : PhysReg::RAX, width)};
+                                    MachineOperand::pregOp(isRem ? PhysReg::RDX : PhysReg::RAX, width)};
                 copyOut.defIndices = {0};
                 emit(std::move(copyOut));
                 return;
@@ -640,9 +683,7 @@ namespace zust::codegen::machine {
                 MachineOperand a = regOperand(inst.operands[0]);
                 MachineOperand b = regOperand(inst.operands[1]);
                 MachineInst cmpInst;
-                cmpInst.mnemonic = inst.op == Opcode::FCmp
-                                       ? (a.widthBits == 32 ? "ucomiss" : "ucomisd")
-                                       : "cmp";
+                cmpInst.mnemonic = inst.op == Opcode::FCmp ? (a.widthBits == 32 ? "ucomiss" : "ucomisd") : "cmp";
                 cmpInst.operands = {a, b};
                 emit(std::move(cmpInst));
 
@@ -864,9 +905,15 @@ namespace zust::codegen::machine {
         const Type &sig = m_.types().get(callee.signature());
         std::size_t declaredParamCount = sig.params.size();
 
-        std::size_t stackArgCount = inst.operands.size() > abi_.intArgRegs.size()
-                                        ? inst.operands.size() - abi_.intArgRegs.size()
-                                        : 0;
+        std::vector<bool> isFloatFlags(inst.operands.size());
+        for (std::size_t i = 0; i < inst.operands.size(); ++i)
+            isFloatFlags[i] = isFloatType(fn_->typeOf(inst.operands[i]));
+        std::vector<ArgPlacement> placement = placeArgs(abi_, isFloatFlags);
+
+        std::size_t stackArgCount = 0;
+        for (const ArgPlacement &pl : placement)
+            if (pl.reg == PhysReg::None)
+                ++stackArgCount;
         std::int64_t stackBytes = static_cast<std::int64_t>(stackArgCount) * 8;
         std::int64_t roundedStack = (stackBytes + 15) & ~std::int64_t{15};
         std::int64_t callFrame = abi_.shadowSpaceBytes + roundedStack;
@@ -881,24 +928,28 @@ namespace zust::codegen::machine {
         for (std::size_t i = 0; i < inst.operands.size(); ++i) {
             ValueId argVal = inst.operands[i];
             TypeId argTy = fn_->typeOf(argVal);
-            bool isFloat = isFloatType(argTy);
+            bool isFloat = isFloatFlags[i];
             std::uint32_t width = widthOf(argTy);
             MachineOperand val = regOperand(argVal);
             bool isVariadicArg = callee.isVariadic() && i >= declaredParamCount;
+            PhysReg argReg = placement[i].reg;
 
-            if (i < abi_.intArgRegs.size()) {
+            if (argReg != PhysReg::None) {
                 if (isFloat) {
                     MachineInst mi;
                     mi.mnemonic = width == 32 ? "movss" : "movsd";
-                    mi.operands = {MachineOperand::pregOp(abi_.xmmArgRegs[i], width), val};
+                    mi.operands = {MachineOperand::pregOp(argReg, width), val};
                     mi.defIndices = {0};
                     emit(std::move(mi));
                     ++xmmUsedCount;
                     if (isVariadicArg && abi_.variadicRule == VariadicRule::DuplicateFloatIntoPairedGpr) {
+                        // Win64: slot N's paired GPR is intArgRegs[N], and
+                        // shared slots mean this float's own index is its
+                        // slot index.
                         MachineInst dup;
                         dup.mnemonic = "movq";
                         dup.operands = {MachineOperand::pregOp(abi_.intArgRegs[i], 64),
-                                       MachineOperand::pregOp(abi_.xmmArgRegs[i], 64)};
+                                        MachineOperand::pregOp(argReg, 64)};
                         dup.defIndices = {0};
                         emit(std::move(dup));
                     }
@@ -907,18 +958,17 @@ namespace zust::codegen::machine {
                     mi.mnemonic = "mov";
                     MachineOperand v64 = val;
                     v64.widthBits = 64;  // pass the full register; ABI slots are always 8 bytes wide
-                    mi.operands = {MachineOperand::pregOp(abi_.intArgRegs[i], 64), v64};
+                    mi.operands = {MachineOperand::pregOp(argReg, 64), v64};
                     mi.defIndices = {0};
                     emit(std::move(mi));
                 }
             } else {
                 // Stack args sit *above* the shadow space from the callee's
-                // perspective (return address, then 32 bytes of shadow
-                // space, then the 5th+ argument) -- shadowSpaceBytes has to
-                // lead here, or the callee reads every stack argument 32
-                // bytes short of where it actually is.
-                std::int64_t disp =
-                    abi_.shadowSpaceBytes + 8 * static_cast<std::int64_t>(i - abi_.intArgRegs.size());
+                // perspective (return address, then shadow space, then the
+                // stack-passed arguments) -- shadowSpaceBytes has to lead
+                // here, or the callee reads every stack argument short of
+                // where it actually is.
+                std::int64_t disp = abi_.shadowSpaceBytes + 8 * placement[i].stackSlot;
                 MachineInst mi;
                 mi.mnemonic = isFloat ? (width == 32 ? "movss" : "movsd") : "mov";
                 MachineOperand storedVal = val;
@@ -926,7 +976,7 @@ namespace zust::codegen::machine {
                     storedVal.widthBits = 64;  // ABI stack slots are always 8 bytes wide, same as register slots
                 mi.operands = {MachineOperand::memOp(PhysReg::RSP, disp, isFloat ? width : 64,
                                                      isFloat ? RegClass::XMM : RegClass::GPR),
-                              storedVal};
+                               storedVal};
                 emit(std::move(mi));
             }
         }
@@ -960,8 +1010,8 @@ namespace zust::codegen::machine {
             hasVReg_[inst.result.value()] = true;
             MachineInst mi;
             mi.mnemonic = rc == RegClass::XMM ? (width == 32 ? "movss" : "movsd") : "mov";
-            mi.operands = {MachineOperand::vregOp(vr, rc, width), MachineOperand::pregOp(
-                                                                       rc == RegClass::XMM ? abi_.returnXmm : abi_.returnGpr, width)};
+            mi.operands = {MachineOperand::vregOp(vr, rc, width),
+                           MachineOperand::pregOp(rc == RegClass::XMM ? abi_.returnXmm : abi_.returnGpr, width)};
             mi.defIndices = {0};
             emit(std::move(mi));
         }
@@ -1016,8 +1066,8 @@ namespace zust::codegen::machine {
                     MachineOperand val = regOperand(t.retValue);
                     MachineInst mi;
                     mi.mnemonic = isFloat ? (width == 32 ? "movss" : "movsd") : "mov";
-                    MachineOperand dst = MachineOperand::pregOp(isFloat ? abi_.returnXmm : abi_.returnGpr,
-                                                                isFloat ? width : 64);
+                    MachineOperand dst =
+                        MachineOperand::pregOp(isFloat ? abi_.returnXmm : abi_.returnGpr, isFloat ? width : 64);
                     MachineOperand src = val;
                     if (!isFloat)
                         src.widthBits = 64;

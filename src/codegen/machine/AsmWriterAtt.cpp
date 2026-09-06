@@ -30,10 +30,9 @@ namespace zust::codegen::machine {
         // (GNU as accepts the suffix unconditionally, so this always adds
         // it rather than trying to prove it's redundant).
         bool takesSuffix(const std::string &mnemonic) {
-            static const std::unordered_set<std::string> set = {
-                "mov",  "add",  "sub",    "and",  "or",   "xor",  "cmp",  "neg",
-                "not",  "imul", "idiv",   "div",  "shl",  "shr",  "sar",  "movzx",
-                "movsx", "movsxd"};
+            static const std::unordered_set<std::string> set = {"mov", "add", "sub", "and",   "or",    "xor",
+                                                                "cmp", "neg", "not", "imul",  "idiv",  "div",
+                                                                "shl", "shr", "sar", "movzx", "movsx", "movsxd"};
             return set.count(mnemonic) != 0;
         }
 
@@ -42,7 +41,9 @@ namespace zust::codegen::machine {
             return set.count(mnemonic) != 0;
         }
 
-        std::string reg(PhysReg r, std::uint32_t width) { return std::string("%") + physRegName(r, width, false); }
+        std::string reg(PhysReg r, std::uint32_t width) {
+            return std::string("%") + physRegName(r, width, false);
+        }
 
         std::string operandText(const MachineFunction &mf, const MachineOperand &op) {
             switch (op.kind) {
@@ -78,10 +79,15 @@ namespace zust::codegen::machine {
         // Intel dest-first internally, so the common case is "reverse it".
         std::vector<std::size_t> attOrder(const std::string &mnemonic, std::size_t count) {
             std::vector<std::size_t> order(count);
-            for (std::size_t i = 0; i < count; ++i) order[i] = count - 1 - i;
-            if (mnemonic == "lea" || mnemonic == "call" || mnemonic == "jmp" || mnemonic.rfind('j', 0) == 0 ||
-                count <= 1)
-                for (std::size_t i = 0; i < count; ++i) order[i] = i;
+            for (std::size_t i = 0; i < count; ++i)
+                order[i] = count - 1 - i;
+            // `lea` is stored dest-first in MachineIR's canonical (Intel)
+            // order like every other 2-operand instruction, so it reverses
+            // to source-first for AT&T too -- only the operand-less and
+            // single-operand control-flow mnemonics stay as-is.
+            if (mnemonic == "call" || mnemonic == "jmp" || mnemonic.rfind('j', 0) == 0 || count <= 1)
+                for (std::size_t i = 0; i < count; ++i)
+                    order[i] = i;
             return order;
         }
 
@@ -103,9 +109,11 @@ namespace zust::codegen::machine {
                 }
             };
             if (saving) {
-                for (std::size_t i = 0; i < mf.calleeSavedUsed.size(); ++i) emitOne(i);
+                for (std::size_t i = 0; i < mf.calleeSavedUsed.size(); ++i)
+                    emitOne(i);
             } else {
-                for (std::size_t i = mf.calleeSavedUsed.size(); i-- > 0;) emitOne(i);
+                for (std::size_t i = mf.calleeSavedUsed.size(); i-- > 0;)
+                    emitOne(i);
             }
         }
 
@@ -132,6 +140,21 @@ namespace zust::codegen::machine {
                     if (inst.mnemonic == "ret")
                         printEpilogue(mf, out);
                     std::string mnemonic = inst.mnemonic;
+                    // Width-changing moves: AT&T spells the source and
+                    // destination widths into the mnemonic itself
+                    // (`movslq`, `movzbl`, ...) rather than as a single
+                    // trailing suffix. operands[0] is the (wider)
+                    // destination, operands[1] the (narrower) source.
+                    if ((mnemonic == "movzx" || mnemonic == "movsx" || mnemonic == "movsxd") &&
+                        inst.operands.size() == 2) {
+                        char dstS = suffixFor(inst.operands[0].widthBits);
+                        char srcS = suffixFor(inst.operands[1].widthBits);
+                        mnemonic =
+                            (mnemonic == "movzx" ? "movz" : "movs") + std::string(1, srcS) + std::string(1, dstS);
+                        out << "    " << mnemonic << " " << operandText(mf, inst.operands[1]) << ", "
+                            << operandText(mf, inst.operands[0]) << "\n";
+                        continue;
+                    }
                     if (!isTextOperandless(mnemonic) && takesSuffix(mnemonic) && !inst.operands.empty()) {
                         // Suffix from the widest explicit operand -- always
                         // correct for this pipeline's own same-width
@@ -168,7 +191,11 @@ namespace zust::codegen::machine {
             if (g.hasInit)
                 continue;
             std::uint32_t bytes = m.layout().sizeOfBytes(m.types(), g.type);
-            out << sanitizeSymbol(g.name) << ":\n    ." << (bytes == 8 ? "quad" : bytes == 4 ? "long" : bytes == 2 ? "word" : "byte")
+            out << sanitizeSymbol(g.name) << ":\n    ."
+                << (bytes == 8   ? "quad"
+                    : bytes == 4 ? "long"
+                    : bytes == 2 ? "word"
+                                 : "byte")
                 << " 0\n";
         }
 
@@ -189,7 +216,8 @@ namespace zust::codegen::machine {
         }
 
         out << "\n    .text\n";
-        for (const MachineFunction &mf : externs) out << "    .extern " << mf.name << "\n";
+        for (const MachineFunction &mf : externs)
+            out << "    .extern " << mf.name << "\n";
         out << "\n";
 
         for (const MachineFunction &mf : funcs) {

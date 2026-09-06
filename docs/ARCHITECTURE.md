@@ -1,6 +1,18 @@
 # zpiler Architecture
 
-## Current pipeline (as of today)
+> **Status (Wave 6 complete).** The five-stage ZIR pipeline described under
+> *Target pipeline* below has landed for all three backends. Every backend now
+> consumes ZIR: `ZirLlvmBackend` for `llvm-ir`, and the shared x86 machine
+> layer (`X86InstSel → LinearScan → FrameLayout → AsmWriter{Att,Intel}`)
+> against a `TargetABI` value (`SysVAbi` / `Win64Abi`) for the two native
+> targets, at every optimization level `-O0`–`-O3`. The legacy AST-walking
+> `CodeGen{Linux,Windows,LLVM}` emitters and `RegisterAllocator` have been
+> deleted. What remains of the old coupling: the parser still builds the
+> `ScopeContext` chain and the `FunctionScope` frame API / `NameMapper` are
+> not yet removed (PRD-ZIR Wave 7.1). The diagram immediately below is kept
+> for historical context.
+
+## Original pipeline (pre-ZIR, for context)
 
 ```
                  .zz source text

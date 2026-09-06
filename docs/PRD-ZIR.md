@@ -99,9 +99,12 @@ goldens do NOT exercise but a naive rewrite would still change). Get these into
       false via LLVM's ordered predicates) is unreachable today — decide the ZIR
       `fcmp` semantics deliberately rather than let it fall out of whichever
       backend is written first.
-- [ ] **Variadic calls** — SysV sets `al` to the vector-arg count; Win64 duplicates
+- [x] **Variadic calls** — SysV sets `al` to the vector-arg count; Win64 duplicates
       float args into the paired GPR at the same index. Every one of the 40 cases
-      calls `printf`, so this is on the critical path everywhere.
+      calls `printf`, so this is on the critical path everywhere. Both rules live
+      in `X86InstSel::selectCall` behind `TargetABI::variadicRule`; SysV's
+      independent GPR/XMM argument counters vs Win64's shared slots are
+      `placeArgs()` behind `TargetABI::sharedArgSlots`.
 - [x] **Boolean representation.** Decide once: **`i1` in ZIR, 1 byte in memory**,
       with explicit `zext`/`trunc` at every load/store boundary, and lower every
       condition as `icmp ne <ty> %v, 0` (matches the natives' "test the whole
@@ -124,8 +127,9 @@ goldens do NOT exercise but a naive rewrite would still change). Get these into
 - [x] **Integer widening picks `zext` vs `sext` by the *source* type's
       signedness**, matching `castValue`'s existing split — getting this backwards
       at a variadic boundary turns a wrapped `uint8_t` value like `255` into `-1`.
-- [ ] **DCE must treat calls as side-effecting**, or `-O1` deletes the `printf`
-      every golden depends on.
+- [x] **DCE must treat calls as side-effecting**, or `-O1` deletes the `printf`
+      every golden depends on. (Verified: 40/40 green at `-O1`/`-O2`/`-O3` on
+      Linux and Windows.)
 - [x] The three `tests/expected/runtime/variables.{linux,llvm,windows}.stdout`
       overrides are confirmed byte-identical to the shared `variables.stdout` —
       they are `--bless` residue, not a real per-backend divergence. Leave them
@@ -251,11 +255,18 @@ what stands in for the ZIR interpreter this rewrite deliberately skips.
 
 ## Wave 6 — the native targets (the Linux/Windows split point)
 
-- [ ] **6.1 [L]** `SysVAbi.cpp` — the `TargetABI` value for SysV: 6 int arg regs
+- [x] **6.1 [L]** `SysVAbi.cpp` — the `TargetABI` value for SysV: 6 int arg regs
       (`rdi rsi rdx rcx r8 r9`), independent GPR/XMM argument counters, 8 XMM arg
       regs, callee-saved `rbx r12-r15`, 128-byte red zone, no shadow space,
-      variadic rule = `al` holds the vector-arg count, AT&T syntax. *Exit:*
-      `TARGET=linux pytest -q` green (40/40) at `-O0`.
+      variadic rule = `al` holds the vector-arg count, AT&T syntax. Shares every
+      line of the Wave 5 machine layer with `Win64Abi`; the only shared-layer
+      code the two ABIs' difference touched was `X86InstSel`'s argument slot
+      assignment (now `placeArgs()` behind `sharedArgSlots`) and three AT&T
+      writer fixes (`lea` operand order, `movz/movs` width-in-mnemonic
+      spelling). SysV has no callee-saved XMM, so the allocatable XMM pool is
+      caller-saved `xmm8-xmm13` — sound only because `-O0`/mem2reg + block-local
+      live ranges never leave a bare float SSA value across a call (documented
+      in `SysVAbi.cpp`). *Exit:* `TARGET=linux pytest -q` green (40/40) at `-O0`.
 - [x] **6.2 [W]** `Win64Abi.cpp` — the `TargetABI` value for Win64: 4 int arg regs
       (`rcx rdx r8 r9`), **shared** GPR/XMM argument slots (slot N is one or the
       other, never both), callee-saved `rbx rdi rsi r12-r15` + `xmm6-xmm15`,
@@ -264,7 +275,11 @@ what stands in for the ZIR interpreter this rewrite deliberately skips.
       plan** — see Risks below. *Exit:* `TARGET=windows pytest -q` green (40/40)
       at `-O0`. Registered as the default `x86_64-mswin` backend at every
       optimization level (see 6.4 for how `-O1`+ was made sound).
-- [ ] **6.3 [L]** Raise Linux through `-O1`/`-O2`/`-O3`.
+- [x] **6.3 [L]** Raise Linux through `-O1`/`-O2`/`-O3`. No Linux-specific work
+      was needed: Wave 6.4's target-neutral `computeCrossBlockValues()` /
+      dedicated-slot handling in `X86InstSel` already makes mem2reg's
+      cross-block values sound for any backend. *Exit:* `TARGET=linux pytest -q`
+      green (40/40) at `-O0`, `-O1`, `-O2`, and `-O3`.
 - [x] **6.4 [W]** Raise Windows through `-O1`/`-O2`/`-O3`. `LiveIntervals`/
       `LinearScan` (5.3/5.4) are still deliberately scoped to block-local live
       ranges — that didn't change — but `-O1`'s `mem2reg` breaks the assumption
@@ -307,20 +322,32 @@ even for a 32-bit signed division.
 
 ## Wave 7 — cleanup
 
-- [ ] **7.1 [S]** Delete `CodeGenLinux.cpp`, `CodeGenWindows.cpp`, `CodeGen.hpp`,
-      `CodeGen.cpp`, `RegisterAllocator.*`, the `FunctionScope` frame API,
-      `NameMapper`, `GLOBAL_NAME_MAPPER`, `test_runner.py`,
-      `generate_expected_outputs.py` (ROADMAP M0-6).
-- [ ] **7.2 [S]** Add an `OPT` axis to `conftest.py` (`OPT=0,1,2,3`), parametrized
-      alongside `TARGET` — full matrix is 40 × 3 × 4 = 480 cells, run by default.
-- [ ] **7.3 [S]** CI gate: the constraint-5 grep, plus a check that
-      `git diff --stat -- tests/ ':!tests/zir' ':!tests/conftest.py'
-      ':!tests/test_pipeline.py'` is empty against the branch point.
-- [ ] **7.4 [S]** Refresh `docs/ARCHITECTURE.md`'s pipeline diagram and tick
-      M3/M4/M5 in `docs/ROADMAP.md`. Reconcile `docs/IR-DESIGN.md`'s pass-manager
-      table (it currently places `inline`/`licm` at `-O2`; this PRD places them
-      at `-O3`) and `docs/CONVENTIONS.md` (still directs ABI data into
-      `RegisterAllocator`, a file this plan deletes).
+- [~] **7.1 [S]** Deleted `CodeGenLinux.cpp`, `CodeGenWindows.cpp`, `CodeGen.hpp`,
+      `CodeGen.cpp`, `RegisterAllocator.*`, and the now-orphaned `Canaries.hpp`;
+      dropped the `codegen/CodeGen.hpp` include from `RegisterBackends.cpp`.
+      `test_runner.py` / `generate_expected_outputs.py` were already gone.
+      **Still to do:** the `FunctionScope` frame API (`allocateStack`,
+      `allocateSpillSlot`, `getStackOffset`, `getSpillSize`, `freeSpillSlot`)
+      and `NameMapper` / `GLOBAL_NAME_MAPPER` — these are still called from
+      `parser/ScopeContext.cpp` and are entangled with parse-time name
+      resolution, so removing them is its own change with `compile_fail`
+      surface risk. The scope *tree* (`FunctionScope`,
+      `findEnclosingFunctionScope`) stays regardless — Sema and the parser use
+      it for lexical scoping, not frame layout.
+- [x] **7.2 [S]** Added an `OPT` axis to `conftest.py` (`OPT=0,1,2,3`, all four
+      by default), parametrized alongside `TARGET` for `test_runtime` /
+      `test_runtime_fail` — full matrix is 40 × 3 × 4 = 480 cells, run by
+      default. `compile_fail` stays single-run (diagnostics are opt-independent).
+- [x] **7.3 [S]** CI gate: new `guardrails` job in `.github/workflows/test.yml`
+      runs the constraint-5 grep and a frozen-`tests/` diff check
+      (`tests/zir`, `tests/conftest.py`, `tests/test_pipeline.py`, `tests/unit`
+      excepted) against the PR base.
+- [x] **7.4 [S]** `docs/ARCHITECTURE.md` gets a Wave-6-complete status banner
+      above the now-historical "original pipeline" diagram; M3/M4/M5 ticked in
+      `docs/ROADMAP.md` with a done/not-done breakdown each; `docs/CONVENTIONS.md`
+      updated to point ABI data at `TargetABI` values and note `RegisterAllocator`
+      is deleted. `docs/IR-DESIGN.md`'s pass table was already consistent
+      (`inline`/`licm` at `-O3`) — no change needed.
 
 ## Optimization levels
 

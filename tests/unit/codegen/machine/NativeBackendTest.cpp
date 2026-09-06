@@ -7,6 +7,7 @@
 #include "codegen/machine/FrameLayout.hpp"
 #include "codegen/machine/LinearScan.hpp"
 #include "codegen/machine/NativeBackend.hpp"
+#include "codegen/machine/SysVAbi.hpp"
 #include "codegen/machine/Win64Abi.hpp"
 #include "codegen/machine/X86InstSel.hpp"
 #include "lexer/Lexer.hpp"
@@ -79,6 +80,46 @@ TEST_CASE("NativeBackend emits AT&T text for the same trivial function") {
     CHECK(text.find(".text") != std::string::npos);
 }
 
+TEST_CASE("NativeBackend emits SysV AT&T text for the trivial function") {
+    // docs/PRD-ZIR.md Wave 6.1's exit-criterion function, SysV side.
+    Module m = lowerSource(
+        "fn f(x: int64_t) -> int64_t {\n"
+        "    return x + 1;\n"
+        "}\n"
+        "fn main() {\n"
+        "}\n");
+
+    std::ostringstream out;
+    emitNative(m, sysVAbi(), /*intelSyntax=*/false, out);
+    std::string text = out.str();
+    CAPTURE(text);
+
+    CHECK(text.find("zzfn_f:") != std::string::npos);
+    CHECK(text.find("%rdi") != std::string::npos);  // SysV first int arg register
+    CHECK(text.find(".text") != std::string::npos);
+}
+
+TEST_CASE("NativeBackend places SysV arguments on independent GPR/XMM counters") {
+    // Win64 would burn rdx on the float in slot 1 and put `c` in rcx;
+    // SysV keeps separate counters, so `c` is the 2nd int arg (rsi) and
+    // the float is the 1st xmm arg (xmm0).
+    Module m = lowerSource(
+        "fn g(a: int64_t, b: double, c: int64_t) -> int64_t {\n"
+        "    return a + c;\n"
+        "}\n"
+        "fn main() {\n"
+        "}\n");
+
+    std::ostringstream out;
+    emitNative(m, sysVAbi(), /*intelSyntax=*/false, out);
+    std::string text = out.str();
+    CAPTURE(text);
+
+    CHECK(text.find("%rsi") != std::string::npos);   // c -- 2nd int arg, not rdx
+    CHECK(text.find("%xmm0") != std::string::npos);  // b -- 1st xmm arg
+    CHECK(text.find("%rdx") == std::string::npos);   // never touched for arguments
+}
+
 TEST_CASE("NativeBackend mangles a user function whose name collides with an x86 mnemonic") {
     // A regression pin for a real bug: `fn add(...)` produced `add PROC` /
     // `add ENDP`, which MASM garbled against the `add` instruction mnemonic
@@ -140,12 +181,15 @@ TEST_CASE("LinearScan spills when a block has more live values than the allocata
     // and never more than two values are live at once.
     std::ostringstream src;
     src << "extern fn sink(";
-    for (int i = 0; i < 9; ++i) src << (i ? ", " : "") << "a" << i << ": int64_t";
+    for (int i = 0; i < 9; ++i)
+        src << (i ? ", " : "") << "a" << i << ": int64_t";
     src << ") -> none;\n";
     src << "fn sumMany() -> int64_t {\n";
-    for (int i = 0; i < 9; ++i) src << "    let v" << i << ": int64_t = " << i << ";\n";
+    for (int i = 0; i < 9; ++i)
+        src << "    let v" << i << ": int64_t = " << i << ";\n";
     src << "    sink(";
-    for (int i = 0; i < 9; ++i) src << (i ? ", v" : "v") << i;
+    for (int i = 0; i < 9; ++i)
+        src << (i ? ", v" : "v") << i;
     src << ");\n";
     src << "    return v0;\n";
     src << "}\n";

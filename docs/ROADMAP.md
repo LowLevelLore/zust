@@ -159,6 +159,12 @@ and the C backend passes the golden suite.
 
 ## M3 — ZIR: the intermediate representation
 
+**Status: ✅ DONE** (PRD-ZIR Waves 1–3). Typed SSA `Module/Function/BasicBlock/
+Instruction` arenas, block arguments, `alloca`/`load`/`store` locals, verifier,
+textual form + round-trip parser, and AST→ZIR lowering all landed. The
+standalone interpreter was deliberately skipped — `llc` on the LLVM backend
+stands in as the execution oracle (PRD-ZIR Wave 4 rationale).
+
 The centerpiece. Spec lives in `docs/IR-DESIGN.md`. Tracked implementation
 work (spans M3/M4/M5 together — stage isolation, ZIR, and -O0..-O3 land as one
 piece of work) lives in `docs/PRD-ZIR.md`; check it for current progress before
@@ -185,6 +191,13 @@ through the parser; the interpreter agrees with native output on every case.
 ---
 
 ## M4 — Optimization passes
+
+**Status: ✅ DONE** (PRD-ZIR Waves 4.3–4.5). `PassManager`/`AnalysisManager`/
+`DominatorTree` plus `-O1` (mem2reg, constfold, simplifycfg, dce), `-O2`
+(+sccp, gvn, instcombine, tailcall), `-O3` (+inline, licm, loop unroll). Each
+pass has `.zir` unit tests; verifier runs clean after every pass on all 40
+golden cases at every level, on all three backends. Pass-fuzzing / a benchmark
+`-O2`-vs-`-O0` ratio were not pursued (the frozen golden suite is the contract).
 
 All in ZIR. This is why the IR exists.
 
@@ -215,6 +228,18 @@ tests over `.zir` inputs; verifier clean after each pass on the whole test suite
 ---
 
 ## M5 — Backends off ZIR
+
+**Status: ✅ DONE** (PRD-ZIR Waves 4.1–4.2, 5, 6). All three backends consume
+ZIR. `CodeGenLLVM.cpp` deleted (Wave 4.2); `CodeGenLinux.cpp` /
+`CodeGenWindows.cpp` / `RegisterAllocator.*` deleted (Wave 7.1). The two native
+targets are now one shared `X86InstSel → LinearScan → FrameLayout → AsmWriter`
+layer parameterized by a `TargetABI` value (`SysVAbi` / `Win64Abi`), green
+40/40 at `-O0`–`-O3` on both OSes. Not done: instruction-selection tree tiling
+(`a*8+b → lea`), live-range splitting / move coalescing in `LinearScan`, machine
+peephole, and the stack canary (not carried over from the legacy backends).
+`Backend::emit` still takes the AST and lowers internally rather than taking a
+`const zir::Module &` — the interface migration in the last paragraph below is
+still pending.
 
 - **LLVM backend rewrite**: ZIR → LLVM IR is mostly 1:1 once ZIR is SSA. Should
   shrink `CodeGenLLVM.cpp` substantially. Optionally move from textual `.ll` to

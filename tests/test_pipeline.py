@@ -86,6 +86,7 @@ def compile_source(
     asm_out: Path,
     target_config,
     zpiler_path: Path,
+    opt_level: str = "0",
 ) -> tuple[list[str], subprocess.CompletedProcess[bytes]]:
     # ZPILER_EXTRA_ARGS is not a permanent per-target setting -- it's how a
     # PRD wave verifies a codegen path that's still behind a flag before it
@@ -99,6 +100,7 @@ def compile_source(
         str(zpiler_path),
         "--format",
         target_config.zpiler_format,
+        f"-O{opt_level}",
         *extra_args,
         "-o",
         str(asm_out),
@@ -283,9 +285,10 @@ def build_and_run(
     target_config,
     zpiler_path: Path,
     artifacts_root: Path,
+    opt_level: str = "0",
 ) -> subprocess.CompletedProcess[bytes]:
     source = source_root / rel_path
-    case_root = artifacts_root / mode / target_name / rel_path.with_suffix("")
+    case_root = artifacts_root / mode / target_name / f"O{opt_level}" / rel_path.with_suffix("")
     case_root.mkdir(parents=True, exist_ok=True)
 
     asm_out = case_root / f"{source.stem}{target_config.asm_ext}"
@@ -297,6 +300,7 @@ def build_and_run(
         asm_out=asm_out,
         target_config=target_config,
         zpiler_path=zpiler_path,
+        opt_level=opt_level,
     )
     if compile_proc.returncode != 0:
         pytest.fail(
@@ -383,6 +387,7 @@ def load_compile_fail_expected_exit(base: Path, target_name: str) -> tuple[int, 
 def test_runtime(
     rel_path: Path,
     target_name: str,
+    opt_level: str,
     target_config,
     project_root: Path,
     zpiler_path: Path,
@@ -397,6 +402,7 @@ def test_runtime(
         target_config=target_config,
         zpiler_path=zpiler_path,
         artifacts_root=artifacts_root,
+        opt_level=opt_level,
     )
 
     base = expected_base("runtime", rel_path)
@@ -452,6 +458,7 @@ def test_runtime(
 def test_runtime_fail(
     rel_path: Path,
     target_name: str,
+    opt_level: str,
     target_config,
     project_root: Path,
     zpiler_path: Path,
@@ -466,6 +473,7 @@ def test_runtime_fail(
         target_config=target_config,
         zpiler_path=zpiler_path,
         artifacts_root=artifacts_root,
+        opt_level=opt_level,
     )
 
     base = expected_base("runtime_fail", rel_path)

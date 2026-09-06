@@ -84,8 +84,10 @@ Positional children are the current design; when you add a node type:
 - Anything conditional on target must go through the `TargetABI` data struct
   (see `docs/PRD-ZIR.md` / `docs/BACKENDS.md`) — never `#ifdef _WIN64` inside
   lowering logic. (`main.cpp` selecting a default target is the one exception.)
-  `RegisterAllocator` is being replaced by a linear-scan allocator over ZIR and
-  should not gain new target knowledge in the meantime.
+  ABI data lives in `TargetABI` values (`src/codegen/machine/{SysV,Win64}Abi.cpp`),
+  consumed by the shared `X86InstSel`/`LinearScan`/`FrameLayout` layer. The old
+  per-emission `RegisterAllocator` has been deleted; `LinearScan` over ZIR live
+  intervals replaces it.
 - Emit through the provided `std::ostringstream&`, not to `std::cout`.
 - Keep the assembly commented. The existing `# load canary` style comments are
   what makes generated code debuggable; preserve them.

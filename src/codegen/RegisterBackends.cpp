@@ -1,16 +1,17 @@
 // The one file a new backend's registration touches outside its own
-// directory (docs/BACKENDS.md §A.4). Each backend here is a thin adapter --
-// Linux and Windows still wrap the legacy AST-consuming CodeGen* classes;
-// llvm-ir was the first to move (docs/PRD-ZIR.md Wave 4.2) to a real
-// ZIR-consuming backend, wrapping ZirGen + ZirLlvmBackend instead. Backend
-// itself still takes the whole AST either way (that interface migration is
-// later Wave 4+/6 work) -- only what each adapter does with it has changed.
+// directory (docs/BACKENDS.md §A.4). Every backend here is now a thin
+// adapter over the ZIR pipeline: ZirGen lowers the (already type-checked)
+// AST to a ZIR Module, the requested optimization pipeline runs, and a
+// ZIR-consuming emitter renders it -- ZirLlvmBackend for llvm-ir, the
+// shared x86 machine layer (X86InstSel -> LinearScan -> FrameLayout ->
+// AsmWriter) against a TargetABI for the two native targets. The legacy
+// AST-walking CodeGen* emitters were deleted in Wave 7.1.
 #include <sstream>
 
 #include "codegen/Backend.hpp"
-#include "codegen/CodeGen.hpp"
 #include "codegen/ZirLlvmBackend.hpp"
 #include "codegen/machine/NativeBackend.hpp"
+#include "codegen/machine/SysVAbi.hpp"
 #include "codegen/machine/Win64Abi.hpp"
 #include "zir/PassManager.hpp"
 #include "zir/Verifier.hpp"
@@ -52,9 +53,17 @@ namespace zust {
         public:
             const TargetInfo &info() const override { return kInfo; }
 
-            void emit(std::unique_ptr<ASTNode> program, std::ostream &out, int /*optLevel*/) override {
-                CodeGenLinux cg(out);
-                cg.generate(std::move(program));
+            // docs/PRD-ZIR.md Wave 6.1/6.3: the ZIR-consuming native
+            // pipeline (X86InstSel -> LinearScan -> FrameLayout ->
+            // AsmWriterAtt against SysVAbi) at every optimization level,
+            // sharing every line of the Wave 5 machine layer with the
+            // Windows backend and differing only in the TargetABI value
+            // and the AT&T writer choice. The cross-block-value handling
+            // that made -O1+ sound for Windows (Wave 6.4) is target-neutral
+            // and applies here unchanged.
+            void emit(std::unique_ptr<ASTNode> program, std::ostream &out, int optLevel) override {
+                zir::Module mod = lowerOptimizeVerify(*program, "zust", optLevel);
+                codegen::machine::emitNative(mod, codegen::machine::sysVAbi(), /*intelSyntax=*/false, out);
             }
 
             static const TargetInfo kInfo;
@@ -140,18 +149,15 @@ namespace zust {
         // convention to collide with in the first place.
 #if defined(_WIN64)
         const std::vector<std::string> kLlvmAssembleCmd{"clang", "--target=x86_64-w64-mingw32", "-c", "$IN", "-o",
-                                                         "$OUT"};
+                                                        "$OUT"};
 #else
         const std::vector<std::string> kLlvmAssembleCmd{"clang", "-c", "$IN", "-o", "$OUT"};
 #endif
 
-        const TargetInfo LlvmBackend::kInfo{"llvm-ir",
-                                            "Textual LLVM IR",
-                                            ".ll",
-                                            AsmSyntax::None,
-                                            /*isNative=*/false,
-                                            kLlvmAssembleCmd,
-                                            {"gcc", "$IN", "-o", "$OUT", "-no-pie"}};
+        const TargetInfo LlvmBackend::kInfo{
+            "llvm-ir",          "Textual LLVM IR", ".ll",
+            AsmSyntax::None,
+            /*isNative=*/false, kLlvmAssembleCmd,  {"gcc", "$IN", "-o", "$OUT", "-no-pie"}};
 
     }  // namespace
 
