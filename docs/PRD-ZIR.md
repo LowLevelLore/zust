@@ -338,10 +338,9 @@ even for a 32-bit signed division.
       by default), parametrized alongside `TARGET` for `test_runtime` /
       `test_runtime_fail` — full matrix is 40 × 3 × 4 = 480 cells, run by
       default. `compile_fail` stays single-run (diagnostics are opt-independent).
-- [x] **7.3 [S]** CI gate: new `guardrails` job in `.github/workflows/test.yml`
-      runs the constraint-5 grep and a frozen-`tests/` diff check
-      (`tests/zir`, `tests/conftest.py`, `tests/test_pipeline.py`, `tests/unit`
-      excepted) against the PR base.
+- [ ] **7.3 [S]** CI gate: the constraint-5 grep, plus a check that
+      `git diff --stat -- tests/ ':!tests/zir' ':!tests/conftest.py'
+      ':!tests/test_pipeline.py'` is empty against the branch point.
 - [x] **7.4 [S]** `docs/ARCHITECTURE.md` gets a Wave-6-complete status banner
       above the now-historical "original pipeline" diagram; M3/M4/M5 ticked in
       `docs/ROADMAP.md` with a done/not-done breakdown each; `docs/CONVENTIONS.md`
